@@ -25,6 +25,7 @@ pub struct Model {
     pub added_via: String,
     pub is_starred: i32,
     pub is_dismissed: i32,
+    pub is_read: i32,
     pub added_to_ideas_at: Option<DateTimeUtc>,
     pub dismissed_at: Option<DateTimeUtc>,
     pub is_pinned: i32,

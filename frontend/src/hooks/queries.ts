@@ -19,13 +19,25 @@ export type CalendarEvent = {
   location?: string;
 };
 
-export type ArticleIdea = {
+export type IdeaStatus = 'in_progress' | 'stalled' | 'complete';
+
+export type Idea = {
   id: number;
   title: string;
-  notes?: string;
-  sourceUrl?: string;
-  status: 'inbox' | 'planned' | 'drafting' | 'archived';
-  createdAt: string;
+  summary?: string | null;
+  status: IdeaStatus;
+  newsArticleId?: number | null;
+  target?: string | null;
+  tags: string[];
+  notesMarkdown?: string | null;
+  articleTitle?: string | null;
+  articleMarkdown?: string | null;
+  dateAdded: string;
+  dateUpdated: string;
+  dateCompleted?: string | null;
+  dateRemoved?: string | null;
+  priority: number;
+  isPinned: boolean;
 };
 
 export type Job = {
@@ -55,6 +67,7 @@ export type NewsArticle = {
   addedVia?: string;
   isStarred?: boolean;
   isDismissed?: boolean;
+  isRead?: boolean;
   publishedAt?: string;
   addedToIdeasAt?: string;
   dismissedAt?: string;
@@ -175,23 +188,30 @@ export function useUpcomingEvents(horizonMinutes = 480) {
   });
 }
 
-export function useArticleIdeas(status?: ArticleIdea['status']) {
+export function useIdeas(params: {
+  status?: IdeaStatus;
+  includeRemoved?: boolean;
+  search?: string;
+  limit?: number;
+  offset?: number;
+} = {}) {
+  const { status, includeRemoved = false, search, limit = 50, offset = 0 } = params;
   return useQuery({
-    queryKey: ['articleIdeas', status],
+    queryKey: ['ideas', status, includeRemoved, search, limit, offset],
     queryFn: () =>
       invokeWithFallback(
-        'list_article_ideas',
-        status ? { status } : {},
-        [
-          {
-            id: 1,
-            title: 'Build a moderator autopilot',
-            notes: 'Blend Reddit mod actions with calendar events',
-            status: 'inbox',
-            createdAt: new Date().toISOString(),
-          },
-        ] as ArticleIdea[]
+        'list_ideas',
+        { status, include_removed: includeRemoved, search, limit, offset },
+        [] as Idea[]
       ),
+  });
+}
+
+export function useIdea(id?: number) {
+  return useQuery({
+    queryKey: ['idea', id],
+    queryFn: () => invoke<Idea>('get_idea', { id }),
+    enabled: !!id,
   });
 }
 
@@ -235,13 +255,22 @@ export function useNewsArticles(params: {
             id: 1,
             title: 'Mock: Latest AI policy update',
             excerpt: 'Placeholder article while backend is offline.',
-            source_name: 'mock',
+            sourceName: 'mock',
             tags: ['policy'],
-            published_at: new Date().toISOString(),
+            publishedAt: new Date().toISOString(),
+            isRead: false,
           },
         ] as NewsArticle[]
       ),
     staleTime: 1000 * 60,
+  });
+}
+
+export function useNewsArticle(id?: number) {
+  return useQuery({
+    queryKey: ['newsArticle', id],
+    queryFn: () => invoke<NewsArticle>('get_news_article', { id }),
+    enabled: !!id,
   });
 }
 

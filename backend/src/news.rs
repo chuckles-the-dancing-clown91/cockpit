@@ -1,15 +1,18 @@
-use sea_orm::{EntityTrait, QueryFilter, QueryOrder, ColumnTrait, Set, PaginatorTrait, QuerySelect, ActiveModelTrait};
-use reqwest::Client;
-use tracing::{info, warn, error};
-use chrono::Datelike;
 use crate::crypto;
-use crate::news_articles::{self, Entity as EntityNewsArticles};
-use crate::news_sources::{self, Entity as EntityNewsSources};
-use crate::news_settings::{self, Entity as EntityNewsSettings};
-use crate::logging;
 use crate::errors::{AppError, AppResult};
+use crate::logging;
+use crate::news_articles::{self, Entity as EntityNewsArticles};
+use crate::news_settings::{self, Entity as EntityNewsSettings};
+use crate::news_sources::{self, Entity as EntityNewsSources};
 use crate::scheduler::TaskRunResult;
 use crate::AppState;
+use chrono::Datelike;
+use reqwest::Client;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set,
+};
+use tracing::{error, info, warn};
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,6 +35,7 @@ pub struct NewsArticleDto {
     pub added_via: Option<String>,
     pub is_starred: bool,
     pub is_dismissed: bool,
+    pub is_read: bool,
     pub added_to_ideas_at: Option<String>,
     pub dismissed_at: Option<String>,
 }
@@ -147,7 +151,7 @@ struct NewsSourceApiItem {
     description: Option<String>,
 }
 
-fn parse_vec(json: &Option<String>) -> Vec<String> {
+pub(crate) fn parse_vec(json: &Option<String>) -> Vec<String> {
     json.as_ref()
         .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
         .unwrap_or_default()
@@ -195,7 +199,9 @@ fn settings_to_dto(m: news_settings::Model) -> NewsSettingsDto {
     }
 }
 
-fn ensure_news_settings_defaults(model: Option<news_settings::Model>) -> news_settings::ActiveModel {
+fn ensure_news_settings_defaults(
+    model: Option<news_settings::Model>,
+) -> news_settings::ActiveModel {
     if let Some(m) = model {
         m.into()
     } else {
@@ -278,16 +284,24 @@ pub async fn save_news_settings_handler(
         active.language = sea_orm::Set(Some(lang));
     }
     if let Some(v) = input.languages {
-        active.languages = sea_orm::Set(Some(serde_json::to_string(&v).unwrap_or_else(|_| "[]".into())));
+        active.languages = sea_orm::Set(Some(
+            serde_json::to_string(&v).unwrap_or_else(|_| "[]".into()),
+        ));
     }
     if let Some(v) = input.countries {
-        active.countries = sea_orm::Set(Some(serde_json::to_string(&v).unwrap_or_else(|_| "[]".into())));
+        active.countries = sea_orm::Set(Some(
+            serde_json::to_string(&v).unwrap_or_else(|_| "[]".into()),
+        ));
     }
     if let Some(v) = input.categories {
-        active.categories = sea_orm::Set(Some(serde_json::to_string(&v).unwrap_or_else(|_| "[]".into())));
+        active.categories = sea_orm::Set(Some(
+            serde_json::to_string(&v).unwrap_or_else(|_| "[]".into()),
+        ));
     }
     if let Some(v) = input.sources {
-        active.sources = sea_orm::Set(Some(serde_json::to_string(&v).unwrap_or_else(|_| "[]".into())));
+        active.sources = sea_orm::Set(Some(
+            serde_json::to_string(&v).unwrap_or_else(|_| "[]".into()),
+        ));
     }
     if let Some(q) = input.query {
         active.query = sea_orm::Set(Some(q));
@@ -339,6 +353,7 @@ fn article_to_dto(m: news_articles::Model) -> NewsArticleDto {
         added_via: Some(m.added_via),
         is_starred: m.is_starred == 1,
         is_dismissed: m.is_dismissed == 1,
+        is_read: m.is_read == 1,
         published_at: m.published_at.map(|d| d.to_rfc3339()),
         added_to_ideas_at: m.added_to_ideas_at.map(|d| d.to_rfc3339()),
         dismissed_at: m.dismissed_at.map(|d| d.to_rfc3339()),
@@ -358,6 +373,7 @@ pub async fn list_news_articles_handler(
         Some("unread") => {
             query = query
                 .filter(news_articles::Column::DismissedAt.is_null())
+                .filter(news_articles::Column::IsRead.eq(0))
                 .filter(news_articles::Column::AddedToIdeasAt.is_null())
                 .filter(news_articles::Column::IsDismissed.eq(0));
         }
@@ -390,9 +406,22 @@ pub async fn list_news_articles_handler(
     Ok(items.into_iter().map(article_to_dto).collect())
 }
 
+pub async fn get_news_article_handler(
+    id: i64,
+    state: &crate::AppState,
+) -> AppResult<NewsArticleDto> {
+    let model = EntityNewsArticles::find_by_id(id).one(&state.db).await?;
+    let Some(m) = model else {
+        return Err(AppError::Other("not found".into()));
+    };
+    Ok(article_to_dto(m))
+}
+
 pub async fn dismiss_news_article_handler(id: i64, state: &crate::AppState) -> AppResult<()> {
     let model = EntityNewsArticles::find_by_id(id).one(&state.db).await?;
-    let Some(m) = model else { return Err(AppError::Other("not found".into())); };
+    let Some(m) = model else {
+        return Err(AppError::Other("not found".into()));
+    };
     let mut active: news_articles::ActiveModel = m.into();
     active.dismissed_at = sea_orm::Set(Some(chrono::Utc::now()));
     active.is_dismissed = sea_orm::Set(1);
@@ -401,11 +430,32 @@ pub async fn dismiss_news_article_handler(id: i64, state: &crate::AppState) -> A
     Ok(())
 }
 
-pub async fn toggle_star_news_article_handler(id: i64, starred: bool, state: &crate::AppState) -> AppResult<()> {
+pub async fn toggle_star_news_article_handler(
+    id: i64,
+    starred: bool,
+    state: &crate::AppState,
+) -> AppResult<()> {
     let model = EntityNewsArticles::find_by_id(id).one(&state.db).await?;
-    let Some(m) = model else { return Err(AppError::Other("not found".into())); };
+    let Some(m) = model else {
+        return Err(AppError::Other("not found".into()));
+    };
     let mut active: news_articles::ActiveModel = m.into();
     active.is_starred = sea_orm::Set(if starred { 1 } else { 0 });
+    active.updated_at = sea_orm::Set(chrono::Utc::now());
+    active.update(&state.db).await?;
+    Ok(())
+}
+
+pub async fn mark_news_article_read_handler(id: i64, state: &crate::AppState) -> AppResult<()> {
+    let model = EntityNewsArticles::find_by_id(id).one(&state.db).await?;
+    let Some(m) = model else {
+        return Err(AppError::Other("not found".into()));
+    };
+    if m.is_read == 1 {
+        return Ok(());
+    }
+    let mut active: news_articles::ActiveModel = m.into();
+    active.is_read = sea_orm::Set(1);
     active.updated_at = sea_orm::Set(chrono::Utc::now());
     active.update(&state.db).await?;
     Ok(())
@@ -455,7 +505,9 @@ pub async fn list_news_sources_handler(
         .collect())
 }
 
-pub async fn sync_news_now_handler(state: &crate::AppState) -> AppResult<crate::scheduler::RunTaskNowResult> {
+pub async fn sync_news_now_handler(
+    state: &crate::AppState,
+) -> AppResult<crate::scheduler::RunTaskNowResult> {
     info!("news_sync: manual trigger invoked");
     let res = run_news_sync_task(state).await;
     let finished_at = chrono::Utc::now().to_rfc3339();
@@ -472,7 +524,9 @@ pub async fn sync_news_now_handler(state: &crate::AppState) -> AppResult<crate::
     })
 }
 
-pub async fn sync_news_sources_now_handler(state: &crate::AppState) -> AppResult<crate::scheduler::RunTaskNowResult> {
+pub async fn sync_news_sources_now_handler(
+    state: &crate::AppState,
+) -> AppResult<crate::scheduler::RunTaskNowResult> {
     info!("news_sources_sync: manual trigger invoked");
     let res = run_news_sources_sync_task(state).await;
     let finished_at = chrono::Utc::now().to_rfc3339();
@@ -507,19 +561,39 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
                 let mut active = ensure_news_settings_defaults(None);
                 let cipher = match crypto::encrypt_api_key(&env_key) {
                     Ok(c) => c,
-                    Err(e) => return TaskRunResult { status: "error", result_json: None, error_message: Some(e.to_string()) },
+                    Err(e) => {
+                        return TaskRunResult {
+                            status: "error",
+                            result_json: None,
+                            error_message: Some(e.to_string()),
+                        }
+                    }
                 };
                 active.api_key_encrypted = sea_orm::Set(cipher);
                 match active.insert(&state.db).await {
                     Ok(m) => m,
-                    Err(e) => return TaskRunResult { status: "error", result_json: None, error_message: Some(e.to_string()) },
+                    Err(e) => {
+                        return TaskRunResult {
+                            status: "error",
+                            result_json: None,
+                            error_message: Some(e.to_string()),
+                        }
+                    }
                 }
             } else {
-                return TaskRunResult { status: "skipped", result_json: Some("{\"reason\":\"no settings\"}".into()), error_message: None };
+                return TaskRunResult {
+                    status: "skipped",
+                    result_json: Some("{\"reason\":\"no settings\"}".into()),
+                    error_message: None,
+                };
             }
         }
         Err(e) => {
-            return TaskRunResult { status: "error", result_json: None, error_message: Some(e.to_string()) }
+            return TaskRunResult {
+                status: "error",
+                result_json: None,
+                error_message: Some(e.to_string()),
+            }
         }
     };
 
@@ -528,17 +602,33 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
             info!("news_sync: hydrating empty api_key from env");
             let cipher = match crypto::encrypt_api_key(&env_key) {
                 Ok(c) => c,
-                Err(e) => return TaskRunResult { status: "error", result_json: None, error_message: Some(e.to_string()) },
+                Err(e) => {
+                    return TaskRunResult {
+                        status: "error",
+                        result_json: None,
+                        error_message: Some(e.to_string()),
+                    }
+                }
             };
             let mut active: news_settings::ActiveModel = settings.clone().into();
             active.api_key_encrypted = sea_orm::Set(cipher);
             active.updated_at = sea_orm::Set(chrono::Utc::now());
             settings = match active.update(&state.db).await {
                 Ok(m) => m,
-                Err(e) => return TaskRunResult { status: "error", result_json: None, error_message: Some(e.to_string()) },
+                Err(e) => {
+                    return TaskRunResult {
+                        status: "error",
+                        result_json: None,
+                        error_message: Some(e.to_string()),
+                    }
+                }
             };
         } else {
-            return TaskRunResult { status: "skipped", result_json: Some("{\"reason\":\"no api key\"}".into()), error_message: None };
+            return TaskRunResult {
+                status: "skipped",
+                result_json: Some("{\"reason\":\"no api key\"}".into()),
+                error_message: None,
+            };
         }
     }
 
@@ -559,7 +649,11 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
     let daily_limit = settings.daily_call_limit;
     let mut allowed = daily_limit - calls_today;
     if allowed <= 0 {
-        return TaskRunResult { status: "skipped", result_json: Some("{\"reason\":\"daily limit reached\"}".into()), error_message: None };
+        return TaskRunResult {
+            status: "skipped",
+            result_json: Some("{\"reason\":\"daily limit reached\"}".into()),
+            error_message: None,
+        };
     }
     allowed = allowed.min(3);
 
@@ -570,7 +664,11 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
     let api_key = match crypto::decrypt_api_key(&settings.api_key_encrypted) {
         Ok(k) => k,
         Err(e) => {
-            return TaskRunResult { status: "error", result_json: None, error_message: Some(format!("decrypt api key failed: {e}")) }
+            return TaskRunResult {
+                status: "error",
+                result_json: None,
+                error_message: Some(format!("decrypt api key failed: {e}")),
+            }
         }
     };
 
@@ -580,9 +678,7 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
     let mut next_page: Option<String> = None;
 
     for _ in 0..allowed {
-        let mut req = client
-            .get(endpoint)
-            .query(&[("apikey", api_key.as_str())]);
+        let mut req = client.get(endpoint).query(&[("apikey", api_key.as_str())]);
         if let Some(lang) = &settings.language {
             if !lang.trim().is_empty() {
                 req = req.query(&[("language", lang.trim())]);
@@ -624,14 +720,22 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
         let resp = match req.send().await {
             Ok(r) => r,
             Err(e) => {
-                return TaskRunResult { status: "error", result_json: None, error_message: Some(e.to_string()) }
+                return TaskRunResult {
+                    status: "error",
+                    result_json: None,
+                    error_message: Some(e.to_string()),
+                }
             }
         };
         let status_code = resp.status();
         let text = match resp.text().await {
             Ok(t) => t,
             Err(e) => {
-                return TaskRunResult { status: "error", result_json: None, error_message: Some(format!("http {} body read failed: {}", status_code, e)) }
+                return TaskRunResult {
+                    status: "error",
+                    result_json: None,
+                    error_message: Some(format!("http {} body read failed: {}", status_code, e)),
+                }
             }
         };
         let body: NewsApiResponse = match serde_json::from_str(&text) {
@@ -642,11 +746,19 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
                 return TaskRunResult {
                     status: "error",
                     result_json: None,
-                    error_message: Some(format!("parse failed (status {}): {}; body preview: {}", status_code, e, preview)),
+                    error_message: Some(format!(
+                        "parse failed (status {}): {}; body preview: {}",
+                        status_code, e, preview
+                    )),
                 };
             }
         };
-        logging::log_api_call("news_sync", endpoint, status_code, &text.chars().take(512).collect::<String>());
+        logging::log_api_call(
+            "news_sync",
+            endpoint,
+            status_code,
+            &text.chars().take(512).collect::<String>(),
+        );
         calls_used += 1;
         if let Some(res_list) = body.results {
             for art in res_list {
@@ -792,7 +904,8 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
     TaskRunResult {
         status: "success",
         result_json: Some(
-            serde_json::json!({"inserted": inserted, "updated": updated, "callsUsed": calls_used}).to_string(),
+            serde_json::json!({"inserted": inserted, "updated": updated, "callsUsed": calls_used})
+                .to_string(),
         ),
         error_message: None,
     }
@@ -808,17 +921,31 @@ pub async fn run_news_sources_sync_task(state: &crate::AppState) -> TaskRunResul
 
     let settings = match settings {
         Ok(Some(s)) => s,
-        _ => return TaskRunResult { status: "skipped", result_json: Some("{\"reason\":\"no settings\"}".into()), error_message: None },
+        _ => {
+            return TaskRunResult {
+                status: "skipped",
+                result_json: Some("{\"reason\":\"no settings\"}".into()),
+                error_message: None,
+            }
+        }
     };
 
     if settings.api_key_encrypted.is_empty() {
-        return TaskRunResult { status: "skipped", result_json: Some("{\"reason\":\"no api key\"}".into()), error_message: None };
+        return TaskRunResult {
+            status: "skipped",
+            result_json: Some("{\"reason\":\"no api key\"}".into()),
+            error_message: None,
+        };
     }
 
     let api_key = match crypto::decrypt_api_key(&settings.api_key_encrypted) {
         Ok(k) => k,
         Err(e) => {
-            return TaskRunResult { status: "error", result_json: None, error_message: Some(format!("decrypt api key failed: {e}")) }
+            return TaskRunResult {
+                status: "error",
+                result_json: None,
+                error_message: Some(format!("decrypt api key failed: {e}")),
+            }
         }
     };
 
@@ -849,27 +976,62 @@ pub async fn run_news_sources_sync_task(state: &crate::AppState) -> TaskRunResul
 
         let resp = match req.send().await {
             Ok(r) => r,
-            Err(e) => return TaskRunResult { status: "error", result_json: None, error_message: Some(e.to_string()) },
+            Err(e) => {
+                return TaskRunResult {
+                    status: "error",
+                    result_json: None,
+                    error_message: Some(e.to_string()),
+                }
+            }
         };
         let status = resp.status();
         let text = match resp.text().await {
             Ok(t) => t,
-            Err(e) => return TaskRunResult { status: "error", result_json: None, error_message: Some(e.to_string()) },
+            Err(e) => {
+                return TaskRunResult {
+                    status: "error",
+                    result_json: None,
+                    error_message: Some(e.to_string()),
+                }
+            }
         };
         if !status.is_success() {
             let preview: String = text.chars().take(320).collect();
-            logging::log_api_call("news_sources_sync", "https://newsdata.io/api/1/sources", status, &preview);
-            return TaskRunResult { status: "error", result_json: None, error_message: Some(format!("http {}: {}", status, preview)) };
+            logging::log_api_call(
+                "news_sources_sync",
+                "https://newsdata.io/api/1/sources",
+                status,
+                &preview,
+            );
+            return TaskRunResult {
+                status: "error",
+                result_json: None,
+                error_message: Some(format!("http {}: {}", status, preview)),
+            };
         }
         let body: NewsSourceApiResponse = match serde_json::from_str(&text) {
             Ok(b) => b,
             Err(e) => {
                 let preview: String = text.chars().take(320).collect();
-                logging::log_api_call("news_sources_sync", "https://newsdata.io/api/1/sources", status, &preview);
-                return TaskRunResult { status: "error", result_json: None, error_message: Some(format!("parse: {}; body: {}", e, preview)) };
+                logging::log_api_call(
+                    "news_sources_sync",
+                    "https://newsdata.io/api/1/sources",
+                    status,
+                    &preview,
+                );
+                return TaskRunResult {
+                    status: "error",
+                    result_json: None,
+                    error_message: Some(format!("parse: {}; body: {}", e, preview)),
+                };
             }
         };
-        logging::log_api_call("news_sources_sync", "https://newsdata.io/api/1/sources", status, &text.chars().take(512).collect::<String>());
+        logging::log_api_call(
+            "news_sources_sync",
+            "https://newsdata.io/api/1/sources",
+            status,
+            &text.chars().take(512).collect::<String>(),
+        );
 
         if let Some(list) = body.results {
             for item in list {
@@ -933,7 +1095,8 @@ pub async fn run_news_sources_sync_task(state: &crate::AppState) -> TaskRunResul
     TaskRunResult {
         status: "success",
         result_json: Some(
-            serde_json::json!({"sourcesSeen": seen, "inserted": inserted, "updated": updated}).to_string(),
+            serde_json::json!({"sourcesSeen": seen, "inserted": inserted, "updated": updated})
+                .to_string(),
         ),
         error_message: None,
     }
