@@ -22,10 +22,17 @@ export type CalendarEvent = {
 export type ArticleIdea = {
   id: number;
   title: string;
+  status: 'inbox' | 'planned' | 'drafting' | 'archived';
+  priority?: 'low' | 'normal' | 'high';
+  isPinned?: boolean;
+  articleMarkdown?: string;
+  notesMarkdown?: string;
   notes?: string;
   sourceUrl?: string;
-  status: 'inbox' | 'planned' | 'drafting' | 'archived';
-  createdAt: string;
+  newsArticleId?: number | null;
+  newsArticle?: NewsArticle;
+  createdAt?: string;
+  dateRemoved?: string | null;
 };
 
 export type Job = {
@@ -176,23 +183,53 @@ export function useUpcomingEvents(horizonMinutes = 480) {
   });
 }
 
-export function useArticleIdeas(status?: ArticleIdea['status']) {
+function normalizeIdea(raw: any): ArticleIdea {
+  return {
+    id: raw.id,
+    title: raw.title ?? 'Untitled idea',
+    status: raw.status ?? 'inbox',
+    priority: raw.priority ?? raw.idea_priority ?? 'normal',
+    isPinned: raw.is_pinned ?? raw.pinned ?? false,
+    articleMarkdown: raw.article_markdown ?? raw.articleMarkdown ?? '',
+    notesMarkdown: raw.notes_markdown ?? raw.notesMarkdown ?? raw.notes ?? '',
+    notes: raw.notes ?? raw.notes_markdown ?? '',
+    sourceUrl: raw.source_url ?? raw.sourceUrl,
+    newsArticleId: raw.news_article_id ?? raw.newsArticleId ?? null,
+    newsArticle: raw.news_article ?? raw.newsArticle,
+    createdAt: raw.created_at ?? raw.createdAt,
+    dateRemoved: raw.date_removed ?? raw.dateRemoved ?? null,
+  } as ArticleIdea;
+}
+
+export function useArticleIdeas(params: { status?: ArticleIdea['status'] | 'all'; search?: string } = {}) {
+  const { status, search } = params;
+  const normalizedStatus = status && status !== 'all' ? status : undefined;
   return useQuery({
-    queryKey: ['articleIdeas', status],
+    queryKey: ['articleIdeas', normalizedStatus, search],
     queryFn: () =>
       invokeWithFallback(
-        'list_article_ideas',
-        status ? { status } : {},
+        'list_ideas',
+        { status: normalizedStatus, search },
         [
           {
             id: 1,
             title: 'Build a moderator autopilot',
-            notes: 'Blend Reddit mod actions with calendar events',
+            notes_markdown: 'Blend Reddit mod actions with calendar events',
             status: 'inbox',
-            createdAt: new Date().toISOString(),
+            article_markdown: '# Draft outline\n- automation\n- safety nets',
+            news_article_id: 42,
+            news_article: {
+              id: 42,
+              title: 'Mock reference article',
+              sourceName: 'mock.news',
+              url: 'https://example.com/mock',
+              tags: ['ai'],
+              country: [],
+            },
+            created_at: new Date().toISOString(),
           },
         ] as ArticleIdea[]
-      ),
+      ).then((ideas) => ideas.map(normalizeIdea)),
   });
 }
 
