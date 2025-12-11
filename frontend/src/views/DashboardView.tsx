@@ -266,12 +266,23 @@ function IdeasPanel({ ideas, loading }: { ideas: ArticleIdea[]; loading?: boolea
             />
           ))
         ) : ideas.length ? (
-          ideas.map((idea) => (
-            <div key={idea.id} className="p-3 rounded-[var(--radius-button)] bg-[var(--color-surface-soft)] border border-[var(--color-border-subtle)]">
-              <div className="font-semibold text-[var(--color-text-primary)]">{idea.title}</div>
-              {idea.notes ? <div className="text-[var(--color-text-soft)] text-xs">{idea.notes}</div> : null}
-            </div>
-          ))
+          ideas.map((idea) => {
+            const summary = idea.summary || idea.notesMarkdown || idea.articleTitle;
+            return (
+              <div
+                key={idea.id}
+                className="p-3 rounded-[var(--radius-button)] bg-[var(--color-surface-soft)] border border-[var(--color-border-subtle)]"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="font-semibold text-[var(--color-text-primary)]">{idea.title}</div>
+                  <span className="text-[11px] px-2 py-1 rounded-full bg-[var(--color-surface-strong)] text-[var(--color-text-soft)] capitalize">
+                    {idea.status.replace('_', ' ')}
+                  </span>
+                </div>
+                {summary ? <div className="text-[var(--color-text-soft)] text-xs mt-1">{summary}</div> : null}
+              </div>
+            );
+          })
         ) : (
           <div className="text-[var(--color-text-muted)]">No ideas yet.</div>
         )}

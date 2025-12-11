@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 export type FeedItem = {
   id: string;
@@ -22,6 +22,52 @@ export type CalendarEvent = {
 export type ArticleIdea = {
   id: number;
   title: string;
+  summary?: string | null;
+  status: 'in_progress' | 'stalled' | 'complete';
+  newsArticleId?: number | null;
+  target?: string | null;
+  tags: string[];
+  notesMarkdown?: string | null;
+  articleTitle?: string | null;
+  articleMarkdown?: string | null;
+  dateAdded?: string;
+  dateUpdated?: string | null;
+  dateCompleted?: string | null;
+  dateRemoved?: string | null;
+  priority?: number | null;
+  isPinned?: boolean;
+};
+
+export type CreateArticleIdeaInput = {
+  title: string;
+  summary?: string;
+  newsArticleId?: number;
+  target?: string;
+  tags?: string[];
+  priority?: number;
+};
+
+export type UpdateArticleIdeaMetadataInput = {
+  id: number;
+  title?: string;
+  summary?: string | null;
+  status?: ArticleIdea['status'];
+  newsArticleId?: number | null;
+  target?: string | null;
+  tags?: string[];
+  priority?: number | null;
+  isPinned?: boolean;
+};
+
+export type UpdateArticleIdeaNotesInput = {
+  id: number;
+  notesMarkdown: string;
+};
+
+export type UpdateArticleIdeaArticleInput = {
+  id: number;
+  articleTitle?: string | null;
+  articleMarkdown?: string | null;
   status: 'inbox' | 'planned' | 'drafting' | 'archived';
   priority?: 'low' | 'normal' | 'high';
   isPinned?: boolean;
