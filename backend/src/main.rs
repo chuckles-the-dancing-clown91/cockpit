@@ -348,6 +348,7 @@ fn main() {
             get_news_settings,
             save_news_settings,
             list_news_articles,
+            get_news_article,
             dismiss_news_article,
             toggle_star_news_article,
             mark_news_article_read,

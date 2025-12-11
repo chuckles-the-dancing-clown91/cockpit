@@ -151,7 +151,7 @@ struct NewsSourceApiItem {
     description: Option<String>,
 }
 
-fn parse_vec(json: &Option<String>) -> Vec<String> {
+pub(crate) fn parse_vec(json: &Option<String>) -> Vec<String> {
     json.as_ref()
         .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
         .unwrap_or_default()
@@ -404,6 +404,17 @@ pub async fn list_news_articles_handler(
         .all(&state.db)
         .await?;
     Ok(items.into_iter().map(article_to_dto).collect())
+}
+
+pub async fn get_news_article_handler(
+    id: i64,
+    state: &crate::AppState,
+) -> AppResult<NewsArticleDto> {
+    let model = EntityNewsArticles::find_by_id(id).one(&state.db).await?;
+    let Some(m) = model else {
+        return Err(AppError::Other("not found".into()));
+    };
+    Ok(article_to_dto(m))
 }
 
 pub async fn dismiss_news_article_handler(id: i64, state: &crate::AppState) -> AppResult<()> {

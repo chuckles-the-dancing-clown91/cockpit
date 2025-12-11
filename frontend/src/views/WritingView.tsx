@@ -123,7 +123,15 @@ export function WritingView() {
       <Card className="flex flex-col gap-3 overflow-hidden">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Ideas</h3>
-          <Button variant="ghost" size="sm" className="border border-[var(--color-border)]">New</Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="border border-[var(--color-border)]"
+            onClick={() => createIdea.mutate()}
+            disabled={createIdea.isLoading}
+          >
+            New
+          </Button>
         </div>
         <Tabs value={status} onValueChange={(value) => setStatus(value as ArticleIdea['status'] | 'all')}>
           <TabsList className="w-full justify-start overflow-x-auto">

@@ -438,6 +438,56 @@ pub async fn init_db(db_url: &str) -> Result<DatabaseConnection, AppError> {
     ))
     .await?;
 
+    let create_ideas: TableCreateStatement = Table::create()
+        .table(ideas::Entity.table_ref())
+        .if_not_exists()
+        .col(
+            ColumnDef::new(ideas::Column::Id)
+                .integer()
+                .primary_key()
+                .auto_increment()
+                .not_null(),
+        )
+        .col(ColumnDef::new(ideas::Column::Title).string().not_null())
+        .col(ColumnDef::new(ideas::Column::Summary).string())
+        .col(ColumnDef::new(ideas::Column::Status).string().not_null())
+        .col(ColumnDef::new(ideas::Column::NewsArticleId).integer())
+        .col(ColumnDef::new(ideas::Column::Target).string())
+        .col(ColumnDef::new(ideas::Column::Tags).string())
+        .col(ColumnDef::new(ideas::Column::NotesMarkdown).string())
+        .col(ColumnDef::new(ideas::Column::ArticleTitle).string())
+        .col(ColumnDef::new(ideas::Column::ArticleMarkdown).string())
+        .col(
+            ColumnDef::new(ideas::Column::DateAdded)
+                .date_time()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(ideas::Column::DateUpdated)
+                .date_time()
+                .not_null(),
+        )
+        .col(ColumnDef::new(ideas::Column::DateCompleted).date_time())
+        .col(ColumnDef::new(ideas::Column::DateRemoved).date_time())
+        .col(
+            ColumnDef::new(ideas::Column::Priority)
+                .integer()
+                .not_null()
+                .default(0),
+        )
+        .col(
+            ColumnDef::new(ideas::Column::IsPinned)
+                .integer()
+                .not_null()
+                .default(0),
+        )
+        .to_owned();
+    db.execute(Statement::from_string(
+        builder,
+        create_ideas.to_string(SqliteQueryBuilder),
+    ))
+    .await?;
+
     // Lightweight column backfills for existing installs
     let _ = db
         .execute(Statement::from_sql_and_values(

@@ -19,7 +19,9 @@ export type CalendarEvent = {
   location?: string;
 };
 
-export type ArticleIdea = {
+export type IdeaStatus = 'in_progress' | 'stalled' | 'complete';
+
+export type Idea = {
   id: number;
   title: string;
   summary?: string | null;
@@ -279,6 +281,14 @@ export function useArticleIdeas(params: { status?: ArticleIdea['status'] | 'all'
   });
 }
 
+export function useIdea(id?: number) {
+  return useQuery({
+    queryKey: ['idea', id],
+    queryFn: () => invoke<Idea>('get_idea', { id }),
+    enabled: !!id,
+  });
+}
+
 export function useScheduledJobs() {
   return useQuery({
     queryKey: ['scheduledJobs'],
@@ -347,6 +357,14 @@ export function useNewsArticles(params: {
         })()
       ),
     staleTime: 1000 * 60,
+  });
+}
+
+export function useNewsArticle(id?: number) {
+  return useQuery({
+    queryKey: ['newsArticle', id],
+    queryFn: () => invoke<NewsArticle>('get_news_article', { id }),
+    enabled: !!id,
   });
 }
 
