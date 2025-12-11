@@ -39,3 +39,9 @@ coverage
 
 # Logs
 *.log
+
+# Runtime storage (SQLite DBs, logs)
+backend/storage/data/
+backend/storage/logs/
+storage/data/
+storage/logs/
