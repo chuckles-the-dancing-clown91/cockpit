@@ -1,9 +1,11 @@
-use std::path::PathBuf;
-use sea_orm::{ConnectOptions, Database, DatabaseConnection, Schema, Statement, ConnectionTrait, EntityName};
-use sea_orm::sea_query::{ColumnDef, SqliteQueryBuilder, Table, TableCreateStatement};
-use sea_orm::prelude::Expr;
-use crate::{news_articles, news_settings, news_sources, system_task_runs, system_tasks};
 use crate::errors::AppError;
+use crate::{news_articles, news_settings, news_sources, system_task_runs, system_tasks};
+use sea_orm::prelude::Expr;
+use sea_orm::sea_query::{ColumnDef, SqliteQueryBuilder, Table, TableCreateStatement};
+use sea_orm::{
+    ConnectOptions, ConnectionTrait, Database, DatabaseConnection, EntityName, Schema, Statement,
+};
+use std::path::PathBuf;
 
 pub async fn init_db_from_env() -> Result<DatabaseConnection, AppError> {
     let db_path = std::env::var("COCKPIT_DB_PATH").unwrap_or_else(|_| "cockpit.sqlite".into());
@@ -22,14 +24,21 @@ pub async fn init_db(db_url: &str) -> Result<DatabaseConnection, AppError> {
             if let Some(parent) = PathBuf::from(path).parent() {
                 std::fs::create_dir_all(parent)?;
             }
-            let _ = std::fs::OpenOptions::new().create(true).write(true).open(path)?;
+            let _ = std::fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(path)?;
         }
     } else {
-        return Err(AppError::Config(format!("Only sqlite is supported currently. DATABASE_URL={db_url}")));
+        return Err(AppError::Config(format!(
+            "Only sqlite is supported currently. DATABASE_URL={db_url}"
+        )));
     }
 
     let mut opt = ConnectOptions::new(db_url.to_string());
-    opt.max_connections(5).min_connections(1).sqlx_logging(false);
+    opt.max_connections(5)
+        .min_connections(1)
+        .sqlx_logging(false);
     let db = Database::connect(opt).await?;
 
     let builder = db.get_database_backend();
@@ -45,9 +54,21 @@ pub async fn init_db(db_url: &str) -> Result<DatabaseConnection, AppError> {
                 .primary_key()
                 .auto_increment(),
         )
-        .col(ColumnDef::new(system_tasks::Column::Name).string().not_null())
-        .col(ColumnDef::new(system_tasks::Column::TaskType).string().not_null())
-        .col(ColumnDef::new(system_tasks::Column::Component).string().not_null())
+        .col(
+            ColumnDef::new(system_tasks::Column::Name)
+                .string()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(system_tasks::Column::TaskType)
+                .string()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(system_tasks::Column::Component)
+                .string()
+                .not_null(),
+        )
         .col(ColumnDef::new(system_tasks::Column::FrequencyCron).string())
         .col(ColumnDef::new(system_tasks::Column::FrequencySeconds).integer())
         .col(
@@ -101,24 +122,63 @@ pub async fn init_db(db_url: &str) -> Result<DatabaseConnection, AppError> {
     let create_runs: TableCreateStatement = Table::create()
         .table(system_task_runs::Entity.table_ref())
         .if_not_exists()
-        .col(ColumnDef::new(system_task_runs::Column::Id).integer().primary_key().auto_increment().not_null())
-        .col(ColumnDef::new(system_task_runs::Column::TaskId).integer().not_null())
-        .col(ColumnDef::new(system_task_runs::Column::StartedAt).date_time().not_null())
+        .col(
+            ColumnDef::new(system_task_runs::Column::Id)
+                .integer()
+                .primary_key()
+                .auto_increment()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(system_task_runs::Column::TaskId)
+                .integer()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(system_task_runs::Column::StartedAt)
+                .date_time()
+                .not_null(),
+        )
         .col(ColumnDef::new(system_task_runs::Column::FinishedAt).date_time())
-        .col(ColumnDef::new(system_task_runs::Column::Status).string().not_null())
+        .col(
+            ColumnDef::new(system_task_runs::Column::Status)
+                .string()
+                .not_null(),
+        )
         .col(ColumnDef::new(system_task_runs::Column::Result).string())
         .col(ColumnDef::new(system_task_runs::Column::ErrorMessage).string())
         .to_owned();
-    db.execute(Statement::from_string(builder, create_runs.to_string(SqliteQueryBuilder)))
-        .await?;
+    db.execute(Statement::from_string(
+        builder,
+        create_runs.to_string(SqliteQueryBuilder),
+    ))
+    .await?;
 
     let create_settings: TableCreateStatement = Table::create()
         .table(news_settings::Entity.table_ref())
         .if_not_exists()
-        .col(ColumnDef::new(news_settings::Column::Id).integer().primary_key().auto_increment().not_null())
-        .col(ColumnDef::new(news_settings::Column::UserId).integer().not_null())
-        .col(ColumnDef::new(news_settings::Column::Provider).string().not_null())
-        .col(ColumnDef::new(news_settings::Column::ApiKeyEncrypted).binary().not_null())
+        .col(
+            ColumnDef::new(news_settings::Column::Id)
+                .integer()
+                .primary_key()
+                .auto_increment()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(news_settings::Column::UserId)
+                .integer()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(news_settings::Column::Provider)
+                .string()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(news_settings::Column::ApiKeyEncrypted)
+                .binary()
+                .not_null(),
+        )
         .col(ColumnDef::new(news_settings::Column::Language).string())
         .col(ColumnDef::new(news_settings::Column::Languages).string())
         .col(ColumnDef::new(news_settings::Column::Countries).string())
@@ -129,28 +189,74 @@ pub async fn init_db(db_url: &str) -> Result<DatabaseConnection, AppError> {
         .col(ColumnDef::new(news_settings::Column::FromDate).string())
         .col(ColumnDef::new(news_settings::Column::ToDate).string())
         .col(ColumnDef::new(news_settings::Column::MaxStored).integer())
-        .col(ColumnDef::new(news_settings::Column::MaxArticles).integer().not_null().default(4000))
-        .col(ColumnDef::new(news_settings::Column::DailyCallLimit).integer().not_null().default(180))
-        .col(ColumnDef::new(news_settings::Column::CallsToday).integer().not_null().default(0))
+        .col(
+            ColumnDef::new(news_settings::Column::MaxArticles)
+                .integer()
+                .not_null()
+                .default(4000),
+        )
+        .col(
+            ColumnDef::new(news_settings::Column::DailyCallLimit)
+                .integer()
+                .not_null()
+                .default(180),
+        )
+        .col(
+            ColumnDef::new(news_settings::Column::CallsToday)
+                .integer()
+                .not_null()
+                .default(0),
+        )
         .col(ColumnDef::new(news_settings::Column::LastResetDate).date())
         .col(ColumnDef::new(news_settings::Column::LastSyncedAt).date_time())
-        .col(ColumnDef::new(news_settings::Column::CreatedAt).date_time().not_null().default(Expr::current_timestamp()))
-        .col(ColumnDef::new(news_settings::Column::UpdatedAt).date_time().not_null().default(Expr::current_timestamp()))
+        .col(
+            ColumnDef::new(news_settings::Column::CreatedAt)
+                .date_time()
+                .not_null()
+                .default(Expr::current_timestamp()),
+        )
+        .col(
+            ColumnDef::new(news_settings::Column::UpdatedAt)
+                .date_time()
+                .not_null()
+                .default(Expr::current_timestamp()),
+        )
         .to_owned();
-    db.execute(Statement::from_string(builder, create_settings.to_string(SqliteQueryBuilder)))
-        .await?;
+    db.execute(Statement::from_string(
+        builder,
+        create_settings.to_string(SqliteQueryBuilder),
+    ))
+    .await?;
 
     let create_articles: TableCreateStatement = Table::create()
         .table(news_articles::Entity.table_ref())
         .if_not_exists()
-        .col(ColumnDef::new(news_articles::Column::Id).integer().primary_key().auto_increment().not_null())
-        .col(ColumnDef::new(news_articles::Column::UserId).integer().not_null())
-        .col(ColumnDef::new(news_articles::Column::Provider).string().not_null())
+        .col(
+            ColumnDef::new(news_articles::Column::Id)
+                .integer()
+                .primary_key()
+                .auto_increment()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(news_articles::Column::UserId)
+                .integer()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(news_articles::Column::Provider)
+                .string()
+                .not_null(),
+        )
         .col(ColumnDef::new(news_articles::Column::ProviderArticleId).string())
         .col(ColumnDef::new(news_articles::Column::SourceName).string())
         .col(ColumnDef::new(news_articles::Column::SourceDomain).string())
         .col(ColumnDef::new(news_articles::Column::SourceId).string())
-        .col(ColumnDef::new(news_articles::Column::Title).string().not_null())
+        .col(
+            ColumnDef::new(news_articles::Column::Title)
+                .string()
+                .not_null(),
+        )
         .col(ColumnDef::new(news_articles::Column::Excerpt).string())
         .col(ColumnDef::new(news_articles::Column::Content).string())
         .col(ColumnDef::new(news_articles::Column::Tags).string())
@@ -160,50 +266,198 @@ pub async fn init_db(db_url: &str) -> Result<DatabaseConnection, AppError> {
         .col(ColumnDef::new(news_articles::Column::Category).string())
         .col(ColumnDef::new(news_articles::Column::Country).string())
         .col(ColumnDef::new(news_articles::Column::PublishedAt).date_time())
-        .col(ColumnDef::new(news_articles::Column::FetchedAt).date_time().not_null().default(Expr::current_timestamp()))
-        .col(ColumnDef::new(news_articles::Column::AddedVia).string().not_null().default("sync"))
-        .col(ColumnDef::new(news_articles::Column::IsStarred).integer().not_null().default(0))
-        .col(ColumnDef::new(news_articles::Column::IsDismissed).integer().not_null().default(0))
+        .col(
+            ColumnDef::new(news_articles::Column::FetchedAt)
+                .date_time()
+                .not_null()
+                .default(Expr::current_timestamp()),
+        )
+        .col(
+            ColumnDef::new(news_articles::Column::AddedVia)
+                .string()
+                .not_null()
+                .default("sync"),
+        )
+        .col(
+            ColumnDef::new(news_articles::Column::IsStarred)
+                .integer()
+                .not_null()
+                .default(0),
+        )
+        .col(
+            ColumnDef::new(news_articles::Column::IsDismissed)
+                .integer()
+                .not_null()
+                .default(0),
+        )
+        .col(
+            ColumnDef::new(news_articles::Column::IsRead)
+                .integer()
+                .not_null()
+                .default(0),
+        )
         .col(ColumnDef::new(news_articles::Column::AddedToIdeasAt).date_time())
         .col(ColumnDef::new(news_articles::Column::DismissedAt).date_time())
-        .col(ColumnDef::new(news_articles::Column::IsPinned).integer().not_null().default(0))
-        .col(ColumnDef::new(news_articles::Column::CreatedAt).date_time().not_null().default(Expr::current_timestamp()))
-        .col(ColumnDef::new(news_articles::Column::UpdatedAt).date_time().not_null().default(Expr::current_timestamp()))
+        .col(
+            ColumnDef::new(news_articles::Column::IsPinned)
+                .integer()
+                .not_null()
+                .default(0),
+        )
+        .col(
+            ColumnDef::new(news_articles::Column::CreatedAt)
+                .date_time()
+                .not_null()
+                .default(Expr::current_timestamp()),
+        )
+        .col(
+            ColumnDef::new(news_articles::Column::UpdatedAt)
+                .date_time()
+                .not_null()
+                .default(Expr::current_timestamp()),
+        )
         .to_owned();
-    db.execute(Statement::from_string(builder, create_articles.to_string(SqliteQueryBuilder)))
-        .await?;
+    db.execute(Statement::from_string(
+        builder,
+        create_articles.to_string(SqliteQueryBuilder),
+    ))
+    .await?;
 
     let create_sources: TableCreateStatement = Table::create()
         .table(news_sources::Entity.table_ref())
         .if_not_exists()
-        .col(ColumnDef::new(news_sources::Column::Id).integer().primary_key().auto_increment().not_null())
-        .col(ColumnDef::new(news_sources::Column::SourceId).string().not_null())
-        .col(ColumnDef::new(news_sources::Column::Name).string().not_null())
+        .col(
+            ColumnDef::new(news_sources::Column::Id)
+                .integer()
+                .primary_key()
+                .auto_increment()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(news_sources::Column::SourceId)
+                .string()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(news_sources::Column::Name)
+                .string()
+                .not_null(),
+        )
         .col(ColumnDef::new(news_sources::Column::Url).string())
         .col(ColumnDef::new(news_sources::Column::Country).string())
         .col(ColumnDef::new(news_sources::Column::Language).string())
         .col(ColumnDef::new(news_sources::Column::Category).string())
-        .col(ColumnDef::new(news_sources::Column::IsActive).integer().not_null().default(1))
-        .col(ColumnDef::new(news_sources::Column::IsMuted).integer().not_null().default(0))
-        .col(ColumnDef::new(news_sources::Column::CreatedAt).date_time().not_null().default(Expr::current_timestamp()))
-        .col(ColumnDef::new(news_sources::Column::UpdatedAt).date_time().not_null().default(Expr::current_timestamp()))
+        .col(
+            ColumnDef::new(news_sources::Column::IsActive)
+                .integer()
+                .not_null()
+                .default(1),
+        )
+        .col(
+            ColumnDef::new(news_sources::Column::IsMuted)
+                .integer()
+                .not_null()
+                .default(0),
+        )
+        .col(
+            ColumnDef::new(news_sources::Column::CreatedAt)
+                .date_time()
+                .not_null()
+                .default(Expr::current_timestamp()),
+        )
+        .col(
+            ColumnDef::new(news_sources::Column::UpdatedAt)
+                .date_time()
+                .not_null()
+                .default(Expr::current_timestamp()),
+        )
         .to_owned();
-    db.execute(Statement::from_string(builder, create_sources.to_string(SqliteQueryBuilder)))
-        .await?;
+    db.execute(Statement::from_string(
+        builder,
+        create_sources.to_string(SqliteQueryBuilder),
+    ))
+    .await?;
 
     // Lightweight column backfills for existing installs
-    let _ = db.execute(Statement::from_sql_and_values(builder, "ALTER TABLE news_settings ADD COLUMN language TEXT", vec![])).await;
-    let _ = db.execute(Statement::from_sql_and_values(builder, "ALTER TABLE news_settings ADD COLUMN keywords_in_title TEXT", vec![])).await;
-    let _ = db.execute(Statement::from_sql_and_values(builder, "ALTER TABLE news_settings ADD COLUMN from_date TEXT", vec![])).await;
-    let _ = db.execute(Statement::from_sql_and_values(builder, "ALTER TABLE news_settings ADD COLUMN to_date TEXT", vec![])).await;
-    let _ = db.execute(Statement::from_sql_and_values(builder, "ALTER TABLE news_settings ADD COLUMN max_stored INTEGER", vec![])).await;
+    let _ = db
+        .execute(Statement::from_sql_and_values(
+            builder,
+            "ALTER TABLE news_settings ADD COLUMN language TEXT",
+            vec![],
+        ))
+        .await;
+    let _ = db
+        .execute(Statement::from_sql_and_values(
+            builder,
+            "ALTER TABLE news_settings ADD COLUMN keywords_in_title TEXT",
+            vec![],
+        ))
+        .await;
+    let _ = db
+        .execute(Statement::from_sql_and_values(
+            builder,
+            "ALTER TABLE news_settings ADD COLUMN from_date TEXT",
+            vec![],
+        ))
+        .await;
+    let _ = db
+        .execute(Statement::from_sql_and_values(
+            builder,
+            "ALTER TABLE news_settings ADD COLUMN to_date TEXT",
+            vec![],
+        ))
+        .await;
+    let _ = db
+        .execute(Statement::from_sql_and_values(
+            builder,
+            "ALTER TABLE news_settings ADD COLUMN max_stored INTEGER",
+            vec![],
+        ))
+        .await;
 
-    let _ = db.execute(Statement::from_sql_and_values(builder, "ALTER TABLE news_articles ADD COLUMN source_id TEXT", vec![])).await;
-    let _ = db.execute(Statement::from_sql_and_values(builder, "ALTER TABLE news_articles ADD COLUMN country TEXT", vec![])).await;
+    let _ = db
+        .execute(Statement::from_sql_and_values(
+            builder,
+            "ALTER TABLE news_articles ADD COLUMN source_id TEXT",
+            vec![],
+        ))
+        .await;
+    let _ = db
+        .execute(Statement::from_sql_and_values(
+            builder,
+            "ALTER TABLE news_articles ADD COLUMN country TEXT",
+            vec![],
+        ))
+        .await;
     let _ = db.execute(Statement::from_sql_and_values(builder, "ALTER TABLE news_articles ADD COLUMN fetched_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL", vec![])).await;
-    let _ = db.execute(Statement::from_sql_and_values(builder, "ALTER TABLE news_articles ADD COLUMN added_via TEXT DEFAULT 'sync' NOT NULL", vec![])).await;
-    let _ = db.execute(Statement::from_sql_and_values(builder, "ALTER TABLE news_articles ADD COLUMN is_starred INTEGER DEFAULT 0 NOT NULL", vec![])).await;
-    let _ = db.execute(Statement::from_sql_and_values(builder, "ALTER TABLE news_articles ADD COLUMN is_dismissed INTEGER DEFAULT 0 NOT NULL", vec![])).await;
+    let _ = db
+        .execute(Statement::from_sql_and_values(
+            builder,
+            "ALTER TABLE news_articles ADD COLUMN added_via TEXT DEFAULT 'sync' NOT NULL",
+            vec![],
+        ))
+        .await;
+    let _ = db
+        .execute(Statement::from_sql_and_values(
+            builder,
+            "ALTER TABLE news_articles ADD COLUMN is_starred INTEGER DEFAULT 0 NOT NULL",
+            vec![],
+        ))
+        .await;
+    let _ = db
+        .execute(Statement::from_sql_and_values(
+            builder,
+            "ALTER TABLE news_articles ADD COLUMN is_dismissed INTEGER DEFAULT 0 NOT NULL",
+            vec![],
+        ))
+        .await;
+    let _ = db
+        .execute(Statement::from_sql_and_values(
+            builder,
+            "ALTER TABLE news_articles ADD COLUMN is_read INTEGER DEFAULT 0 NOT NULL",
+            vec![],
+        ))
+        .await;
 
     // Seed news_sync task
     db.execute(Statement::from_sql_and_values(

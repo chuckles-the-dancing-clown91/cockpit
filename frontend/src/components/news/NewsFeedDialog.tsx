@@ -43,6 +43,13 @@ export function NewsFeedDialog({ trigger, defaultOpen = false }: Props) {
   const { data: sources } = useNewsSources({ country: settings?.countries?.[0], language: settings?.language ?? undefined });
   const qc = useQueryClient();
 
+  const markReadMutation = useMutation({
+    mutationFn: async (id: number) => invoke('mark_news_article_read', { id }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['newsArticles'] });
+    },
+  });
+
   const dismissMutation = useMutation({
     mutationFn: async (id: number) => invoke('dismiss_news_article', { id }),
     onSuccess: () => {
@@ -81,14 +88,31 @@ export function NewsFeedDialog({ trigger, defaultOpen = false }: Props) {
     },
   });
 
-  const unreadCount = articles?.filter((a) => !a.dismissedAt && !a.addedToIdeasAt).length ?? 0;
+  const unreadCount =
+    articles?.filter((a) => !a.isRead && !a.dismissedAt && !a.addedToIdeasAt).length ?? 0;
   const lastSynced = settings?.last_synced_at
     ? new Date(settings.last_synced_at).toLocaleString()
     : 'Never';
   const syncOk = syncMutation.data?.status === 'success';
 
+  const handleCloseDetails = () => {
+    if (selected) {
+      markReadMutation.mutate(selected.id);
+    }
+    setSelected(null);
+  };
+
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && selected) {
+          markReadMutation.mutate(selected.id);
+          setSelected(null);
+        }
+        setOpen(next);
+      }}
+    >
       {trigger ? <Dialog.Trigger asChild>{trigger}</Dialog.Trigger> : null}
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-[color:var(--color-overlay-scrim)] backdrop-blur-[2px]" />
@@ -199,10 +223,11 @@ export function NewsFeedDialog({ trigger, defaultOpen = false }: Props) {
       </Dialog.Portal>
       <ArticleDetailsDialog
         article={selected}
-        onClose={() => setSelected(null)}
+        onClose={handleCloseDetails}
         onDismiss={() => {
           if (selected) {
             dismissMutation.mutate(selected.id);
+            markReadMutation.mutate(selected.id);
             setSelected(null);
           }
         }}
@@ -237,9 +262,10 @@ function ArticleCard({
   const fallbackInitials = metaSource.slice(0, 2).toUpperCase();
   const categories = article.tags ?? [];
   const countries = article.country ?? [];
+  const isRead = article.isRead ?? false;
 
   return (
-    <Card className="flex flex-col gap-2 overflow-hidden">
+    <Card className={`flex flex-col gap-2 overflow-hidden ${isRead ? 'opacity-80' : ''}`}>
       <div className="relative h-32 bg-[var(--color-surface-soft)]">
         {hasImage ? (
           <img
