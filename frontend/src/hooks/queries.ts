@@ -39,28 +39,41 @@ export type Job = {
 
 export type NewsArticle = {
   id: number;
+  articleId?: string | null;
   title: string;
   excerpt?: string;
   url?: string;
-  source_name?: string;
-  source_domain?: string;
+  sourceName?: string;
+  sourceDomain?: string;
+  imageUrl?: string;
+  sourceId?: string | null;
   tags: string[];
+  country: string[];
   language?: string;
   category?: string;
-  published_at?: string;
-  added_to_ideas_at?: string;
-  dismissed_at?: string;
+  fetchedAt?: string;
+  addedVia?: string;
+  isStarred?: boolean;
+  isDismissed?: boolean;
+  publishedAt?: string;
+  addedToIdeasAt?: string;
+  dismissedAt?: string;
 };
 
 export type NewsSettings = {
   user_id: number;
   provider: string;
   has_api_key: boolean;
+  language?: string | null;
   languages: string[];
   countries: string[];
   categories: string[];
   sources: string[];
   query?: string;
+  keywords_in_title?: string | null;
+  from_date?: string | null;
+  to_date?: string | null;
+  max_stored: number;
   max_articles: number;
   daily_call_limit: number;
   calls_today: number;
@@ -70,13 +83,30 @@ export type NewsSettings = {
 
 export type SaveNewsSettingsInput = {
   api_key?: string;
+  language?: string;
   languages?: string[];
   countries?: string[];
   categories?: string[];
   sources?: string[];
   query?: string;
+  keywords_in_title?: string;
+  from_date?: string;
+  to_date?: string;
+  max_stored?: number;
   max_articles?: number;
   daily_call_limit?: number;
+};
+
+export type NewsSource = {
+  id: number;
+  source_id: string;
+  name: string;
+  url?: string | null;
+  country?: string | null;
+  language?: string | null;
+  category: string[];
+  is_active: boolean;
+  is_muted: boolean;
 };
 
 async function invokeWithFallback<T>(command: string, args: Record<string, unknown> = {}, fallback: T): Promise<T> {
@@ -186,13 +216,20 @@ export function useScheduledJobs() {
   });
 }
 
-export function useNewsArticles(status: 'all' | 'unread' | 'dismissed' | 'ideas' = 'unread', limit = 30) {
+export function useNewsArticles(params: {
+  status?: 'all' | 'unread' | 'dismissed' | 'ideas';
+  limit?: number;
+  offset?: number;
+  includeDismissed?: boolean;
+  search?: string;
+}) {
+  const { status = 'unread', limit = 30, offset = 0, includeDismissed = false, search } = params;
   return useQuery({
-    queryKey: ['newsArticles', status, limit],
+    queryKey: ['newsArticles', status, limit, offset, includeDismissed, search],
     queryFn: () =>
       invokeWithFallback(
         'list_news_articles',
-        { status, limit },
+        { status, limit, offset, include_dismissed: includeDismissed, search },
         [
           {
             id: 1,
@@ -224,11 +261,28 @@ export function useNewsSettings() {
           categories: [],
           sources: [],
           query: '',
+          keywords_in_title: '',
+          from_date: '',
+          to_date: '',
+          max_stored: 4000,
           max_articles: 4000,
           daily_call_limit: 180,
           calls_today: 0,
         } as NewsSettings
       ),
     staleTime: 1000 * 60,
+  });
+}
+
+export function useNewsSources(filters: { country?: string; language?: string; search?: string } = {}) {
+  return useQuery({
+    queryKey: ['newsSources', filters],
+    queryFn: () =>
+      invokeWithFallback(
+        'list_news_sources',
+        filters,
+        [] as NewsSource[]
+      ),
+    staleTime: 1000 * 60 * 5,
   });
 }

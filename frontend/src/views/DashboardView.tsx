@@ -33,7 +33,7 @@ export function DashboardView() {
   } = useMixedFeed();
   const { data: ideas, isLoading: ideasLoading } = useArticleIdeas('inbox');
   const { data: jobs, isLoading: jobsLoading } = useScheduledJobs();
-  const { data: newsArticles } = useNewsArticles('unread', 50);
+  const { data: newsArticles } = useNewsArticles({ status: 'unread', limit: 50 });
   const [syncing, setSyncing] = useState(false);
 
   const stats = useMemo(

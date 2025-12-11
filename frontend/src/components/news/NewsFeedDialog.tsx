@@ -1,11 +1,19 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { invoke } from '@tauri-apps/api/core';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { ScrollArea } from '../ui/ScrollArea';
-import { NewsArticle, NewsSettings, SaveNewsSettingsInput, useNewsArticles, useNewsSettings } from '../../hooks/queries';
+import {
+  NewsArticle,
+  NewsSettings,
+  SaveNewsSettingsInput,
+  useNewsArticles,
+  useNewsSettings,
+  useNewsSources,
+  NewsSource,
+} from '../../hooks/queries';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
 
@@ -26,8 +34,13 @@ export function NewsFeedDialog({ trigger, defaultOpen = false }: Props) {
   const [status, setStatus] = useState<'unread' | 'all' | 'dismissed' | 'ideas'>('unread');
   const [showSettings, setShowSettings] = useState(true);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [selected, setSelected] = useState<NewsArticle | null>(null);
   const { data: settings } = useNewsSettings();
-  const { data: articles, isLoading, refetch } = useNewsArticles(status, 50);
+  const [offset, setOffset] = useState(0);
+  const [search, setSearch] = useState('');
+  const pageSize = 30;
+  const { data: articles, isLoading, refetch } = useNewsArticles({ status, limit: offset + pageSize, offset: 0, search });
+  const { data: sources } = useNewsSources({ country: settings?.countries?.[0], language: settings?.language ?? undefined });
   const qc = useQueryClient();
 
   const dismissMutation = useMutation({
@@ -35,6 +48,11 @@ export function NewsFeedDialog({ trigger, defaultOpen = false }: Props) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['newsArticles'] });
     },
+  });
+
+  const starMutation = useMutation({
+    mutationFn: async ({ id, starred }: { id: number; starred: boolean }) => invoke('toggle_star_news_article', { id, starred }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['newsArticles'] }),
   });
 
   const syncMutation = useMutation({
@@ -56,10 +74,18 @@ export function NewsFeedDialog({ trigger, defaultOpen = false }: Props) {
     },
   });
 
-  const unreadCount = articles?.filter((a) => !a.dismissed_at && !a.added_to_ideas_at).length ?? 0;
+  const syncSourcesMutation = useMutation({
+    mutationFn: async () => invoke<RunTaskNowResult>('sync_news_sources_now'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['newsSources'] });
+    },
+  });
+
+  const unreadCount = articles?.filter((a) => !a.dismissedAt && !a.addedToIdeasAt).length ?? 0;
   const lastSynced = settings?.last_synced_at
     ? new Date(settings.last_synced_at).toLocaleString()
     : 'Never';
+  const syncOk = syncMutation.data?.status === 'success';
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -70,41 +96,49 @@ export function NewsFeedDialog({ trigger, defaultOpen = false }: Props) {
           className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[min(1100px,100%-2rem)] h-[min(720px,100%-2rem)] flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface-soft)] shadow-[var(--shadow-card-elevated)] text-[var(--color-text-primary)]"
         >
           <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between p-5 border-b border-[var(--color-border-subtle)] bg-[var(--color-surface)]">
-            <div>
-              <Dialog.Title className="text-xl font-semibold text-[var(--color-text-primary)]">News Feed</Dialog.Title>
-              <Dialog.Description className="text-sm text-[var(--color-text-soft)]">
-                {unreadCount} unread · Last sync: {lastSynced}
-              </Dialog.Description>
-            </div>
-            <div className="flex flex-wrap gap-2 items-center">
-              <Button variant="subtle" size="sm" onClick={() => setStatus('unread')}>
-                Unread
-              </Button>
-              <Button variant="subtle" size="sm" onClick={() => setStatus('all')}>
-                All
-              </Button>
-              <Button
-                variant={showSettings ? 'outline' : 'subtle'}
-                size="sm"
-                onClick={() => setShowSettings((v) => !v)}
-              >
-                {showSettings ? 'Hide settings' : 'Settings'}
-              </Button>
-              <div className="flex items-center gap-2">
-                <Button variant="solid" size="sm" onClick={() => syncMutation.mutate()} disabled={syncMutation.isLoading}>
-                  {syncMutation.isLoading ? 'Syncing…' : 'Sync now'}
-                </Button>
-                {syncStatus ? (
-                  <span className="text-xs text-[var(--color-text-soft)]">{syncStatus}</span>
-                ) : null}
+            <div className="flex items-center gap-2">
+              <div>
+                <Dialog.Title className="text-xl font-semibold text-[var(--color-text-primary)]">News Feed</Dialog.Title>
+                <Dialog.Description className="text-sm text-[var(--color-text-soft)]">
+                  {unreadCount} unread · Last sync: {lastSynced}
+                </Dialog.Description>
               </div>
-              <Dialog.Close asChild>
-                <Button variant="ghost" size="sm">
-                  Close
-                </Button>
-              </Dialog.Close>
+              <span
+                className={`inline-flex h-3 w-3 rounded-full border border-[var(--color-border)] ${
+                  syncOk ? 'bg-green-500' : 'bg-[var(--color-border-subtle)]'
+                }`}
+                title={syncOk ? 'Synced' : 'Idle'}
+              />
             </div>
-          </header>
+              <div className="flex flex-wrap gap-2 items-center">
+                <Button variant="subtle" size="sm" onClick={() => setStatus('unread')}>
+                  Unread
+                </Button>
+                <Button variant="subtle" size="sm" onClick={() => setStatus('all')}>
+                  All
+                </Button>
+                <Button
+                  variant={showSettings ? 'outline' : 'subtle'}
+                  size="sm"
+                  onClick={() => setShowSettings((v) => !v)}
+                >
+                  {showSettings ? 'Hide settings' : 'Settings'}
+                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="solid" size="sm" onClick={() => syncMutation.mutate()} disabled={syncMutation.isLoading}>
+                    {syncMutation.isLoading ? 'Syncing…' : 'Sync now'}
+                  </Button>
+                  {syncStatus ? (
+                    <span className="text-xs text-[var(--color-text-soft)]">{syncStatus}</span>
+                  ) : null}
+                </div>
+                <Dialog.Close asChild>
+                  <Button variant="ghost" size="sm">
+                    Close
+                  </Button>
+                </Dialog.Close>
+              </div>
+            </header>
           <div
             className={
               showSettings
@@ -113,65 +147,152 @@ export function NewsFeedDialog({ trigger, defaultOpen = false }: Props) {
             }
           >
             <Card className="min-h-0 h-full flex flex-col shadow-[var(--shadow-card-soft)]">
+              <div className="flex items-center gap-2 px-4 pt-4">
+                <Input
+                  placeholder="Search stored articles…"
+                  value={search}
+                  onChange={(e) => {
+                    setOffset(0);
+                    setSearch(e.target.value);
+                  }}
+                />
+                <Button variant="ghost" size="sm" onClick={() => { setOffset(0); refetch(); }}>
+                  Apply
+                </Button>
+              </div>
               <ScrollArea className="h-full">
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 p-4">
                   {isLoading
                     ? Array.from({ length: 8 }).map((_, idx) => <Card key={idx} className="h-[170px] animate-pulse" />)
                     : (articles ?? []).map((article) => (
-                        <ArticleCard key={article.id} article={article} onDismiss={() => dismissMutation.mutate(article.id)} />
+                        <ArticleCard
+                          key={article.id}
+                          article={article}
+                          onDismiss={() => dismissMutation.mutate(article.id)}
+                          onStar={() => starMutation.mutate({ id: article.id, starred: !(article.isStarred ?? false) })}
+                          onOpen={() => setSelected(article)}
+                        />
                       ))}
                   {!isLoading && (articles ?? []).length === 0 ? (
                     <div className="text-[var(--color-text-muted)]">No articles available.</div>
                   ) : null}
                 </div>
+                <div className="flex justify-center pb-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setOffset((o) => o + pageSize)}
+                    disabled={isLoading || (articles ?? []).length < offset + pageSize}
+                  >
+                    Load more
+                  </Button>
+                </div>
               </ScrollArea>
             </Card>
             {showSettings ? (
               <Card className="min-h-0 h-full shadow-[var(--shadow-card-soft)] p-4">
-                <SettingsCard settings={settings} />
+                <SettingsCard settings={settings} sources={sources ?? []} onSyncSources={() => syncSourcesMutation.mutate()} />
               </Card>
             ) : null}
           </div>
         </Dialog.Content>
       </Dialog.Portal>
+      <ArticleDetailsDialog
+        article={selected}
+        onClose={() => setSelected(null)}
+        onDismiss={() => {
+          if (selected) {
+            dismissMutation.mutate(selected.id);
+            setSelected(null);
+          }
+        }}
+        onStar={() => {
+          if (selected) {
+            starMutation.mutate({ id: selected.id, starred: !(selected.isStarred ?? false) });
+          }
+        }}
+      />
     </Dialog.Root>
   );
 }
 
-function ArticleCard({ article, onDismiss }: { article: NewsArticle; onDismiss: () => void }) {
+function ArticleCard({
+  article,
+  onDismiss,
+  onStar,
+  onOpen,
+}: {
+  article: NewsArticle;
+  onDismiss: () => void;
+  onStar: () => void;
+  onOpen: () => void;
+}) {
+  const metaSource = article.sourceName || article.sourceDomain || article.sourceId || 'Unknown source';
+  const metaDate = article.publishedAt
+    ? new Date(article.publishedAt).toLocaleString()
+    : article.fetchedAt
+    ? new Date(article.fetchedAt).toLocaleString()
+    : 'Unknown time';
+  const hasImage = !!article.imageUrl;
+  const fallbackInitials = metaSource.slice(0, 2).toUpperCase();
+  const categories = article.tags ?? [];
+  const countries = article.country ?? [];
+
   return (
-    <Card className="flex flex-col gap-2">
+    <Card className="flex flex-col gap-2 overflow-hidden">
+      <div className="relative h-32 bg-[var(--color-surface-soft)]">
+        {hasImage ? (
+          <img
+            src={article.imageUrl as string}
+            alt={article.title}
+            className="w-full h-full object-cover"
+            onClick={onOpen}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-sm text-[var(--color-text-soft)] bg-[var(--color-surface)]">
+            {fallbackInitials}
+          </div>
+        )}
+      </div>
       <Card.Header className="border-none px-0 pt-0 pb-0">
         <div className="flex flex-col gap-1 px-3 pt-2">
           <Card.Title className="text-base">
-            <button
-              className="text-left hover:underline"
-              onClick={() => article.url && window.open(article.url, '_blank')}
-            >
+            <button className="text-left hover:underline" onClick={onOpen}>
               {article.title}
             </button>
           </Card.Title>
-          <div className="text-xs text-[var(--color-text-soft)]">{article.source_name || article.source_domain || 'Unknown source'}</div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-soft)]">
+            <span>{metaSource}</span>
+            <span className="text-[var(--color-text-muted)]">•</span>
+            <span>{metaDate}</span>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {countries.map((c) => (
+              <span key={`c-${c}`} className="text-[0.7rem] px-2 py-1 rounded border border-[var(--color-border-subtle)] text-[var(--color-text-soft)]">
+                {c}
+              </span>
+            ))}
+            {categories.map((c) => (
+              <span key={`t-${c}`} className="text-[0.7rem] px-2 py-1 rounded border border-[var(--color-border-subtle)] text-[var(--color-text-soft)]">
+                {c}
+              </span>
+            ))}
+          </div>
         </div>
       </Card.Header>
-      <Card.Body className="px-3 py-0 text-sm text-[var(--color-text-muted)]">
+      <Card.Body className="px-3 py-0 text-sm text-[var(--color-text-muted)] line-clamp-4 cursor-pointer" onClick={onOpen}>
         {article.excerpt ?? 'No excerpt available.'}
       </Card.Body>
       <Card.Footer className="px-3 pb-3 pt-2">
-        <div className="text-xs text-[var(--color-text-soft)]">
-          {article.published_at ? new Date(article.published_at).toLocaleString() : 'Unknown time'}
-        </div>
         <div className="flex gap-2">
+          <Button variant="ghost" size="sm" className="border border-[var(--color-border)]" onClick={onStar}>
+            {article.isStarred ? 'Unstar' : 'Star'}
+          </Button>
           <Button variant="ghost" size="sm" className="border border-[var(--color-border)]" onClick={onDismiss}>
             Dismiss
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="border border-[var(--color-border)]"
-            onClick={() => article.url && window.open(article.url, '_blank')}
-          >
-            Open
+          <Button variant="ghost" size="sm" className="border border-[var(--color-border)]" onClick={onOpen}>
+            Details
           </Button>
         </div>
       </Card.Footer>
@@ -179,13 +300,120 @@ function ArticleCard({ article, onDismiss }: { article: NewsArticle; onDismiss: 
   );
 }
 
-function SettingsCard({ settings }: { settings?: NewsSettings }) {
+function ArticleDetailsDialog({
+  article,
+  onClose,
+  onDismiss,
+  onStar,
+}: {
+  article: NewsArticle | null;
+  onClose: () => void;
+  onDismiss: () => void;
+  onStar: () => void;
+}) {
+  if (!article) return null;
+  const metaSource = article.sourceName || article.sourceDomain || article.sourceId || 'Unknown source';
+  const metaDate = article.publishedAt
+    ? new Date(article.publishedAt).toLocaleString()
+    : article.fetchedAt
+    ? new Date(article.fetchedAt).toLocaleString()
+    : 'Unknown time';
+  const categories = article.tags ?? [];
+  const countries = article.country ?? [];
+  return (
+    <Dialog.Portal>
+      <Dialog.Overlay className="fixed inset-0 z-[60] bg-[color:var(--color-overlay-scrim)] backdrop-blur-[2px]" />
+      <Dialog.Content className="fixed left-1/2 top-1/2 z-[70] -translate-x-1/2 -translate-y-1/2 w-[min(900px,100%-2rem)] max-h-[80vh] flex flex-col rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-card-elevated)] overflow-hidden">
+        <div className="flex items-start gap-3 p-4 border-b border-[var(--color-border-subtle)]">
+          <div className="flex-1">
+            <div className="text-xs text-[var(--color-text-soft)]">{metaSource} • {metaDate}</div>
+            <h3 className="text-xl font-semibold text-[var(--color-text-primary)] mt-1">{article.title}</h3>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {countries.map((c) => (
+                <span key={`detail-c-${c}`} className="text-[0.75rem] px-2 py-1 rounded border border-[var(--color-border-subtle)] text-[var(--color-text-soft)]">
+                  {c}
+                </span>
+              ))}
+              {categories.map((c) => (
+                <span key={`detail-t-${c}`} className="text-[0.75rem] px-2 py-1 rounded border border-[var(--color-border-subtle)] text-[var(--color-text-soft)]">
+                  {c}
+                </span>
+              ))}
+            </div>
+          </div>
+          <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>
+        </div>
+        {article.imageUrl ? (
+          <div className="h-56 overflow-hidden bg-[var(--color-surface-soft)]">
+            <img src={article.imageUrl as string} alt={article.title} className="w-full h-full object-cover" />
+          </div>
+        ) : null}
+        <ScrollArea className="flex-1">
+          <div className="p-4 text-sm text-[var(--color-text-muted)] space-y-3">
+            <p>{article.excerpt || 'No excerpt available.'}</p>
+          </div>
+        </ScrollArea>
+        <div className="p-4 border-t border-[var(--color-border-subtle)] flex items-center justify-between">
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={() => alert('Review action will be enabled when Ideas command is available.')}>
+            Review for article
+          </Button>
+            {article.url ? (
+              <a
+                className="text-sm underline text-[var(--color-text-primary)]"
+                href={article.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Open original (browser)
+              </a>
+            ) : null}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={onStar}>
+              {article.isStarred ? 'Unstar' : 'Star'}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onDismiss}>
+              Dismiss
+            </Button>
+          </div>
+        </div>
+      </Dialog.Content>
+    </Dialog.Portal>
+  );
+}
+
+function SettingsCard({ settings, sources, onSyncSources }: { settings?: NewsSettings; sources: NewsSource[]; onSyncSources: () => void }) {
   const [form, setForm] = useState<SaveNewsSettingsInput>({
     api_key: '',
+    language: settings?.language ?? 'en',
     max_articles: settings?.max_articles ?? 4000,
+    max_stored: settings?.max_stored ?? settings?.max_articles ?? 4000,
     daily_call_limit: settings?.daily_call_limit ?? 180,
     query: settings?.query ?? '',
+    keywords_in_title: settings?.keywords_in_title ?? '',
+    from_date: settings?.from_date ?? '',
+    to_date: settings?.to_date ?? '',
+    countries: settings?.countries ?? ['us'],
+    sources: settings?.sources ?? [],
   });
+
+  React.useEffect(() => {
+    setForm({
+      api_key: '',
+      language: settings?.language ?? 'en',
+      max_articles: settings?.max_articles ?? 4000,
+      max_stored: settings?.max_stored ?? settings?.max_articles ?? 4000,
+      daily_call_limit: settings?.daily_call_limit ?? 180,
+      query: settings?.query ?? '',
+      keywords_in_title: settings?.keywords_in_title ?? '',
+      from_date: settings?.from_date ?? '',
+      to_date: settings?.to_date ?? '',
+      countries: settings?.countries ?? ['us'],
+      sources: settings?.sources ?? [],
+    });
+  }, [settings]);
   const qc = useQueryClient();
   const saveMutation = useMutation({
     mutationFn: async (body: SaveNewsSettingsInput) => invoke('save_news_settings', { input: body }),
@@ -194,6 +422,26 @@ function SettingsCard({ settings }: { settings?: NewsSettings }) {
       qc.invalidateQueries({ queryKey: ['newsArticles'] });
     },
   });
+  const syncMutation = useMutation({
+    mutationFn: async () => invoke<RunTaskNowResult>('sync_news_now'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['newsSettings'] });
+      qc.invalidateQueries({ queryKey: ['newsArticles'] });
+      qc.invalidateQueries({ queryKey: ['newsSources'] });
+    },
+  });
+
+  const handleSaveAndSync = async () => {
+    const apiKey = form.api_key?.trim();
+    const payload: SaveNewsSettingsInput = { ...form };
+    if (apiKey && apiKey.length > 0) {
+      payload.api_key = apiKey;
+    } else {
+      delete (payload as Partial<SaveNewsSettingsInput>).api_key;
+    }
+    await saveMutation.mutateAsync(payload);
+    await syncMutation.mutateAsync();
+  };
 
   return (
     <Card className="flex flex-col gap-3">
@@ -207,23 +455,89 @@ function SettingsCard({ settings }: { settings?: NewsSettings }) {
           <Input
             type="password"
             placeholder={settings?.has_api_key ? '••••••••' : 'Enter NewsData API key'}
+            value={form.api_key ?? ''}
             onChange={(e) => setForm((f) => ({ ...f, api_key: e.target.value }))}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Input
+            placeholder="language (e.g. en)"
+            value={form.language ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, language: e.target.value }))}
+          />
+          <Input
+            placeholder="Countries (comma separated)"
+            value={(form.countries ?? []).join(',')}
+            onChange={(e) => setForm((f) => ({ ...f, countries: e.target.value.split(',').map((v) => v.trim()).filter(Boolean) }))}
           />
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-xs text-[var(--color-text-muted)]">Query</span>
           <Textarea
             placeholder="keywords, e.g. ai OR policy"
-            defaultValue={settings?.query}
+            value={form.query ?? ''}
             onChange={(e) => setForm((f) => ({ ...f, query: e.target.value }))}
           />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-[var(--color-text-muted)]">Title keywords</span>
+          <Input
+            placeholder="qInTitle"
+            value={form.keywords_in_title ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, keywords_in_title: e.target.value }))}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Input
+            type="date"
+            value={form.from_date ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, from_date: e.target.value }))}
+          />
+          <Input
+            type="date"
+            value={form.to_date ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, to_date: e.target.value }))}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-[var(--color-text-muted)]">Domains (sources)</span>
+          <div className="flex flex-wrap gap-1">
+            {sources.slice(0, 32).map((src) => {
+              const checked = form.sources?.includes(src.source_id) ?? false;
+              return (
+                <button
+                  key={src.source_id}
+                  className={`px-2 py-1 text-xs rounded border ${
+                    checked ? 'border-[var(--color-border-accent)] text-[var(--color-text-primary)]' : 'border-[var(--color-border-subtle)] text-[var(--color-text-soft)]'
+                  }`}
+                  onClick={() =>
+                    setForm((f) => {
+                      const current = f.sources ?? [];
+                      if (current.includes(src.source_id)) {
+                        return { ...f, sources: current.filter((s) => s !== src.source_id) };
+                      }
+                      return { ...f, sources: [...current, src.source_id] };
+                    })
+                  }
+                  type="button"
+                  title={src.url ?? src.source_id}
+                >
+                  {src.name ?? src.source_id}
+                  <span className="text-[10px] text-[var(--color-text-muted)] ml-1">({src.source_id})</span>
+                </button>
+              );
+            })}
+          </div>
+          <Button variant="ghost" size="sm" onClick={onSyncSources}>
+            Sync providers
+          </Button>
         </div>
         <div className="grid grid-cols-2 gap-2">
           <Input
             type="number"
             min={500}
             max={8000}
-            defaultValue={settings?.max_articles ?? 4000}
+            value={form.max_articles ?? 4000}
             onChange={(e) => setForm((f) => ({ ...f, max_articles: Number(e.target.value) }))}
             placeholder="Max articles"
           />
@@ -231,9 +545,17 @@ function SettingsCard({ settings }: { settings?: NewsSettings }) {
             type="number"
             min={10}
             max={200}
-            defaultValue={settings?.daily_call_limit ?? 180}
+            value={form.daily_call_limit ?? 180}
             onChange={(e) => setForm((f) => ({ ...f, daily_call_limit: Number(e.target.value) }))}
             placeholder="Daily cap"
+          />
+          <Input
+            type="number"
+            min={500}
+            max={8000}
+            value={form.max_stored ?? form.max_articles ?? 4000}
+            onChange={(e) => setForm((f) => ({ ...f, max_stored: Number(e.target.value) }))}
+            placeholder="Max stored"
           />
         </div>
       </Card.Body>
@@ -241,11 +563,11 @@ function SettingsCard({ settings }: { settings?: NewsSettings }) {
         <div className="flex gap-2 justify-end w-full">
           <Button
             size="sm"
-            onClick={() => saveMutation.mutate(form)}
-            disabled={saveMutation.isLoading}
+            onClick={() => handleSaveAndSync()}
+            disabled={saveMutation.isLoading || syncMutation.isLoading}
             variant="solid"
           >
-            {saveMutation.isLoading ? 'Saving…' : 'Save & Sync'}
+            {saveMutation.isLoading || syncMutation.isLoading ? 'Saving…' : 'Save & Sync'}
           </Button>
         </div>
       </Card.Footer>

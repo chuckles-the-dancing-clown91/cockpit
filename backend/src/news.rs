@@ -6,6 +6,7 @@ use crate::crypto;
 use crate::news_articles::{self, Entity as EntityNewsArticles};
 use crate::news_sources::{self, Entity as EntityNewsSources};
 use crate::news_settings::{self, Entity as EntityNewsSettings};
+use crate::logging;
 use crate::errors::{AppError, AppResult};
 use crate::scheduler::TaskRunResult;
 use crate::AppState;
@@ -18,6 +19,7 @@ pub struct NewsArticleDto {
     pub title: String,
     pub excerpt: Option<String>,
     pub url: Option<String>,
+    pub image_url: Option<String>,
     pub source_name: Option<String>,
     pub source_domain: Option<String>,
     pub source_id: Option<String>,
@@ -134,13 +136,15 @@ struct NewsSourceApiResponse {
 
 #[derive(serde::Deserialize)]
 struct NewsSourceApiItem {
-    #[serde(rename = "source_id")]
+    #[serde(alias = "source_id", alias = "id")]
     source_id: String,
     name: String,
     url: Option<String>,
+    icon: Option<String>,
     country: Option<StringOrVec>,
-    language: Option<String>,
+    language: Option<StringOrVec>,
     category: Option<Vec<String>>,
+    description: Option<String>,
 }
 
 fn parse_vec(json: &Option<String>) -> Vec<String> {
@@ -323,6 +327,7 @@ fn article_to_dto(m: news_articles::Model) -> NewsArticleDto {
         title: m.title,
         excerpt: m.excerpt,
         url: m.url,
+        image_url: m.image_url,
         source_name: m.source_name,
         source_domain: m.source_domain,
         source_id: m.source_id,
@@ -591,7 +596,9 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
         if let Some(srcs) = &settings.sources {
             if let Ok(list) = serde_json::from_str::<Vec<String>>(srcs) {
                 if !list.is_empty() {
-                    req = req.query(&[("source_id", list.join(","))]);
+                    // NewsData uses `domain` to filter sources; values come from the sources endpoint ids
+                    let joined = list.join(",");
+                    req = req.query(&[("domain", joined.as_str())]);
                 }
             }
         }
@@ -631,6 +638,7 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
             Ok(b) => b,
             Err(e) => {
                 let preview = text.chars().take(320).collect::<String>();
+                logging::log_api_call("news_sync", endpoint, status_code, &preview);
                 return TaskRunResult {
                     status: "error",
                     result_json: None,
@@ -638,6 +646,7 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
                 };
             }
         };
+        logging::log_api_call("news_sync", endpoint, status_code, &text.chars().take(512).collect::<String>());
         calls_used += 1;
         if let Some(res_list) = body.results {
             for art in res_list {
@@ -849,21 +858,29 @@ pub async fn run_news_sources_sync_task(state: &crate::AppState) -> TaskRunResul
         };
         if !status.is_success() {
             let preview: String = text.chars().take(320).collect();
+            logging::log_api_call("news_sources_sync", "https://newsdata.io/api/1/sources", status, &preview);
             return TaskRunResult { status: "error", result_json: None, error_message: Some(format!("http {}: {}", status, preview)) };
         }
         let body: NewsSourceApiResponse = match serde_json::from_str(&text) {
             Ok(b) => b,
             Err(e) => {
                 let preview: String = text.chars().take(320).collect();
+                logging::log_api_call("news_sources_sync", "https://newsdata.io/api/1/sources", status, &preview);
                 return TaskRunResult { status: "error", result_json: None, error_message: Some(format!("parse: {}; body: {}", e, preview)) };
             }
         };
+        logging::log_api_call("news_sources_sync", "https://newsdata.io/api/1/sources", status, &text.chars().take(512).collect::<String>());
 
         if let Some(list) = body.results {
             for item in list {
                 seen += 1;
                 let category = to_json_vec_str(&item.category);
                 let country = match item.country {
+                    Some(StringOrVec::String(s)) => Some(s),
+                    Some(StringOrVec::Vec(v)) => v.first().cloned(),
+                    None => None,
+                };
+                let language = match item.language {
                     Some(StringOrVec::String(s)) => Some(s),
                     Some(StringOrVec::Vec(v)) => v.first().cloned(),
                     None => None,
@@ -879,7 +896,7 @@ pub async fn run_news_sources_sync_task(state: &crate::AppState) -> TaskRunResul
                     active.name = Set(item.name.clone());
                     active.url = Set(item.url.clone());
                     active.country = Set(country.clone());
-                    active.language = Set(item.language.clone());
+                    active.language = Set(language.clone());
                     active.category = Set(category.clone());
                     active.updated_at = Set(chrono::Utc::now());
                     if let Ok(_) = active.update(&state.db).await {
@@ -891,7 +908,7 @@ pub async fn run_news_sources_sync_task(state: &crate::AppState) -> TaskRunResul
                         name: Set(item.name.clone()),
                         url: Set(item.url.clone()),
                         country: Set(country.clone()),
-                        language: Set(item.language.clone()),
+                        language: Set(language.clone()),
                         category: Set(category.clone()),
                         is_active: Set(1),
                         is_muted: Set(0),

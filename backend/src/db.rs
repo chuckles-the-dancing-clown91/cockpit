@@ -84,6 +84,20 @@ pub async fn init_db(db_url: &str) -> Result<DatabaseConnection, AppError> {
     ))
     .await?;
 
+    // Deduplicate seeded tasks and enforce uniqueness on task_type
+    db.execute(Statement::from_sql_and_values(
+        builder,
+        r#"DELETE FROM system_tasks WHERE id NOT IN (SELECT MIN(id) FROM system_tasks GROUP BY task_type)"#,
+        vec![],
+    ))
+    .await?;
+    db.execute(Statement::from_sql_and_values(
+        builder,
+        r#"CREATE UNIQUE INDEX IF NOT EXISTS idx_system_tasks_task_type ON system_tasks (task_type)"#,
+        vec![],
+    ))
+    .await?;
+
     let create_runs: TableCreateStatement = Table::create()
         .table(system_task_runs::Entity.table_ref())
         .if_not_exists()
