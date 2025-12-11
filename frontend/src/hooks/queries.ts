@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 export type FeedItem = {
   id: string;
@@ -25,19 +25,62 @@ export type Idea = {
   id: number;
   title: string;
   summary?: string | null;
-  status: IdeaStatus;
+  status: 'in_progress' | 'stalled' | 'complete';
   newsArticleId?: number | null;
   target?: string | null;
   tags: string[];
   notesMarkdown?: string | null;
   articleTitle?: string | null;
   articleMarkdown?: string | null;
-  dateAdded: string;
-  dateUpdated: string;
+  dateAdded?: string;
+  dateUpdated?: string | null;
   dateCompleted?: string | null;
   dateRemoved?: string | null;
-  priority: number;
-  isPinned: boolean;
+  priority?: number | null;
+  isPinned?: boolean;
+};
+
+export type CreateArticleIdeaInput = {
+  title: string;
+  summary?: string;
+  newsArticleId?: number;
+  target?: string;
+  tags?: string[];
+  priority?: number;
+};
+
+export type UpdateArticleIdeaMetadataInput = {
+  id: number;
+  title?: string;
+  summary?: string | null;
+  status?: ArticleIdea['status'];
+  newsArticleId?: number | null;
+  target?: string | null;
+  tags?: string[];
+  priority?: number | null;
+  isPinned?: boolean;
+};
+
+export type UpdateArticleIdeaNotesInput = {
+  id: number;
+  notesMarkdown: string;
+};
+
+export type UpdateArticleIdeaArticleInput = {
+  id: number;
+  articleTitle?: string | null;
+  articleMarkdown?: string | null;
+  status: 'inbox' | 'planned' | 'drafting' | 'archived';
+  priority?: 'low' | 'normal' | 'high';
+  isPinned?: boolean;
+  articleMarkdown?: string;
+  notesMarkdown?: string;
+  notes?: string;
+  sourceUrl?: string;
+  newsArticleId?: number | null;
+  newsArticle?: NewsArticle;
+  createdAt?: string;
+  dateRemoved?: string | null;
 };
 
 export type Job = {
@@ -188,22 +231,53 @@ export function useUpcomingEvents(horizonMinutes = 480) {
   });
 }
 
-export function useIdeas(params: {
-  status?: IdeaStatus;
-  includeRemoved?: boolean;
-  search?: string;
-  limit?: number;
-  offset?: number;
-} = {}) {
-  const { status, includeRemoved = false, search, limit = 50, offset = 0 } = params;
+function normalizeIdea(raw: any): ArticleIdea {
+  return {
+    id: raw.id,
+    title: raw.title ?? 'Untitled idea',
+    status: raw.status ?? 'inbox',
+    priority: raw.priority ?? raw.idea_priority ?? 'normal',
+    isPinned: raw.is_pinned ?? raw.pinned ?? false,
+    articleMarkdown: raw.article_markdown ?? raw.articleMarkdown ?? '',
+    notesMarkdown: raw.notes_markdown ?? raw.notesMarkdown ?? raw.notes ?? '',
+    notes: raw.notes ?? raw.notes_markdown ?? '',
+    sourceUrl: raw.source_url ?? raw.sourceUrl,
+    newsArticleId: raw.news_article_id ?? raw.newsArticleId ?? null,
+    newsArticle: raw.news_article ?? raw.newsArticle,
+    createdAt: raw.created_at ?? raw.createdAt,
+    dateRemoved: raw.date_removed ?? raw.dateRemoved ?? null,
+  } as ArticleIdea;
+}
+
+export function useArticleIdeas(params: { status?: ArticleIdea['status'] | 'all'; search?: string } = {}) {
+  const { status, search } = params;
+  const normalizedStatus = status && status !== 'all' ? status : undefined;
   return useQuery({
-    queryKey: ['ideas', status, includeRemoved, search, limit, offset],
+    queryKey: ['articleIdeas', normalizedStatus, search],
     queryFn: () =>
       invokeWithFallback(
         'list_ideas',
-        { status, include_removed: includeRemoved, search, limit, offset },
-        [] as Idea[]
-      ),
+        { status: normalizedStatus, search },
+        [
+          {
+            id: 1,
+            title: 'Build a moderator autopilot',
+            notes_markdown: 'Blend Reddit mod actions with calendar events',
+            status: 'inbox',
+            article_markdown: '# Draft outline\n- automation\n- safety nets',
+            news_article_id: 42,
+            news_article: {
+              id: 42,
+              title: 'Mock reference article',
+              sourceName: 'mock.news',
+              url: 'https://example.com/mock',
+              tags: ['ai'],
+              country: [],
+            },
+            created_at: new Date().toISOString(),
+          },
+        ] as ArticleIdea[]
+      ).then((ideas) => ideas.map(normalizeIdea)),
   });
 }
 
@@ -250,17 +324,37 @@ export function useNewsArticles(params: {
       invokeWithFallback(
         'list_news_articles',
         { status, limit, offset, include_dismissed: includeDismissed, search },
-        [
-          {
-            id: 1,
-            title: 'Mock: Latest AI policy update',
-            excerpt: 'Placeholder article while backend is offline.',
-            sourceName: 'mock',
-            tags: ['policy'],
-            publishedAt: new Date().toISOString(),
-            isRead: false,
-          },
-        ] as NewsArticle[]
+        (() => {
+          const mock: NewsArticle[] = [
+            {
+              id: 1,
+              title: 'Mock: Latest AI policy update',
+              excerpt: 'Placeholder article while backend is offline.',
+              sourceName: 'mock',
+              tags: ['policy'],
+              publishedAt: new Date().toISOString(),
+              isRead: false,
+            },
+            {
+              id: 2,
+              title: 'Mock: Funding round for AI startup',
+              excerpt: 'Example item already reviewed into Ideas.',
+              sourceName: 'mock',
+              tags: ['funding'],
+              publishedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+              isRead: true,
+              addedToIdeasAt: new Date().toISOString(),
+            },
+          ];
+          switch (status) {
+            case 'unread':
+              return mock.filter((m) => !m.isRead && !m.addedToIdeasAt);
+            case 'ideas':
+              return mock.filter((m) => !!m.addedToIdeasAt);
+            default:
+              return mock;
+          }
+        })()
       ),
     staleTime: 1000 * 60,
   });

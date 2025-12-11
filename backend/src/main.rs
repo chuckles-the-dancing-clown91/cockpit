@@ -24,12 +24,13 @@ use errors::AppError;
 use ideas::{
     archive_idea_handler, create_idea_for_article_handler, create_idea_handler, get_idea_handler,
     list_ideas_handler, update_idea_article_handler, update_idea_metadata_handler,
-    update_idea_notes_handler, IdeaDto,
+    update_idea_notes_handler, CreateIdeaForArticleInput, CreateIdeaInput, IdeaDto,
+    UpdateIdeaArticleInput, UpdateIdeaMetadataInput, UpdateIdeaNotesInput,
 };
 use news::{
-    dismiss_news_article_handler, get_news_article_handler, get_news_settings_handler,
-    list_news_articles_handler, mark_news_article_read_handler, save_news_settings_handler,
-    sync_news_now_handler, toggle_star_news_article_handler,
+    dismiss_news_article_handler, get_news_settings_handler, list_news_articles_handler,
+    mark_news_article_read_handler, save_news_settings_handler, sync_news_now_handler,
+    toggle_star_news_article_handler,
 };
 use news::{NewsArticleDto, NewsSettingsDto, NewsSourceDto, SaveNewsSettingsInput};
 use scheduler::{start_scheduler, SystemTaskDto};
@@ -180,13 +181,6 @@ async fn list_news_articles(
 }
 
 #[tauri::command]
-async fn get_news_article(id: i64, state: State<'_, AppState>) -> Result<NewsArticleDto, String> {
-    get_news_article_handler(id, &state)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 async fn dismiss_news_article(id: i64, state: State<'_, AppState>) -> Result<(), String> {
     dismiss_news_article_handler(id, &state)
         .await
@@ -242,13 +236,13 @@ async fn list_news_sources(
 #[tauri::command]
 async fn list_ideas(
     status: Option<String>,
-    include_removed: bool,
     search: Option<String>,
-    limit: Option<i64>,
-    offset: Option<i64>,
+    include_removed: Option<bool>,
+    limit: Option<u64>,
+    offset: Option<u64>,
     state: State<'_, AppState>,
 ) -> Result<Vec<IdeaDto>, String> {
-    list_ideas_handler(status, include_removed, search, limit, offset, &state)
+    list_ideas_handler(status, search, include_removed, limit, offset, &state)
         .await
         .map_err(|e| e.to_string())
 }
@@ -262,33 +256,20 @@ async fn get_idea(id: i64, state: State<'_, AppState>) -> Result<IdeaDto, String
 
 #[tauri::command]
 async fn create_idea(
-    title: String,
-    summary: Option<String>,
-    news_article_id: Option<i64>,
-    target: Option<String>,
-    initial_status: Option<String>,
-    tags: Option<Vec<String>>,
+    input: CreateIdeaInput,
     state: State<'_, AppState>,
 ) -> Result<IdeaDto, String> {
-    create_idea_handler(
-        title,
-        summary,
-        news_article_id,
-        target,
-        initial_status,
-        tags,
-        &state,
-    )
-    .await
-    .map_err(|e| e.to_string())
+    create_idea_handler(input, &state)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn create_idea_for_article(
-    article_id: i64,
+    input: CreateIdeaForArticleInput,
     state: State<'_, AppState>,
 ) -> Result<IdeaDto, String> {
-    create_idea_for_article_handler(article_id, &state)
+    create_idea_for_article_handler(input, &state)
         .await
         .map_err(|e| e.to_string())
 }
@@ -296,29 +277,21 @@ async fn create_idea_for_article(
 #[tauri::command]
 async fn update_idea_metadata(
     id: i64,
-    title: Option<String>,
-    summary: Option<String>,
-    status: Option<String>,
-    target: Option<String>,
-    tags: Option<Vec<String>>,
-    priority: Option<i64>,
-    is_pinned: Option<bool>,
+    input: UpdateIdeaMetadataInput,
     state: State<'_, AppState>,
 ) -> Result<IdeaDto, String> {
-    update_idea_metadata_handler(
-        id, title, summary, status, target, tags, priority, is_pinned, &state,
-    )
-    .await
-    .map_err(|e| e.to_string())
+    update_idea_metadata_handler(id, input, &state)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn update_idea_notes(
     id: i64,
-    notes_markdown: String,
+    input: UpdateIdeaNotesInput,
     state: State<'_, AppState>,
-) -> Result<(), String> {
-    update_idea_notes_handler(id, notes_markdown, &state)
+) -> Result<IdeaDto, String> {
+    update_idea_notes_handler(id, input, &state)
         .await
         .map_err(|e| e.to_string())
 }
@@ -326,17 +299,16 @@ async fn update_idea_notes(
 #[tauri::command]
 async fn update_idea_article(
     id: i64,
-    article_title: Option<String>,
-    article_markdown: String,
+    input: UpdateIdeaArticleInput,
     state: State<'_, AppState>,
-) -> Result<(), String> {
-    update_idea_article_handler(id, article_title, article_markdown, &state)
+) -> Result<IdeaDto, String> {
+    update_idea_article_handler(id, input, &state)
         .await
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn archive_idea(id: i64, state: State<'_, AppState>) -> Result<(), String> {
+async fn archive_idea(id: i64, state: State<'_, AppState>) -> Result<IdeaDto, String> {
     archive_idea_handler(id, &state)
         .await
         .map_err(|e| e.to_string())

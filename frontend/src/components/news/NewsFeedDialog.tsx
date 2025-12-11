@@ -1,7 +1,8 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { invoke } from '@tauri-apps/api/core';
+import { toast } from 'sonner';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { ScrollArea } from '../ui/ScrollArea';
@@ -22,6 +23,8 @@ type Props = {
   defaultOpen?: boolean;
 };
 
+type NewsFeedStatus = NonNullable<Parameters<typeof useNewsArticles>[0]['status']>;
+
 type RunTaskNowResult = {
   status: string;
   result?: string | null;
@@ -31,13 +34,17 @@ type RunTaskNowResult = {
 
 export function NewsFeedDialog({ trigger, defaultOpen = false }: Props) {
   const [open, setOpen] = useState(defaultOpen);
-  const [status, setStatus] = useState<'unread' | 'all' | 'dismissed' | 'ideas'>('unread');
+  const [status, setStatus] = useState<NewsFeedStatus>('unread');
   const [showSettings, setShowSettings] = useState(true);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const [selected, setSelected] = useState<NewsArticle | null>(null);
   const { data: settings } = useNewsSettings();
   const [offset, setOffset] = useState(0);
   const [search, setSearch] = useState('');
+  const handleStatusChange = (next: typeof status) => {
+    setStatus(next);
+    setOffset(0);
+  };
   const pageSize = 30;
   const { data: articles, isLoading, refetch } = useNewsArticles({ status, limit: offset + pageSize, offset: 0, search });
   const { data: sources } = useNewsSources({ country: settings?.countries?.[0], language: settings?.language ?? undefined });
@@ -47,6 +54,20 @@ export function NewsFeedDialog({ trigger, defaultOpen = false }: Props) {
     mutationFn: async (id: number) => invoke('mark_news_article_read', { id }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['newsArticles'] });
+    },
+  });
+
+  const createIdeaMutation = useMutation({
+    mutationFn: async (id: number) => invoke('create_idea_for_article', { article_id: id }),
+    onSuccess: (_, articleId) => {
+      toast.success('Added to Ideas inbox');
+      qc.invalidateQueries({ queryKey: ['articleIdeas'] });
+      qc.invalidateQueries({ queryKey: ['newsArticles'] });
+      markReadMutation.mutate(articleId);
+      setSelected(null);
+    },
+    onError: (err: any) => {
+      toast.error(err?.message ?? 'Failed to create idea for article');
     },
   });
 
@@ -86,17 +107,6 @@ export function NewsFeedDialog({ trigger, defaultOpen = false }: Props) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['newsSources'] });
     },
-  });
-
-  const createIdeaMutation = useMutation({
-    mutationFn: async (articleId: number) => invoke('create_idea_for_article', { articleId }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['newsArticles'] });
-      qc.invalidateQueries({ queryKey: ['ideas'] });
-      setSelected(null);
-      setSyncStatus('Review added to Ideas');
-    },
-    onError: (err: any) => setSyncStatus(err?.message ?? 'Could not create idea'),
   });
 
   const unreadCount =
@@ -146,11 +156,24 @@ export function NewsFeedDialog({ trigger, defaultOpen = false }: Props) {
               />
             </div>
               <div className="flex flex-wrap gap-2 items-center">
-                <Button variant="subtle" size="sm" onClick={() => setStatus('unread')}>
+                <Button variant={status === 'unread' ? 'solid' : 'subtle'} size="sm" onClick={() => setStatus('unread')}>
                   Unread
                 </Button>
-                <Button variant="subtle" size="sm" onClick={() => setStatus('all')}>
+                <Button variant={status === 'all' ? 'solid' : 'subtle'} size="sm" onClick={() => setStatus('all')}>
                   All
+                </Button>
+                <Button variant={status === 'dismissed' ? 'solid' : 'subtle'} size="sm" onClick={() => setStatus('dismissed')}>
+                  Dismissed
+                </Button>
+                <Button variant={status === 'ideas' ? 'solid' : 'subtle'} size="sm" onClick={() => setStatus('ideas')}>
+                  Ideas
+                </Button>
+                <Button
+                  variant={status === 'ideas' ? 'solid' : 'subtle'}
+                  size="sm"
+                  onClick={() => handleStatusChange('ideas')}
+                >
+                  Ideas
                 </Button>
                 <Button
                   variant={showSettings ? 'outline' : 'subtle'}
@@ -248,10 +271,11 @@ export function NewsFeedDialog({ trigger, defaultOpen = false }: Props) {
           }
         }}
         onCreateIdea={() => {
-          if (selected) {
+          if (selected && !selected.addedToIdeasAt) {
             createIdeaMutation.mutate(selected.id);
           }
         }}
+        creatingIdea={createIdeaMutation.isLoading}
       />
     </Dialog.Root>
   );
@@ -326,7 +350,12 @@ function ArticleCard({
         {article.excerpt ?? 'No excerpt available.'}
       </Card.Body>
       <Card.Footer className="px-3 pb-3 pt-2">
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {article.addedToIdeasAt ? (
+            <span className="text-xs px-2 py-1 rounded-full bg-[var(--color-surface-soft)] text-[var(--color-text-soft)] border border-[var(--color-border-subtle)]">
+              In Ideas
+            </span>
+          ) : null}
           <Button variant="ghost" size="sm" className="border border-[var(--color-border)]" onClick={onStar}>
             {article.isStarred ? 'Unstar' : 'Star'}
           </Button>
@@ -348,12 +377,14 @@ function ArticleDetailsDialog({
   onDismiss,
   onStar,
   onCreateIdea,
+  creatingIdea,
 }: {
   article: NewsArticle | null;
   onClose: () => void;
   onDismiss: () => void;
   onStar: () => void;
   onCreateIdea: () => void;
+  creatingIdea: boolean;
 }) {
   if (!article) return null;
   const metaSource = article.sourceName || article.sourceDomain || article.sourceId || 'Unknown source';
@@ -397,11 +428,16 @@ function ArticleDetailsDialog({
             <p>{article.excerpt || 'No excerpt available.'}</p>
           </div>
         </ScrollArea>
-          <div className="p-4 border-t border-[var(--color-border-subtle)] flex items-center justify-between">
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={onCreateIdea}>
-              Review for article
-            </Button>
+        <div className="p-4 border-t border-[var(--color-border-subtle)] flex items-center justify-between">
+        <div className="flex gap-2 items-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={!!article.addedToIdeasAt || creatingIdea}
+            onClick={onCreateIdea}
+          >
+            {article.addedToIdeasAt ? 'Added to Ideas' : creatingIdea ? 'Adding…' : 'Add to Ideas'}
+          </Button>
             {article.url ? (
               <a
                 className="text-sm underline text-[var(--color-text-primary)]"

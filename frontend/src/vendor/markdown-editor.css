@@ -1,0 +1,5 @@
+/* Lightweight placeholder styles for the markdown editor. */
+.md-editor-stub {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}

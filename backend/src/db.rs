@@ -1,7 +1,9 @@
 use crate::errors::AppError;
 use crate::{ideas, news_articles, news_settings, news_sources, system_task_runs, system_tasks};
 use sea_orm::prelude::Expr;
-use sea_orm::sea_query::{ColumnDef, SqliteQueryBuilder, Table, TableCreateStatement};
+use sea_orm::sea_query::{
+    ColumnDef, ForeignKey, ForeignKeyAction, SqliteQueryBuilder, Table, TableCreateStatement,
+};
 use sea_orm::{
     ConnectOptions, ConnectionTrait, Database, DatabaseConnection, EntityName, Schema, Statement,
 };
@@ -320,6 +322,64 @@ pub async fn init_db(db_url: &str) -> Result<DatabaseConnection, AppError> {
     db.execute(Statement::from_string(
         builder,
         create_articles.to_string(SqliteQueryBuilder),
+    ))
+    .await?;
+
+    let create_ideas: TableCreateStatement = Table::create()
+        .table(ideas::Entity.table_ref())
+        .if_not_exists()
+        .col(
+            ColumnDef::new(ideas::Column::Id)
+                .integer()
+                .not_null()
+                .primary_key()
+                .auto_increment(),
+        )
+        .col(ColumnDef::new(ideas::Column::Title).string().not_null())
+        .col(ColumnDef::new(ideas::Column::Summary).string())
+        .col(ColumnDef::new(ideas::Column::Status).string().not_null())
+        .col(ColumnDef::new(ideas::Column::NewsArticleId).integer())
+        .col(ColumnDef::new(ideas::Column::Target).string())
+        .col(ColumnDef::new(ideas::Column::Tags).string())
+        .col(ColumnDef::new(ideas::Column::NotesMarkdown).string())
+        .col(ColumnDef::new(ideas::Column::ArticleTitle).string())
+        .col(ColumnDef::new(ideas::Column::ArticleMarkdown).string())
+        .col(
+            ColumnDef::new(ideas::Column::DateAdded)
+                .date_time()
+                .not_null()
+                .default(Expr::current_timestamp()),
+        )
+        .col(
+            ColumnDef::new(ideas::Column::DateUpdated)
+                .date_time()
+                .not_null()
+                .default(Expr::current_timestamp()),
+        )
+        .col(ColumnDef::new(ideas::Column::DateCompleted).date_time())
+        .col(ColumnDef::new(ideas::Column::DateRemoved).date_time())
+        .col(
+            ColumnDef::new(ideas::Column::Priority)
+                .integer()
+                .not_null()
+                .default(0),
+        )
+        .col(
+            ColumnDef::new(ideas::Column::IsPinned)
+                .integer()
+                .not_null()
+                .default(0),
+        )
+        .foreign_key(
+            ForeignKey::create()
+                .from(ideas::Entity, ideas::Column::NewsArticleId)
+                .to(news_articles::Entity, news_articles::Column::Id)
+                .on_delete(ForeignKeyAction::SetNull),
+        )
+        .to_owned();
+    db.execute(Statement::from_string(
+        builder,
+        create_ideas.to_string(SqliteQueryBuilder),
     ))
     .await?;
 
