@@ -31,7 +31,7 @@ export function DashboardView() {
     refetch: refetchFeed,
     isFetching: feedFetching,
   } = useMixedFeed();
-  const { data: ideas, isLoading: ideasLoading } = useArticleIdeas('in_progress');
+  const { data: ideas, isLoading: ideasLoading } = useArticleIdeas({ status: 'inbox' });
   const { data: jobs, isLoading: jobsLoading } = useScheduledJobs();
   const { data: newsArticles } = useNewsArticles({ status: 'unread', limit: 50 });
   const [syncing, setSyncing] = useState(false);

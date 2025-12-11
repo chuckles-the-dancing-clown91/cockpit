@@ -68,6 +68,17 @@ export type UpdateArticleIdeaArticleInput = {
   id: number;
   articleTitle?: string | null;
   articleMarkdown?: string | null;
+  status: 'inbox' | 'planned' | 'drafting' | 'archived';
+  priority?: 'low' | 'normal' | 'high';
+  isPinned?: boolean;
+  articleMarkdown?: string;
+  notesMarkdown?: string;
+  notes?: string;
+  sourceUrl?: string;
+  newsArticleId?: number | null;
+  newsArticle?: NewsArticle;
+  createdAt?: string;
+  dateRemoved?: string | null;
 };
 
 export type Job = {
@@ -218,78 +229,53 @@ export function useUpcomingEvents(horizonMinutes = 480) {
   });
 }
 
-export function useArticleIdeas(status?: ArticleIdea['status']) {
+function normalizeIdea(raw: any): ArticleIdea {
+  return {
+    id: raw.id,
+    title: raw.title ?? 'Untitled idea',
+    status: raw.status ?? 'inbox',
+    priority: raw.priority ?? raw.idea_priority ?? 'normal',
+    isPinned: raw.is_pinned ?? raw.pinned ?? false,
+    articleMarkdown: raw.article_markdown ?? raw.articleMarkdown ?? '',
+    notesMarkdown: raw.notes_markdown ?? raw.notesMarkdown ?? raw.notes ?? '',
+    notes: raw.notes ?? raw.notes_markdown ?? '',
+    sourceUrl: raw.source_url ?? raw.sourceUrl,
+    newsArticleId: raw.news_article_id ?? raw.newsArticleId ?? null,
+    newsArticle: raw.news_article ?? raw.newsArticle,
+    createdAt: raw.created_at ?? raw.createdAt,
+    dateRemoved: raw.date_removed ?? raw.dateRemoved ?? null,
+  } as ArticleIdea;
+}
+
+export function useArticleIdeas(params: { status?: ArticleIdea['status'] | 'all'; search?: string } = {}) {
+  const { status, search } = params;
+  const normalizedStatus = status && status !== 'all' ? status : undefined;
   return useQuery({
-    queryKey: ['articleIdeas', status],
-    queryFn: () => invoke<ArticleIdea[]>('list_ideas', status ? { status } : {}),
-  });
-}
-
-export function useArticleIdea(id?: number) {
-  return useQuery({
-    queryKey: ['articleIdea', id],
-    queryFn: () => invoke<ArticleIdea>('get_idea', { id }),
-    enabled: typeof id === 'number',
-  });
-}
-
-export function useCreateArticleIdea() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: CreateArticleIdeaInput) => invoke<ArticleIdea>('create_idea', input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['articleIdeas'] }),
-  });
-}
-
-export function useUpdateArticleIdeaMetadata() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: UpdateArticleIdeaMetadataInput) => invoke<ArticleIdea>('update_idea_metadata', input),
-    onSuccess: (updated) => {
-      qc.invalidateQueries({ queryKey: ['articleIdeas'] });
-      if (updated?.id) {
-        qc.invalidateQueries({ queryKey: ['articleIdea', updated.id] });
-      }
-    },
-  });
-}
-
-export function useUpdateArticleIdeaNotes() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: UpdateArticleIdeaNotesInput) => invoke<ArticleIdea>('update_idea_notes', input),
-    onSuccess: (updated) => {
-      qc.invalidateQueries({ queryKey: ['articleIdeas'] });
-      if (updated?.id) {
-        qc.invalidateQueries({ queryKey: ['articleIdea', updated.id] });
-      }
-    },
-  });
-}
-
-export function useUpdateArticleIdeaArticle() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: UpdateArticleIdeaArticleInput) => invoke<ArticleIdea>('update_idea_article', input),
-    onSuccess: (updated) => {
-      qc.invalidateQueries({ queryKey: ['articleIdeas'] });
-      if (updated?.id) {
-        qc.invalidateQueries({ queryKey: ['articleIdea', updated.id] });
-      }
-    },
-  });
-}
-
-export function useArchiveArticleIdea() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: number) => invoke<ArticleIdea>('archive_idea', { id }),
-    onSuccess: (updated) => {
-      qc.invalidateQueries({ queryKey: ['articleIdeas'] });
-      if (updated?.id) {
-        qc.invalidateQueries({ queryKey: ['articleIdea', updated.id] });
-      }
-    },
+    queryKey: ['articleIdeas', normalizedStatus, search],
+    queryFn: () =>
+      invokeWithFallback(
+        'list_ideas',
+        { status: normalizedStatus, search },
+        [
+          {
+            id: 1,
+            title: 'Build a moderator autopilot',
+            notes_markdown: 'Blend Reddit mod actions with calendar events',
+            status: 'inbox',
+            article_markdown: '# Draft outline\n- automation\n- safety nets',
+            news_article_id: 42,
+            news_article: {
+              id: 42,
+              title: 'Mock reference article',
+              sourceName: 'mock.news',
+              url: 'https://example.com/mock',
+              tags: ['ai'],
+              country: [],
+            },
+            created_at: new Date().toISOString(),
+          },
+        ] as ArticleIdea[]
+      ).then((ideas) => ideas.map(normalizeIdea)),
   });
 }
 
