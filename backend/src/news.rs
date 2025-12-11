@@ -4,6 +4,7 @@ use tracing::{info, warn, error};
 use chrono::Datelike;
 use crate::crypto;
 use crate::news_articles::{self, Entity as EntityNewsArticles};
+use crate::news_sources::{self, Entity as EntityNewsSources};
 use crate::news_settings::{self, Entity as EntityNewsSettings};
 use crate::errors::{AppError, AppResult};
 use crate::scheduler::TaskRunResult;
@@ -13,15 +14,22 @@ use crate::AppState;
 #[serde(rename_all = "camelCase")]
 pub struct NewsArticleDto {
     pub id: i64,
+    pub article_id: Option<String>,
     pub title: String,
     pub excerpt: Option<String>,
     pub url: Option<String>,
     pub source_name: Option<String>,
     pub source_domain: Option<String>,
+    pub source_id: Option<String>,
     pub tags: Vec<String>,
+    pub country: Vec<String>,
     pub language: Option<String>,
     pub category: Option<String>,
     pub published_at: Option<String>,
+    pub fetched_at: Option<String>,
+    pub added_via: Option<String>,
+    pub is_starred: bool,
+    pub is_dismissed: bool,
     pub added_to_ideas_at: Option<String>,
     pub dismissed_at: Option<String>,
 }
@@ -66,9 +74,25 @@ pub struct SaveNewsSettingsInput {
     pub daily_call_limit: Option<i64>,
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewsSourceDto {
+    pub id: i64,
+    pub source_id: String,
+    pub name: String,
+    pub url: Option<String>,
+    pub country: Option<String>,
+    pub language: Option<String>,
+    pub category: Vec<String>,
+    pub is_active: bool,
+    pub is_muted: bool,
+}
+
 #[derive(serde::Deserialize)]
 struct NewsApiResponse {
     status: Option<String>,
+    #[serde(rename = "totalResults")]
+    total_results: Option<i64>,
     results: Option<Vec<NewsApiArticle>>,
     #[serde(rename = "nextPage")]
     next_page: Option<String>,
@@ -100,10 +124,34 @@ struct NewsApiArticle {
     pub_date: Option<String>,
 }
 
+#[derive(serde::Deserialize)]
+struct NewsSourceApiResponse {
+    status: Option<String>,
+    results: Option<Vec<NewsSourceApiItem>>,
+    #[serde(rename = "nextPage")]
+    next_page: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct NewsSourceApiItem {
+    #[serde(rename = "source_id")]
+    source_id: String,
+    name: String,
+    url: Option<String>,
+    country: Option<StringOrVec>,
+    language: Option<String>,
+    category: Option<Vec<String>>,
+}
+
 fn parse_vec(json: &Option<String>) -> Vec<String> {
     json.as_ref()
         .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
         .unwrap_or_default()
+}
+
+fn to_json_vec_str(v: &Option<Vec<String>>) -> Option<String> {
+    v.as_ref()
+        .map(|vec| serde_json::to_string(vec).unwrap_or_else(|_| "[]".into()))
 }
 
 fn to_json_vec(v: &Option<Vec<String>>) -> Option<String> {
@@ -271,14 +319,21 @@ pub async fn save_news_settings_handler(
 fn article_to_dto(m: news_articles::Model) -> NewsArticleDto {
     NewsArticleDto {
         id: m.id,
+        article_id: m.provider_article_id,
         title: m.title,
         excerpt: m.excerpt,
         url: m.url,
         source_name: m.source_name,
         source_domain: m.source_domain,
+        source_id: m.source_id,
         tags: parse_vec(&m.tags),
+        country: parse_vec(&m.country),
         language: m.language,
         category: m.category,
+        fetched_at: Some(m.fetched_at.to_rfc3339()),
+        added_via: Some(m.added_via),
+        is_starred: m.is_starred == 1,
+        is_dismissed: m.is_dismissed == 1,
         published_at: m.published_at.map(|d| d.to_rfc3339()),
         added_to_ideas_at: m.added_to_ideas_at.map(|d| d.to_rfc3339()),
         dismissed_at: m.dismissed_at.map(|d| d.to_rfc3339()),
@@ -288,6 +343,9 @@ fn article_to_dto(m: news_articles::Model) -> NewsArticleDto {
 pub async fn list_news_articles_handler(
     status: Option<String>,
     limit: Option<u64>,
+    offset: Option<u64>,
+    include_dismissed: Option<bool>,
+    search: Option<String>,
     state: &crate::AppState,
 ) -> AppResult<Vec<NewsArticleDto>> {
     let mut query = EntityNewsArticles::find().filter(news_articles::Column::UserId.eq(1));
@@ -295,15 +353,33 @@ pub async fn list_news_articles_handler(
         Some("unread") => {
             query = query
                 .filter(news_articles::Column::DismissedAt.is_null())
-                .filter(news_articles::Column::AddedToIdeasAt.is_null());
+                .filter(news_articles::Column::AddedToIdeasAt.is_null())
+                .filter(news_articles::Column::IsDismissed.eq(0));
         }
-        Some("dismissed") => query = query.filter(news_articles::Column::DismissedAt.is_not_null()),
+        Some("dismissed") => query = query.filter(news_articles::Column::IsDismissed.eq(1)),
         Some("ideas") => query = query.filter(news_articles::Column::AddedToIdeasAt.is_not_null()),
-        _ => {}
+        _ => {
+            if include_dismissed != Some(true) {
+                query = query.filter(news_articles::Column::IsDismissed.eq(0));
+            }
+        }
+    }
+    if let Some(term) = search {
+        if !term.trim().is_empty() {
+            let like = format!("%{}%", term.trim());
+            query = query.filter(
+                news_articles::Column::Title
+                    .like(like.clone())
+                    .or(news_articles::Column::Excerpt.like(like.clone()))
+                    .or(news_articles::Column::Content.like(like)),
+            );
+        }
     }
     let items = query
         .order_by_desc(news_articles::Column::PublishedAt)
+        .order_by_desc(news_articles::Column::FetchedAt)
         .limit(limit.unwrap_or(30))
+        .offset(offset.unwrap_or(0))
         .all(&state.db)
         .await?;
     Ok(items.into_iter().map(article_to_dto).collect())
@@ -314,9 +390,64 @@ pub async fn dismiss_news_article_handler(id: i64, state: &crate::AppState) -> A
     let Some(m) = model else { return Err(AppError::Other("not found".into())); };
     let mut active: news_articles::ActiveModel = m.into();
     active.dismissed_at = sea_orm::Set(Some(chrono::Utc::now()));
+    active.is_dismissed = sea_orm::Set(1);
     active.updated_at = sea_orm::Set(chrono::Utc::now());
     active.update(&state.db).await?;
     Ok(())
+}
+
+pub async fn toggle_star_news_article_handler(id: i64, starred: bool, state: &crate::AppState) -> AppResult<()> {
+    let model = EntityNewsArticles::find_by_id(id).one(&state.db).await?;
+    let Some(m) = model else { return Err(AppError::Other("not found".into())); };
+    let mut active: news_articles::ActiveModel = m.into();
+    active.is_starred = sea_orm::Set(if starred { 1 } else { 0 });
+    active.updated_at = sea_orm::Set(chrono::Utc::now());
+    active.update(&state.db).await?;
+    Ok(())
+}
+
+pub async fn list_news_sources_handler(
+    country: Option<String>,
+    language: Option<String>,
+    search: Option<String>,
+    state: &crate::AppState,
+) -> AppResult<Vec<NewsSourceDto>> {
+    let mut query = EntityNewsSources::find();
+    if let Some(c) = country {
+        if !c.trim().is_empty() {
+            query = query.filter(news_sources::Column::Country.eq(c.trim().to_string()));
+        }
+    }
+    if let Some(l) = language {
+        if !l.trim().is_empty() {
+            query = query.filter(news_sources::Column::Language.eq(l.trim().to_string()));
+        }
+    }
+    if let Some(s) = search {
+        if !s.trim().is_empty() {
+            let like = format!("%{}%", s.trim());
+            query = query.filter(
+                news_sources::Column::Name
+                    .like(like.clone())
+                    .or(news_sources::Column::SourceId.like(like.clone())),
+            );
+        }
+    }
+    let rows = query.all(&state.db).await?;
+    Ok(rows
+        .into_iter()
+        .map(|m| NewsSourceDto {
+            id: m.id,
+            source_id: m.source_id,
+            name: m.name,
+            url: m.url,
+            country: m.country,
+            language: m.language,
+            category: parse_vec(&m.category),
+            is_active: m.is_active == 1,
+            is_muted: m.is_muted == 1,
+        })
+        .collect())
 }
 
 pub async fn sync_news_now_handler(state: &crate::AppState) -> AppResult<crate::scheduler::RunTaskNowResult> {
@@ -327,6 +458,23 @@ pub async fn sync_news_now_handler(state: &crate::AppState) -> AppResult<crate::
         "success" => info!("news_sync: completed ok"),
         "skipped" => warn!("news_sync: skipped - {:?}", res.result_json),
         _ => error!("news_sync: error - {:?}", res.error_message),
+    }
+    Ok(crate::scheduler::RunTaskNowResult {
+        status: res.status.to_string(),
+        result: res.result_json,
+        error_message: res.error_message,
+        finished_at,
+    })
+}
+
+pub async fn sync_news_sources_now_handler(state: &crate::AppState) -> AppResult<crate::scheduler::RunTaskNowResult> {
+    info!("news_sources_sync: manual trigger invoked");
+    let res = run_news_sources_sync_task(state).await;
+    let finished_at = chrono::Utc::now().to_rfc3339();
+    match res.status {
+        "success" => info!("news_sources_sync: completed ok"),
+        "skipped" => warn!("news_sources_sync: skipped - {:?}", res.result_json),
+        _ => error!("news_sources_sync: error - {:?}", res.error_message),
     }
     Ok(crate::scheduler::RunTaskNowResult {
         status: res.status.to_string(),
@@ -440,6 +588,13 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
         if !countries.is_empty() {
             req = req.query(&[("country", &countries.join(","))]);
         }
+        if let Some(srcs) = &settings.sources {
+            if let Ok(list) = serde_json::from_str::<Vec<String>>(srcs) {
+                if !list.is_empty() {
+                    req = req.query(&[("source_id", list.join(","))]);
+                }
+            }
+        }
         if !categories.is_empty() {
             req = req.query(&[("category", &categories.join(","))]);
         }
@@ -509,11 +664,12 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
                     None => vec![],
                 };
                 let tags = to_json_vec(&Some(tags_vec.clone()));
-                let country = match art.country {
-                    Some(StringOrVec::String(s)) => Some(s),
-                    Some(StringOrVec::Vec(v)) => v.first().cloned(),
-                    None => None,
+                let country_vec = match art.country {
+                    Some(StringOrVec::String(s)) => vec![s],
+                    Some(StringOrVec::Vec(v)) => v,
+                    None => vec![],
                 };
+                let country_json = to_json_vec(&Some(country_vec.clone()));
                 let published_at = art
                     .pub_date
                     .as_ref()
@@ -529,9 +685,8 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
                     active.image_url = Set(art.image_url.clone());
                     active.language = Set(art.language.clone());
                     active.category = Set(tags_vec.first().cloned());
-                    if let Some(c) = country.clone() {
-                        active.source_domain = Set(Some(c));
-                    }
+                    active.country = Set(country_json.clone());
+                    active.source_id = Set(art.source_id.clone());
                     active.published_at = Set(published_at);
                     active.updated_at = Set(chrono::Utc::now());
                     if let Err(e) = active.update(&state.db).await {
@@ -544,17 +699,23 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
                         user_id: Set(1),
                         provider: Set(provider.clone()),
                         provider_article_id: Set(art.article_id.clone()),
+                        source_id: Set(art.source_id.clone()),
                         source_name: Set(art.source_id.clone()),
                         source_domain: Set(None),
                         title: Set(title.clone()),
                         excerpt: Set(art.description.clone()),
                         content: Set(art.content.clone()),
                         tags: Set(tags.clone()),
+                        country: Set(country_json.clone()),
                         url: Set(url.clone()),
                         image_url: Set(art.image_url.clone()),
                         language: Set(art.language.clone()),
                         category: Set(tags_vec.first().cloned()),
                         published_at: Set(published_at),
+                        fetched_at: Set(chrono::Utc::now()),
+                        added_via: Set("sync".into()),
+                        is_starred: Set(0),
+                        is_dismissed: Set(0),
                         added_to_ideas_at: Set(None),
                         dismissed_at: Set(None),
                         is_pinned: Set(0),
@@ -578,19 +739,24 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
         }
     }
 
+    let max_keep = settings.max_stored.unwrap_or(settings.max_articles);
+
     if let Ok(total) = EntityNewsArticles::find()
         .filter(news_articles::Column::UserId.eq(1))
         .count(&state.db)
         .await
     {
-        if total as i64 > settings.max_articles {
-            let to_delete = total as i64 - settings.max_articles;
+        if total as i64 > max_keep {
+            let to_delete = total as i64 - max_keep;
             let ids = EntityNewsArticles::find()
                 .filter(news_articles::Column::UserId.eq(1))
                 .filter(news_articles::Column::IsPinned.eq(0))
+                .filter(news_articles::Column::IsStarred.eq(0))
+                .filter(news_articles::Column::IsDismissed.eq(0))
                 .filter(news_articles::Column::AddedToIdeasAt.is_null())
                 .filter(news_articles::Column::DismissedAt.is_null())
-                .order_by_asc(news_articles::Column::CreatedAt)
+                .order_by_asc(news_articles::Column::PublishedAt)
+                .order_by_asc(news_articles::Column::FetchedAt)
                 .limit(to_delete as u64)
                 .all(&state.db)
                 .await
@@ -618,6 +784,139 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
         status: "success",
         result_json: Some(
             serde_json::json!({"inserted": inserted, "updated": updated, "callsUsed": calls_used}).to_string(),
+        ),
+        error_message: None,
+    }
+}
+
+pub async fn run_news_sources_sync_task(state: &crate::AppState) -> TaskRunResult {
+    let client = Client::new();
+    let settings = EntityNewsSettings::find()
+        .filter(news_settings::Column::UserId.eq(1))
+        .filter(news_settings::Column::Provider.eq("newsdata"))
+        .one(&state.db)
+        .await;
+
+    let settings = match settings {
+        Ok(Some(s)) => s,
+        _ => return TaskRunResult { status: "skipped", result_json: Some("{\"reason\":\"no settings\"}".into()), error_message: None },
+    };
+
+    if settings.api_key_encrypted.is_empty() {
+        return TaskRunResult { status: "skipped", result_json: Some("{\"reason\":\"no api key\"}".into()), error_message: None };
+    }
+
+    let api_key = match crypto::decrypt_api_key(&settings.api_key_encrypted) {
+        Ok(k) => k,
+        Err(e) => {
+            return TaskRunResult { status: "error", result_json: None, error_message: Some(format!("decrypt api key failed: {e}")) }
+        }
+    };
+
+    let mut next_page: Option<String> = None;
+    let mut seen = 0;
+    let mut updated = 0;
+    let mut inserted = 0;
+
+    loop {
+        let mut req = client
+            .get("https://newsdata.io/api/1/sources")
+            .query(&[("apikey", api_key.as_str())]);
+        if let Some(lang) = &settings.language {
+            if !lang.trim().is_empty() {
+                req = req.query(&[("language", lang.trim())]);
+            }
+        }
+        if let Some(countries) = &settings.countries {
+            if let Ok(list) = serde_json::from_str::<Vec<String>>(countries) {
+                if !list.is_empty() {
+                    req = req.query(&[("country", list.join(",").as_str())]);
+                }
+            }
+        }
+        if let Some(next) = &next_page {
+            req = req.query(&[("page", next.as_str())]);
+        }
+
+        let resp = match req.send().await {
+            Ok(r) => r,
+            Err(e) => return TaskRunResult { status: "error", result_json: None, error_message: Some(e.to_string()) },
+        };
+        let status = resp.status();
+        let text = match resp.text().await {
+            Ok(t) => t,
+            Err(e) => return TaskRunResult { status: "error", result_json: None, error_message: Some(e.to_string()) },
+        };
+        if !status.is_success() {
+            let preview: String = text.chars().take(320).collect();
+            return TaskRunResult { status: "error", result_json: None, error_message: Some(format!("http {}: {}", status, preview)) };
+        }
+        let body: NewsSourceApiResponse = match serde_json::from_str(&text) {
+            Ok(b) => b,
+            Err(e) => {
+                let preview: String = text.chars().take(320).collect();
+                return TaskRunResult { status: "error", result_json: None, error_message: Some(format!("parse: {}; body: {}", e, preview)) };
+            }
+        };
+
+        if let Some(list) = body.results {
+            for item in list {
+                seen += 1;
+                let category = to_json_vec_str(&item.category);
+                let country = match item.country {
+                    Some(StringOrVec::String(s)) => Some(s),
+                    Some(StringOrVec::Vec(v)) => v.first().cloned(),
+                    None => None,
+                };
+                let existing = EntityNewsSources::find()
+                    .filter(news_sources::Column::SourceId.eq(item.source_id.clone()))
+                    .one(&state.db)
+                    .await
+                    .ok()
+                    .flatten();
+                if let Some(existing) = existing {
+                    let mut active: news_sources::ActiveModel = existing.into();
+                    active.name = Set(item.name.clone());
+                    active.url = Set(item.url.clone());
+                    active.country = Set(country.clone());
+                    active.language = Set(item.language.clone());
+                    active.category = Set(category.clone());
+                    active.updated_at = Set(chrono::Utc::now());
+                    if let Ok(_) = active.update(&state.db).await {
+                        updated += 1;
+                    }
+                } else {
+                    let active = news_sources::ActiveModel {
+                        source_id: Set(item.source_id.clone()),
+                        name: Set(item.name.clone()),
+                        url: Set(item.url.clone()),
+                        country: Set(country.clone()),
+                        language: Set(item.language.clone()),
+                        category: Set(category.clone()),
+                        is_active: Set(1),
+                        is_muted: Set(0),
+                        created_at: Set(chrono::Utc::now()),
+                        updated_at: Set(chrono::Utc::now()),
+                        ..Default::default()
+                    };
+                    if let Ok(_) = active.insert(&state.db).await {
+                        inserted += 1;
+                    }
+                }
+            }
+        }
+
+        if let Some(next) = body.next_page {
+            next_page = Some(next);
+        } else {
+            break;
+        }
+    }
+
+    TaskRunResult {
+        status: "success",
+        result_json: Some(
+            serde_json::json!({"sourcesSeen": seen, "inserted": inserted, "updated": updated}).to_string(),
         ),
         error_message: None,
     }

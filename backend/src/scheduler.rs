@@ -131,6 +131,7 @@ async fn run_task_once(app: &AppHandle, state: &AppState, task: SystemTask) -> T
 
     let result = match task.task_type.as_str() {
         "news_sync" => news::run_news_sync_task(state).await,
+        "news_sources_sync" => news::run_news_sources_sync_task(state).await,
         _ => TaskRunResult {
             status: "skipped",
             result_json: Some("{\"reason\":\"unknown task\"}".into()),

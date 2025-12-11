@@ -20,9 +20,9 @@ use tokio::sync::Mutex;
 use sea_orm::DatabaseConnection;
 
 use scheduler::{start_scheduler, SystemTaskDto};
-use news::{NewsArticleDto, SaveNewsSettingsInput, NewsSettingsDto};
+use news::{NewsArticleDto, SaveNewsSettingsInput, NewsSettingsDto, NewsSourceDto};
 use errors::AppError;
-use news::{list_news_articles_handler, dismiss_news_article_handler, save_news_settings_handler, get_news_settings_handler, sync_news_now_handler};
+use news::{list_news_articles_handler, dismiss_news_article_handler, save_news_settings_handler, get_news_settings_handler, sync_news_now_handler, toggle_star_news_article_handler};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -167,8 +167,15 @@ async fn save_news_settings(input: SaveNewsSettingsInput, state: State<'_, AppSt
 }
 
 #[tauri::command]
-async fn list_news_articles(status: Option<String>, limit: Option<u64>, state: State<'_, AppState>) -> Result<Vec<NewsArticleDto>, String> {
-    list_news_articles_handler(status, limit, &state).await.map_err(|e| e.to_string())
+async fn list_news_articles(
+    status: Option<String>,
+    limit: Option<u64>,
+    offset: Option<u64>,
+    include_dismissed: Option<bool>,
+    search: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<NewsArticleDto>, String> {
+    list_news_articles_handler(status, limit, offset, include_dismissed, search, &state).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -177,8 +184,23 @@ async fn dismiss_news_article(id: i64, state: State<'_, AppState>) -> Result<(),
 }
 
 #[tauri::command]
+async fn toggle_star_news_article(id: i64, starred: bool, state: State<'_, AppState>) -> Result<(), String> {
+    toggle_star_news_article_handler(id, starred, &state).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn sync_news_now(state: State<'_, AppState>) -> Result<scheduler::RunTaskNowResult, String> {
     sync_news_now_handler(&state).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn sync_news_sources_now(state: State<'_, AppState>) -> Result<scheduler::RunTaskNowResult, String> {
+    news::sync_news_sources_now_handler(&state).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn list_news_sources(country: Option<String>, language: Option<String>, search: Option<String>, state: State<'_, AppState>) -> Result<Vec<NewsSourceDto>, String> {
+    news::list_news_sources_handler(country, language, search, &state).await.map_err(|e| e.to_string())
 }
 
 fn main() {
@@ -215,7 +237,10 @@ fn main() {
             save_news_settings,
             list_news_articles,
             dismiss_news_article,
-            sync_news_now
+            toggle_star_news_article,
+            sync_news_now,
+            sync_news_sources_now,
+            list_news_sources
         ])
         .run(tauri::generate_context!())
         .expect("error while running Architect Cockpit backend");

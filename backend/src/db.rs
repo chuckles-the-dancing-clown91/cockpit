@@ -203,6 +203,17 @@ pub async fn init_db(db_url: &str) -> Result<DatabaseConnection, AppError> {
         vec![],
     ))
     .await?;
+    db.execute(Statement::from_sql_and_values(
+        builder,
+        r#"
+        INSERT OR IGNORE INTO system_tasks
+            (name, task_type, component, frequency_cron, frequency_seconds, enabled, created_at, updated_at)
+        VALUES
+            ('News Sources Sync', 'news_sources_sync', 'news', '0 0 2 * * * *', NULL, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+        "#,
+        vec![],
+    ))
+    .await?;
 
     Ok(db)
 }
