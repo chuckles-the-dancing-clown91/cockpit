@@ -2,27 +2,31 @@ mod config;
 mod crypto;
 mod db;
 mod errors;
+mod logging;
+mod news;
 mod news_articles;
 mod news_settings;
+mod news_sources;
+mod scheduler;
 mod system_task_runs;
 mod system_tasks;
-mod scheduler;
-mod news;
-mod news_sources;
-mod logging;
 
+use sea_orm::DatabaseConnection;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{async_runtime, Manager, State};
 use tokio::sync::Mutex;
-use sea_orm::DatabaseConnection;
 
-use scheduler::{start_scheduler, SystemTaskDto};
-use news::{NewsArticleDto, SaveNewsSettingsInput, NewsSettingsDto, NewsSourceDto};
 use errors::AppError;
-use news::{list_news_articles_handler, dismiss_news_article_handler, save_news_settings_handler, get_news_settings_handler, sync_news_now_handler, toggle_star_news_article_handler};
+use news::{
+    dismiss_news_article_handler, get_news_settings_handler, list_news_articles_handler,
+    mark_news_article_read_handler, save_news_settings_handler, sync_news_now_handler,
+    toggle_star_news_article_handler,
+};
+use news::{NewsArticleDto, NewsSettingsDto, NewsSourceDto, SaveNewsSettingsInput};
+use scheduler::{start_scheduler, SystemTaskDto};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -143,27 +147,48 @@ fn sync_calendar() -> Result<(), String> {
 
 #[tauri::command]
 async fn list_system_tasks(state: State<'_, AppState>) -> Result<Vec<SystemTaskDto>, String> {
-    scheduler::list_system_tasks_handler(&state).await.map_err(|e| e.to_string())
+    scheduler::list_system_tasks_handler(&state)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn run_system_task_now(task_type: String, state: State<'_, AppState>, app: tauri::AppHandle) -> Result<scheduler::RunTaskNowResult, String> {
-    scheduler::run_system_task_now_handler(task_type, &state, &app).await.map_err(|e| e.to_string())
+async fn run_system_task_now(
+    task_type: String,
+    state: State<'_, AppState>,
+    app: tauri::AppHandle,
+) -> Result<scheduler::RunTaskNowResult, String> {
+    scheduler::run_system_task_now_handler(task_type, &state, &app)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn update_system_task(task_type: String, input: scheduler::UpdateTaskInput, state: State<'_, AppState>) -> Result<SystemTaskDto, String> {
-    scheduler::update_system_task_handler(task_type, input, &state).await.map_err(|e| e.to_string())
+async fn update_system_task(
+    task_type: String,
+    input: scheduler::UpdateTaskInput,
+    state: State<'_, AppState>,
+) -> Result<SystemTaskDto, String> {
+    scheduler::update_system_task_handler(task_type, input, &state)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn get_news_settings(state: State<'_, AppState>) -> Result<NewsSettingsDto, String> {
-    get_news_settings_handler(&state).await.map_err(|e| e.to_string())
+    get_news_settings_handler(&state)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn save_news_settings(input: SaveNewsSettingsInput, state: State<'_, AppState>) -> Result<NewsSettingsDto, String> {
-    save_news_settings_handler(input, &state).await.map_err(|e| e.to_string())
+async fn save_news_settings(
+    input: SaveNewsSettingsInput,
+    state: State<'_, AppState>,
+) -> Result<NewsSettingsDto, String> {
+    save_news_settings_handler(input, &state)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -175,32 +200,62 @@ async fn list_news_articles(
     search: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<NewsArticleDto>, String> {
-    list_news_articles_handler(status, limit, offset, include_dismissed, search, &state).await.map_err(|e| e.to_string())
+    list_news_articles_handler(status, limit, offset, include_dismissed, search, &state)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn dismiss_news_article(id: i64, state: State<'_, AppState>) -> Result<(), String> {
-    dismiss_news_article_handler(id, &state).await.map_err(|e| e.to_string())
+    dismiss_news_article_handler(id, &state)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn toggle_star_news_article(id: i64, starred: bool, state: State<'_, AppState>) -> Result<(), String> {
-    toggle_star_news_article_handler(id, starred, &state).await.map_err(|e| e.to_string())
+async fn toggle_star_news_article(
+    id: i64,
+    starred: bool,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    toggle_star_news_article_handler(id, starred, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn mark_news_article_read(id: i64, state: State<'_, AppState>) -> Result<(), String> {
+    mark_news_article_read_handler(id, &state)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn sync_news_now(state: State<'_, AppState>) -> Result<scheduler::RunTaskNowResult, String> {
-    sync_news_now_handler(&state).await.map_err(|e| e.to_string())
+    sync_news_now_handler(&state)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn sync_news_sources_now(state: State<'_, AppState>) -> Result<scheduler::RunTaskNowResult, String> {
-    news::sync_news_sources_now_handler(&state).await.map_err(|e| e.to_string())
+async fn sync_news_sources_now(
+    state: State<'_, AppState>,
+) -> Result<scheduler::RunTaskNowResult, String> {
+    news::sync_news_sources_now_handler(&state)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn list_news_sources(country: Option<String>, language: Option<String>, search: Option<String>, state: State<'_, AppState>) -> Result<Vec<NewsSourceDto>, String> {
-    news::list_news_sources_handler(country, language, search, &state).await.map_err(|e| e.to_string())
+async fn list_news_sources(
+    country: Option<String>,
+    language: Option<String>,
+    search: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<NewsSourceDto>, String> {
+    news::list_news_sources_handler(country, language, search, &state)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 fn main() {
@@ -208,8 +263,10 @@ fn main() {
     logging::init_logging();
     tauri::Builder::default()
         .setup(|app| {
-            let db = async_runtime::block_on(async { db::init_db_from_env().await })
-                .map_err(|e| tauri::Error::Setup((Box::new(e) as Box<dyn std::error::Error>).into()))?;
+            let db =
+                async_runtime::block_on(async { db::init_db_from_env().await }).map_err(|e| {
+                    tauri::Error::Setup((Box::new(e) as Box<dyn std::error::Error>).into())
+                })?;
             let state = AppState {
                 db,
                 running: Arc::new(Mutex::new(HashSet::new())),
@@ -238,6 +295,7 @@ fn main() {
             list_news_articles,
             dismiss_news_article,
             toggle_star_news_article,
+            mark_news_article_read,
             sync_news_now,
             sync_news_sources_now,
             list_news_sources

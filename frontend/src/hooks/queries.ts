@@ -55,6 +55,7 @@ export type NewsArticle = {
   addedVia?: string;
   isStarred?: boolean;
   isDismissed?: boolean;
+  isRead?: boolean;
   publishedAt?: string;
   addedToIdeasAt?: string;
   dismissedAt?: string;
@@ -235,9 +236,10 @@ export function useNewsArticles(params: {
             id: 1,
             title: 'Mock: Latest AI policy update',
             excerpt: 'Placeholder article while backend is offline.',
-            source_name: 'mock',
+            sourceName: 'mock',
             tags: ['policy'],
-            published_at: new Date().toISOString(),
+            publishedAt: new Date().toISOString(),
+            isRead: false,
           },
         ] as NewsArticle[]
       ),
