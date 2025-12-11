@@ -231,17 +231,37 @@ export function useNewsArticles(params: {
       invokeWithFallback(
         'list_news_articles',
         { status, limit, offset, include_dismissed: includeDismissed, search },
-        [
-          {
-            id: 1,
-            title: 'Mock: Latest AI policy update',
-            excerpt: 'Placeholder article while backend is offline.',
-            sourceName: 'mock',
-            tags: ['policy'],
-            publishedAt: new Date().toISOString(),
-            isRead: false,
-          },
-        ] as NewsArticle[]
+        (() => {
+          const mock: NewsArticle[] = [
+            {
+              id: 1,
+              title: 'Mock: Latest AI policy update',
+              excerpt: 'Placeholder article while backend is offline.',
+              sourceName: 'mock',
+              tags: ['policy'],
+              publishedAt: new Date().toISOString(),
+              isRead: false,
+            },
+            {
+              id: 2,
+              title: 'Mock: Funding round for AI startup',
+              excerpt: 'Example item already reviewed into Ideas.',
+              sourceName: 'mock',
+              tags: ['funding'],
+              publishedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+              isRead: true,
+              addedToIdeasAt: new Date().toISOString(),
+            },
+          ];
+          switch (status) {
+            case 'unread':
+              return mock.filter((m) => !m.isRead && !m.addedToIdeasAt);
+            case 'ideas':
+              return mock.filter((m) => !!m.addedToIdeasAt);
+            default:
+              return mock;
+          }
+        })()
       ),
     staleTime: 1000 * 60,
   });
