@@ -1,0 +1,1020 @@
+
+Architect Cockpit – news.txt
+============================
+
+Purpose
+-------
+
+This document specifies the **News Feed subsystem** for Architect Cockpit.
+
+Goals:
+
+- Pull articles from NewsData.io using the **latest** and **archive** endpoints.
+- Respect filters (country, provider/source, keywords, language, date range).
+- Persist up to ~4000 recent articles locally for offline browsing and “Add to ideas.”
+- Maintain a local catalog of news providers (sources) for UI selection.
+- Integrate with the **cron-job scheduler** for periodic syncs and manual “Sync now.”
+- Expose settings, sources, and articles cleanly to the frontend via Tauri commands.
+- Hook into the **News Feed modal** in the Dashboard to control everything from a single place.
+
+
+=========================================
+1. DATA MODEL (DATABASE SCHEMA)
+=========================================
+
+We use SQLite with three main tables:
+
+- `news_settings` – global configuration & filters for the NewsData integration.
+- `news_articles` – stored articles.
+- `news_sources` – catalog of providers from the `/sources` endpoint.
+
+
+1.1 Table: news_settings
+------------------------
+
+Single-row (or few-row) table storing configuration and filter preferences.
+
+Fields:
+
+  CREATE TABLE news_settings (
+    id                INTEGER PRIMARY KEY,
+    api_key           TEXT NULL,         -- NewsData API key
+    language          TEXT NULL,         -- e.g. "en"
+    categories        TEXT NULL,         -- JSON array of categories, optional
+    countries         TEXT NULL,         -- JSON array of ISO country codes ["us","gb"]
+    sources           TEXT NULL,         -- JSON array of source_id strings ["nytimes","guardian"]
+    keywords          TEXT NULL,         -- main query string (q)
+    keywords_in_title TEXT NULL,         -- optional query string for qInTitle
+    from_date         TEXT NULL,         -- "YYYY-MM-DD" for archive mode
+    to_date           TEXT NULL,         -- "YYYY-MM-DD" for archive mode
+    max_stored        INTEGER NOT NULL DEFAULT 4000, -- max articles to keep
+    created_at        DATETIME NOT NULL,
+    updated_at        DATETIME NOT NULL
+  );
+
+Notes:
+
+- `countries`, `sources`, `categories` are JSON strings representing arrays.
+- If `from_date` or `to_date` is non-null, backend should use the **archive** endpoint instead of latest.
+- `max_stored` caps how many articles we keep in `news_articles` (oldest are pruned).
+
+
+1.2 Table: news_articles
+------------------------
+
+Stored articles retrieved from the API.
+
+  CREATE TABLE news_articles (
+    id            INTEGER PRIMARY KEY,
+    article_id    TEXT NOT NULL UNIQUE,   -- NewsData article_id
+    title         TEXT NOT NULL,
+    link          TEXT NULL,
+    description   TEXT NULL,
+    content       TEXT NULL,
+    image_url     TEXT NULL,
+    source_id     TEXT NULL,
+    source_name   TEXT NULL,
+    country       TEXT NULL,             -- JSON array of country codes or CSV
+    category      TEXT NULL,             -- JSON array of category strings
+    language      TEXT NULL,
+    pub_date      TEXT NULL,             -- raw string from API (RFC 3339 or similar)
+    fetched_at    DATETIME NOT NULL,     -- when we fetched this record
+    added_via     TEXT NOT NULL DEFAULT 'sync', -- 'sync' or 'manual'
+    is_starred    INTEGER NOT NULL DEFAULT 0,   -- user starred (for saved readings)
+    is_dismissed  INTEGER NOT NULL DEFAULT 0    -- user dismissed in UI
+  );
+
+Notes:
+
+- `article_id` is used for deduplication and upserts.
+- We retain minimal provider metadata here (`source_id`, `source_name`) for convenience.
+- `country` and `category` can be JSON arrays as strings.
+- `is_dismissed` lets the user hide stuff without deleting rows.
+- When adding a new article from NewsData:
+  - If `article_id` already exists, we update metadata fields if needed.
+  - After insertion, we enforce `max_stored` by deleting the oldest non-starred rows beyond the cap.
+
+
+1.3 Table: news_sources
+-----------------------
+
+Catalog of providers fetched periodically from NewsData `/sources`.
+
+  CREATE TABLE news_sources (
+    id          INTEGER PRIMARY KEY,
+    source_id   TEXT NOT NULL UNIQUE,    -- from API
+    name        TEXT NOT NULL,
+    url         TEXT NULL,               -- domain / homepage
+    country     TEXT NULL,               -- e.g. "us"
+    language    TEXT NULL,               -- e.g. "en"
+    category    TEXT NULL,               -- JSON array of categories
+    is_active   INTEGER NOT NULL DEFAULT 1,
+    is_muted    INTEGER NOT NULL DEFAULT 0, -- user has muted this source
+    created_at  DATETIME NOT NULL,
+    updated_at  DATETIME NOT NULL
+  );
+
+Notes:
+
+- `is_muted` allows the user to opt out of particular sources in the UI.
+- The News Feed modal queries this table to offer a provider picker.
+
+
+=========================================
+2. RUST BACKEND – NEWS DATA INTEGRATION
+=========================================
+
+We use `reqwest` + `serde` and plug into our scheduler engine.
+
+-----------------------------------------
+2.1 API response structs
+-----------------------------------------
+
+Main response from `latest` / `archive`:
+
+  #[derive(serde::Deserialize)]
+  struct NewsApiResponse {
+      status: Option<String>,
+      totalResults: Option<i64>,
+      results: Option<Vec<NewsApiArticle>>,
+      #[serde(rename = "nextPage")]
+      next_page: Option<String>,
+  }
+
+Article:
+
+  #[derive(serde::Deserialize)]
+  struct NewsApiArticle {
+      #[serde(rename = "article_id")]
+      article_id: Option<String>,
+
+      title: Option<String>,
+      link: Option<String>,
+      description: Option<String>,
+      content: Option<String>,
+
+      #[serde(rename = "image_url")]
+      image_url: Option<String>,
+
+      #[serde(rename = "source_id")]
+      source_id: Option<String>,
+      source_name: Option<String>,        // may or may not be present
+
+      // NOTE: NewsData returns country as an array
+      country: Option<Vec<String>>,
+
+      category: Option<Vec<String>>,
+      language: Option<String>,
+
+      #[serde(rename = "pubDate")]
+      pub_date: Option<String>,
+  }
+
+Source list from `/sources`:
+
+  #[derive(serde::Deserialize)]
+  struct NewsSourceApiResponse {
+      status: String,
+      results: Vec<NewsSourceApiItem>,
+      #[serde(rename = "nextPage")]
+      next_page: Option<String>,
+  }
+
+  #[derive(serde::Deserialize)]
+  struct NewsSourceApiItem {
+      source_id: String,
+      name: String,
+      url: Option<String>,
+      country: Option<String>,               // may be array; we can normalize
+      language: Option<String>,
+      category: Option<Vec<String>>,
+  }
+
+
+-----------------------------------------
+2.2 Picking endpoint: latest vs archive
+-----------------------------------------
+
+We use two NewsData endpoints:
+
+- Latest:  https://newsdata.io/api/1/latest
+- Archive: https://newsdata.io/api/1/archive
+
+Rules:
+
+- If `from_date` or `to_date` is set in `news_settings` → use `archive`.
+- Otherwise → use `latest`.
+
+Enum:
+
+  enum NewsEndpoint {
+      Latest,
+      Archive,
+  }
+
+Selector:
+
+  fn pick_endpoint(settings: &NewsSettings) -> NewsEndpoint {
+      if settings.from_date.is_some() || settings.to_date.is_some() {
+          NewsEndpoint::Archive
+      } else {
+          NewsEndpoint::Latest
+      }
+  }
+
+Base URL:
+
+  let base_url = match pick_endpoint(settings) {
+      NewsEndpoint::Latest => "https://newsdata.io/api/1/latest",
+      NewsEndpoint::Archive => "https://newsdata.io/api/1/archive",
+  };
+
+
+-----------------------------------------
+2.3 Building the request with filters
+-----------------------------------------
+
+Helpers:
+
+  fn parse_string_list(json: &Option<String>) -> Vec<String> {
+      json.as_ref()
+          .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
+          .unwrap_or_default()
+  }
+
+When building the `reqwest` request:
+
+  let mut req = client.get(base_url).query(&[("apikey", api_key.as_str())]);
+
+  // language (optional)
+  if let Some(lang) = &settings.language {
+      if !lang.trim().is_empty() {
+          req = req.query(&[("language", lang.trim())]);
+      }
+  }
+
+  // countries: ["us","gb"] => "us,gb"
+  let countries = parse_string_list(&settings.countries);
+  if !countries.is_empty() {
+      let joined = countries.join(",");
+      req = req.query(&[("country", joined.as_str())]);
+  }
+
+  // sources: ["nytimes","guardian"] => "nytimes,guardian"
+  let sources = parse_string_list(&settings.sources);
+  if !sources.is_empty() {
+      let joined = sources.join(",");
+      req = req.query(&[("source_id", joined.as_str())]);
+  }
+
+  // categories: ["business","top"] => "business,top" (if we expose this)
+  let categories = parse_string_list(&settings.categories);
+  if !categories.is_empty() {
+      let joined = categories.join(",");
+      req = req.query(&[("category", joined.as_str())]);
+  }
+
+  // keywords: advanced query string
+  if let Some(q) = &settings.keywords {
+      let q = q.trim();
+      if !q.is_empty() {
+          req = req.query(&[("q", q)]);
+      }
+  }
+
+  // keywords in title only (optional)
+  if let Some(q_title) = &settings.keywords_in_title {
+      let q_title = q_title.trim();
+      if !q_title.is_empty() {
+          req = req.query(&[("qInTitle", q_title)]);
+      }
+  }
+
+  // date range: used only when archive is active
+  if let Some(from_date) = &settings.from_date {
+      req = req.query(&[("from_date", from_date.as_str())]);
+  }
+  if let Some(to_date) = &settings.to_date {
+      req = req.query(&[("to_date", to_date.as_str())]);
+  }
+
+  // pagination cursor: nextPage from previous call
+  if let Some(next_page) = &cursor {
+      req = req.query(&[("page", next_page.as_str())]);
+  }
+
+
+-----------------------------------------
+2.4 Fetching and parsing a page
+-----------------------------------------
+
+Instead of `resp.json()`, we read text first for better error logs:
+
+  async fn fetch_news_page(
+      client: &reqwest::Client,
+      settings: &NewsSettings,
+      cursor: Option<String>,
+  ) -> Result<NewsApiResponse, NewsError> {
+      let base_url = pick_base_url(settings);
+      let req = build_request(client, settings, &base_url, cursor);
+
+      let resp = req.send().await?;
+      let status = resp.status();
+      let text = resp.text().await?;
+
+      if !status.is_success() {
+          return Err(NewsError::HttpError {
+              status,
+              body_preview: text.chars().take(512).collect(),
+          });
+      }
+
+      let body: NewsApiResponse = match serde_json::from_str(&text) {
+          Ok(b) => b,
+          Err(e) => {
+              let preview: String = text.chars().take(512).collect();
+              return Err(NewsError::ParseError {
+                  message: e.to_string(),
+                  body_preview: preview,
+              });
+          }
+      };
+
+      Ok(body)
+  }
+
+
+-----------------------------------------
+2.5 Upserting into news_articles
+-----------------------------------------
+
+For each `NewsApiArticle`:
+
+- Compute:
+
+  - `article_id` (required; skip if missing)
+  - `title` (required; skip if missing)
+  - `link`
+  - `description`
+  - `content`
+  - `image_url`
+  - `source_id`
+  - `source_name`
+  - `country` JSON string from `Option<Vec<String>>`
+  - `category` JSON string from `Option<Vec<String>>`
+  - `language`
+  - `pub_date`
+
+Example helpers:
+
+  fn to_json_vec(v: &Option<Vec<String>>) -> Option<String> {
+      v.as_ref()
+          .map(|vec| serde_json::to_string(vec).unwrap_or_else(|_| "[]".into()))
+  }
+
+Pseudocode:
+
+  for art in body.results.unwrap_or_default() {
+      let article_id = match &art.article_id {
+          Some(id) if !id.is_empty() => id.clone(),
+          _ => continue, // skip invalid
+      };
+
+      let title = match &art.title {
+          Some(t) if !t.is_empty() => t.clone(),
+          _ => continue,
+      };
+
+      let country_json = to_json_vec(&art.country);
+      let category_json = to_json_vec(&art.category);
+
+      // Upsert via ORM or manual SQL:
+      // - If article_id exists -> UPDATE fields
+      // - Else -> INSERT new row
+
+      // After upserts, enforce max_stored
+  }
+
+
+-----------------------------------------
+2.6 Enforcing max_stored (pruning)
+-----------------------------------------
+
+After a sync cycle:
+
+- Read `max_stored` from `news_settings`.
+- Count how many rows exist in `news_articles` where `is_starred = 0` and `is_dismissed = 0`.
+- If count > max_stored:
+  - Delete rows ordered by `pub_date` or `fetched_at` ascending, skipping `is_starred = 1`.
+
+SQL example:
+
+  DELETE FROM news_articles
+  WHERE id IN (
+    SELECT id FROM news_articles
+    WHERE is_starred = 0 AND is_dismissed = 0
+    ORDER BY
+      COALESCE(pub_date, fetched_at) ASC
+    LIMIT ?
+  );
+
+
+=========================================
+3. NEWS SOURCES SYNC
+=========================================
+
+This subsystem maintains a catalog of providers for UI selection.
+
+-----------------------------------------
+3.1 Sync handler
+-----------------------------------------
+
+- Endpoint: `https://newsdata.io/api/1/sources`
+- Query params:
+  - `apikey`
+  - optionally `language`, `country`, `category` for scoping if desired.
+
+Workflow:
+
+1. Fetch first page of sources.
+2. Insert / update each `NewsSourceApiItem` into `news_sources`.
+3. If `nextPage` is present, continue fetching until exhausted (or until a max page limit).
+
+Upsert logic:
+
+- Match by `source_id` (unique).
+- Update `name`, `url`, `country`, `language`, `category`, `updated_at`.
+- Keep user fields `is_active` and `is_muted` unchanged unless logic explicitly changes them.
+
+
+-----------------------------------------
+3.2 Tauri commands for sources
+-----------------------------------------
+
+DTO:
+
+  type NewsSourceDto = {
+    id: number;
+    sourceId: string;
+    name: string;
+    url?: string | null;
+    country?: string | null;
+    language?: string | null;
+    category?: string | null;  // JSON
+    isActive: boolean;
+    isMuted: boolean;
+  };
+
+Commands:
+
+- `list_news_sources(country?: string, language?: string, search?: string)`
+
+  - SELECT from `news_sources` with optional filters:
+    - `country = ?` if provided.
+    - `language = ?` if provided.
+    - `name LIKE ?` or `source_id LIKE ?` if `search` is provided.
+  - Return `NewsSourceDto[]`.
+
+- `sync_news_sources_now()`
+
+  - Invoke the sources sync handler once.
+  - Return success/failure message.
+
+
+=========================================
+4. SCHEDULER INTEGRATION (CRON-JOB)
+=========================================
+
+We plug into the generic scheduler defined in cron-job.txt.
+
+-----------------------------------------
+4.1 Tasks
+-----------------------------------------
+
+Two tasks:
+
+- `news_sync` (component: "news")
+  - Runs every 45–60 minutes.
+  - Calls `run_news_sync_task()` which:
+    - Loads `news_settings`.
+    - Uses current filters and endpoint (latest/archive).
+    - Fetches and upserts articles.
+    - Prunes old articles.
+  - Task result summary:
+    - `{ "inserted": N, "updated": M, "total": T }`.
+
+- `news_sources_sync` (component: "news")
+  - Runs daily, or only manually.
+  - Calls `run_news_sources_sync_task()` which refreshes `news_sources`.
+  - Task result summary:
+    - `{ "sources_seen": N, "new": A, "updated": B }`.
+
+These are created in `system_tasks` with:
+
+  name: "NewsData Sync"
+  task_type: "news_sync"
+  component: "news"
+  frequency_seconds: 2700 (45 minutes)
+
+  name: "News Sources Sync"
+  task_type: "news_sources_sync"
+  component: "news"
+  frequency_seconds: 86400 (24 hours)
+
+
+-----------------------------------------
+4.2 Manual "Sync now" from UI
+-----------------------------------------
+
+From the frontend:
+
+- `run_system_task_now("news_sync")` → immediate sync with current filters.
+- `run_system_task_now("news_sources_sync")` → refresh provider catalog.
+
+Hook:
+
+  const { run: runNewsSync, isRunning } = useRunTaskNow("news_sync");
+
+In News modal footer:
+
+- “Apply & sync” button:
+  - Update settings → runNewsSync().
+
+
+=========================================
+5. TAURI COMMANDS – SETTINGS & ARTICLES
+=========================================
+
+We define commands to expose settings and data to React.
+
+-----------------------------------------
+5.1 DTOs
+-----------------------------------------
+
+Settings, mirroring `news_settings` table:
+
+  type NewsSettingsDto = {
+    apiKey?: string | null;
+    language?: string | null;
+    categories?: string[];  // parsed from JSON
+    countries?: string[];
+    sources?: string[];
+    keywords?: string | null;
+    keywordsInTitle?: string | null;
+    fromDate?: string | null; // "YYYY-MM-DD"
+    toDate?: string | null;   // "YYYY-MM-DD"
+    maxStored: number;
+  };
+
+Article:
+
+  type NewsArticleDto = {
+    id: number;
+    articleId: string;
+    title: string;
+    link?: string | null;
+    description?: string | null;
+    content?: string | null;
+    imageUrl?: string | null;
+    sourceId?: string | null;
+    sourceName?: string | null;
+    country?: string[];    // parsed from JSON
+    category?: string[];   // parsed from JSON
+    language?: string | null;
+    pubDate?: string | null;
+    fetchedAt: string;
+    isStarred: boolean;
+    isDismissed: boolean;
+  };
+
+
+-----------------------------------------
+5.2 Commands
+-----------------------------------------
+
+- `get_news_settings() -> NewsSettingsDto`
+
+  - Reads row from `news_settings`.
+  - Parses JSON arrays to `string[]` in DTO.
+
+- `update_news_settings(input: Partial<NewsSettingsDto>) -> NewsSettingsDto`
+
+  - Applies partial update:
+    - For arrays, convert to JSON string for DB.
+    - For strings and dates, persist as-is.
+  - Updates `updated_at`.
+  - Returns updated `NewsSettingsDto`.
+
+- `list_news_articles(limit: number, offset: number, include_dismissed: bool) -> NewsArticleDto[]`
+
+  - Simple SELECT with ORDER BY:
+    - Most recent first (`pub_date DESC, fetched_at DESC`).
+    - If `include_dismissed = false`, filter `is_dismissed = 0`.
+
+- `dismiss_news_article(id: number)`
+
+  - Sets `is_dismissed = 1` for the row; used by “Dismiss” button.
+
+- `toggle_star_news_article(id: number, starred: bool)`
+
+  - Sets `is_starred` accordingly; used by “Save / Star” control.
+
+
+=========================================
+6. FRONTEND – NEWS FEED MODAL
+=========================================
+
+This ties the backend to the UI.
+
+-----------------------------------------
+6.1 Modal layout
+-----------------------------------------
+
+When the user clicks the “News” metric card (Dashboard Welcome row):
+
+- Open Radix Dialog with:
+  - Overlay: blurred, tinted using theme tokens.
+  - Centered content panel with:
+    - **Left:** Article list, filters summary, and per-article actions.
+    - **Right:** “News Settings” card with filters and controls.
+
+Basic markup structure:
+
+  <Dialog.Root>
+    <Dialog.Trigger>News metric card</Dialog.Trigger>
+    <Dialog.Portal>
+      <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--color-bg)]/80 backdrop-blur-md" />
+      <Dialog.Content className="fixed left-1/2 top-1/2 ... bg-[var(--color-surface-soft)] ...">
+        <div className="flex gap-4 h-full">
+
+          {/* LEFT PANEL: articles */}
+          <section className="flex-1 flex flex-col rounded-[var(--radius-card)] border border-[var(--color-border-subtle)] bg-[var(--color-card-bg)] shadow-[var(--shadow-card-elevated)] overflow-hidden">
+            {/* header: current filter summary and a “Sync now” button */}
+            {/* ScrollArea with ArticleCards */}
+          </section>
+
+          {/* RIGHT PANEL: filters/settings */}
+          <aside className="w-[290px] flex flex-col rounded-[var(--radius-card)] border border-[var(--color-border-subtle)] bg-[var(--color-card-bg)] shadow-[var(--shadow-card-soft)] p-3 gap-3">
+            {/* country multi-select */}
+            {/* provider multi-select */}
+            {/* keyword input */}
+            {/* date range inputs */}
+            {/* Apply & Sync / Reset buttons */}
+          </aside>
+        </div>
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>
+
+
+-----------------------------------------
+6.2 Hooks
+-----------------------------------------
+
+- `useNewsSettings()` → wraps `get_news_settings`.
+- `useUpdateNewsSettings()` → wraps `update_news_settings`.
+- `useNewsArticles()` → wraps `list_news_articles`.
+- `useNewsSources()` → wraps `list_news_sources`.
+- `useRunTaskNow("news_sync")` → from cron-job spec.
+
+Example signatures (TypeScript):
+
+  function useNewsSettings(): {
+    data?: NewsSettingsDto;
+    isLoading: boolean;
+    refetch: () => void;
+  }
+
+  function useUpdateNewsSettings(): {
+    mutate: (input: Partial<NewsSettingsDto>) => Promise<NewsSettingsDto>;
+    isLoading: boolean;
+  }
+
+  function useNewsArticles(params: { limit: number; offset: number; includeDismissed?: boolean }): {
+    data?: NewsArticleDto[];
+    isLoading: boolean;
+    refetch: () => void;
+  }
+
+  function useNewsSources(params: { country?: string; language?: string; search?: string }): {
+    data?: NewsSourceDto[];
+    isLoading: boolean;
+  }
+
+
+-----------------------------------------
+6.3 Filter controls (right-hand panel)
+-----------------------------------------
+
+Controls to include:
+
+- Country selector:
+  - Multi-select (chips or list with checkboxes).
+  - Values: ISO codes (us, ca, gb, etc.).
+  - When changed, triggers `useNewsSources` to refetch sources for those countries.
+
+- Provider selector:
+  - Searchable list from `useNewsSources`.
+  - Display as: `name` + `source_id` and maybe badges for country/lang.
+  - Selected providers map to `sources` array in `NewsSettingsDto`.
+
+- Keywords:
+  - Text input bound to `keywords` (q).
+  - Helper text: “Supports NewsData advanced search (AND, OR, quotes).”
+
+- Date range:
+  - Two inputs: “From date” and “To date” (YYYY-MM-DD).
+  - If either is set, backend flips to archive endpoint on next sync.
+
+- Buttons:
+  - “Apply & sync”:
+    - Calls `update_news_settings` with current UI state.
+    - Then calls `run_system_task_now("news_sync")`.
+  - “Reset filters”:
+    - Clears `countries`, `sources`, `keywords`, `from_date`, `to_date`, etc.
+    - Saves defaults via `update_news_settings`.
+    - Optionally runs a sync.
+
+- Provider sync:
+  - Optional small link or button: “Sync providers” → calls `sync_news_sources_now()`.
+
+
+-----------------------------------------
+6.4 Article list (left panel)
+-----------------------------------------
+
+Each article is a card with:
+
+- Title (clickable to open link in browser).
+- Source label + pub date (top-right).
+- Tags: country codes, categories.
+- Short description / excerpt.
+- Buttons:
+  - “Add to ideas” → calls existing ideas endpoint to create an idea prefilled with link/title.
+  - “Dismiss” → calls `dismiss_news_article`.
+  - Optional “Star” icon → calls `toggle_star_news_article`.
+
+The list should support:
+
+- Vertical scroll using Radix ScrollArea.
+- Pagination or lazy loading (e.g. load 50 at a time, load more when scrolled).
+
+
+=========================================
+7. ERROR HANDLING & LOGGING
+=========================================
+
+- Always log HTTP status and a body preview if parsing fails.
+- Distinguish:
+  - `HttpError { status, body_preview }`
+  - `ParseError { message, body_preview }`
+- For NewsData errors (invalid key, rate limit, etc.), show a clear UI banner in the modal:
+  - “NewsData error: check API key or reduce frequency.”
+
+Frontend:
+
+- If `news_sync` task finishes with status "error", show a toast:
+  - “News sync failed: <errorMessage>.”
+
+
+=========================================
+8. SUMMARY
+=========================================
+
+This spec defines the complete **News Feed subsystem** for Architect Cockpit, including:
+
+- Database schema for settings, articles, and providers.
+- Rust integration with NewsData latest/archive endpoints using filters.
+- Provider sync from `/sources` to power the provider picker.
+- Integration with the generic cron scheduler for periodic and manual sync.
+- Tauri commands exposing settings, sources, and articles.
+- The News Feed modal UI, including filters on the right and article list on the left.
+
+Codex can use this file to generate:
+
+- Rust modules for `news.rs` and `db.rs` portions.
+- Tauri command definitions.
+- React hooks (`useNewsSettings`, `useNewsArticles`, `useNewsSources`).
+- The News Feed modal component wired into the Dashboard view.
+
+
+=========================================
+9. ARTICLE DISPLAY, DETAILS MODAL, LOCAL SEARCH
+=========================================
+
+This section adds more precise behavior for how articles render in the UI, how the user drills into an article without leaving the cockpit, how “Review for article” works, and how local querying/pagination operates.
+
+-----------------------------------------
+9.1 Article card rendering
+-----------------------------------------
+
+For each `NewsArticleDto` in the left panel list:
+
+Visual structure (card):
+
+- Optional thumbnail image at the top or on the left:
+  - Use `imageUrl` if present.
+  - Fallback: colored placeholder with source initials if no image.
+  - Image should respect theme tokens, with rounded corners.
+
+- Meta row (top):
+  - Source name or source_id.
+  - Pub date, formatted to local time.
+  - Optional country and category badges.
+
+- Title:
+  - Clickable, but by default opens the **Article Details Modal**, not the external link.
+
+- Description / excerpt:
+  - A few lines of `description` or truncated `content`.
+
+- Actions row (bottom, right-aligned):
+  - “Review for article” button (primary or ghost).
+  - “Dismiss” button.
+  - Optional “Star” icon (toggle).
+
+Data used:
+
+- `imageUrl` → main thumbnail.
+- `sourceName` or `sourceId` → label.
+- `pubDate` → convert to human-readable.
+- `country` (string[]) → map to small badges.
+- `category` (string[]) → map to small badges.
+
+If `imageUrl` fails to load:
+
+- Use onError to hide the img and show the placeholder box with initials.
+
+
+-----------------------------------------
+9.2 Article Details Modal (second-level modal)
+-----------------------------------------
+
+Clicking an article card (title or “View details” action) should open a **secondary dialog** that shows more detail but still keeps the user inside Architect Cockpit.
+
+Behavior:
+
+- Does NOT automatically open the external article.
+- Shows a “Open original” link as a deliberate action.
+
+Structure:
+
+  <Dialog.Root>  (ArticleDetailsDialog, separate from main news modal)
+    <Dialog.Portal>
+      <Dialog.Overlay ... />
+      <Dialog.Content ... >
+        - Source + date row
+        - Title
+        - Hero image (if present)
+        - Full description / content (scrollable)
+        - Actions row:
+          - “Review for article” → creates an Idea
+          - “Open original” → opens `link` in external browser
+          - “Dismiss” → mark is_dismissed = 1
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>
+
+Details:
+
+- The Article Details modal uses the same theme tokens for background and border as other dialogs.
+- The main News modal remains in the background; we should either:
+  - Use nested Radix dialogs (ArticleDetails inside News modal), or
+  - Close the News modal and replace it with the ArticleDetails view.
+- Recommended: nested dialogs with careful focus handling, so backing out of details returns to the list exactly as-is.
+
+
+-----------------------------------------
+9.3 “Review for article” → Ideas integration
+-----------------------------------------
+
+On both the article card and the Article Details modal:
+
+- Add a button “Review for article”.
+
+Behavior:
+
+- When clicked:
+  - Creates a new entry in the Ideas subsystem (e.g. `ideas` table) with:
+    - title: article title
+    - content/body: template like:
+      - “Review for: <title>”
+      - “Source: <sourceName>”
+      - “Link: <link>”
+      - optional: article description quoted or appended
+    - metadata: link back to `news_articles.id` for future linking
+    - type: "article_review" (or similar field)
+
+- After creation:
+  - Show confirmation (toast) “Review added to Ideas inbox”.
+  - Optionally open the Ideas panel/view.
+
+Backend:
+
+- Tauri command:
+
+  `create_idea_for_article(articleId: string) -> IdeaDto`
+
+  - Looks up the article by `article_id` or DB `id`.
+  - Constructs the idea with the template and saves it.
+  - Returns the created idea.
+
+Frontend:
+
+- `Review for article` button just calls this command with the relevant ID.
+
+
+-----------------------------------------
+9.4 Pagination / infinite scroll on local articles
+-----------------------------------------
+
+We do **not** hit the NewsData API when the user is just browsing or searching articles. API calls only occur via:
+
+- Scheduled `news_sync` task.
+- Manual “Sync now” from the modal.
+
+All regular browsing and searching is against local `news_articles`.
+
+Mechanics:
+
+- The main article list query (`list_news_articles`) should support:
+  - `limit` (default 30)
+  - `offset` OR `cursor` for pagination
+  - optional `search` string for local text search
+  - optional `sourceId`, `fromDate`, `toDate` filters if desired
+
+Command update:
+
+  // Updated signature
+  list_news_articles(
+    limit: number,
+    offset: number,
+    include_dismissed: bool,
+    search?: string
+  ) -> NewsArticleDto[]
+
+SQL example:
+
+  SELECT *
+  FROM news_articles
+  WHERE
+    (is_dismissed = 0 OR :include_dismissed = 1)
+    AND (:search IS NULL OR (
+      title LIKE '%' || :search || '%' OR
+      description LIKE '%' || :search || '%' OR
+      content LIKE '%' || :search || '%'
+    ))
+  ORDER BY
+    COALESCE(pub_date, fetched_at) DESC
+  LIMIT :limit OFFSET :offset;
+
+Frontend:
+
+- Start with `limit = 30`, `offset = 0`.
+- When user scrolls near the bottom:
+  - Load more with `offset += limit`.
+- Optionally switch to button “Load more” if implementing full infinite scroll is overkill.
+
+We **never** call NewsData directly from UI search; we only use the local DB results, which are constrained by the filters set in `news_settings` and pulled by the sync task.
+
+
+-----------------------------------------
+9.5 Local query UX
+-----------------------------------------
+
+Add a local search bar above the article list:
+
+- Placeholder: “Search stored articles…”
+- On submit or debounce:
+  - Call `useNewsArticles({ limit: 30, offset: 0, includeDismissed: false, search })`.
+- The filter summary can show:
+  - “Local search: \<search term\>”
+  - Combined with global NewsData filters: countries, providers, date range.
+
+This makes the UX:
+
+- Global scope controlled by **filters** (NewsData query + stored subset).
+- Local scope controlled by **search** (string match within what we have stored).
+
+
+-----------------------------------------
+9.6 Summary of enhancements
+-----------------------------------------
+
+- Article cards now explicitly render:
+  - Thumbnail image with fallback
+  - Source, date, country/category badges
+  - Title + excerpt
+  - Actions: Review, Dismiss, Star
+
+- Clicking article opens an internal **Article Details modal**, not the external link:
+  - Full content view
+  - “Review for article” button
+  - “Open original” to launch browser tab
+  - “Dismiss”
+
+- “Review for article” integrates with the Ideas system via a dedicated Tauri command.
+
+- Article list uses **local pagination** (30 articles at a time) and optional infinite scroll.
+
+- Local search bar lets you query stored articles (`title`, `description`, `content`) without hitting the external API; NewsData is only hit by scheduled/manual syncs.

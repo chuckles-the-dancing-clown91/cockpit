@@ -1,0 +1,623 @@
+
+Architect Cockpit – build.txt
+=============================
+
+This document is a step-by-step build guide to get the Architect Cockpit desktop app
+running on Ubuntu, all the way to:
+
+- A working Tauri + Rust backend.
+- A themed React + Radix UI frontend.
+- The main App shell, NavBar, and Dashboard view (calendar row + feed + ideas/alerts).
+- Dynamic theme switching (dark / cyberpunk / light).
+
+After this, you can iterate on features without fighting the scaffold.
+
+
+--------------------------------------------------
+0. PREREQUISITES (Ubuntu)
+--------------------------------------------------
+
+On Ubuntu (22.04+ recommended):
+
+1) System packages
+
+  sudo apt update
+  sudo apt install -y \
+    build-essential \
+    curl \
+    libgtk-3-dev \
+    libayatana-appindicator3-dev \
+    libwebkit2gtk-4.1-dev \
+    pkg-config \
+    libssl-dev
+
+2) Rust toolchain
+
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+  source "$HOME/.cargo/env"
+
+3) Node + package manager
+
+Use Node >= 20. You can use nvm:
+
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+  source ~/.bashrc
+  nvm install 22
+  nvm use 22
+
+Pick one package manager (I’ll assume `pnpm`, but npm/yarn are fine):
+
+  npm install -g pnpm
+
+4) Tauri CLI
+
+  cargo install tauri-cli
+
+
+--------------------------------------------------
+1. CREATE A NEW TAURI + REACT + VITE + TS APP
+--------------------------------------------------
+
+Use the official Tauri scaffolder:
+
+  pnpm create tauri-app architect-cockpit
+
+Answer prompts:
+
+- What type of app?   → Vanilla Tauri (Frontend + Rust)
+- Frontend framework? → React
+- Language?           → TypeScript
+- Bundler?            → Vite
+
+This creates a folder `architect-cockpit` with:
+
+- `src-tauri/` (Rust backend)
+- `src/` (React frontend)
+- `vite.config.ts`, `tsconfig.json`, etc.
+
+
+--------------------------------------------------
+2. INSTALL FRONTEND DEPENDENCIES
+--------------------------------------------------
+
+cd into the project:
+
+  cd architect-cockpit
+
+Install the UI + state stack:
+
+  pnpm add \
+    @radix-ui/react-accordion \
+    @radix-ui/react-checkbox \
+    @radix-ui/react-dialog \
+    @radix-ui/react-label \
+    @radix-ui/react-popover \
+    @radix-ui/react-select \
+    @radix-ui/react-separator \
+    @radix-ui/react-slider \
+    @radix-ui/react-slot \
+    @radix-ui/react-switch \
+    @radix-ui/react-tabs \
+    @radix-ui/react-tooltip \
+    @radix-ui/react-scroll-area \
+    @tanstack/react-query \
+    axios \
+    chart.js \
+    class-variance-authority \
+    clsx \
+    framer-motion \
+    lucide-react \
+    react-chartjs-2 \
+    react-router-dom \
+    recharts \
+    sonner \
+    tailwind-merge \
+    tailwindcss-animate \
+    zustand
+
+Dev tools:
+
+  pnpm add -D \
+    @tanstack/react-query-devtools \
+    @tailwindcss/vite \
+    autoprefixer \
+    postcss \
+    tailwindcss
+
+
+--------------------------------------------------
+3. SET UP TAILWINDCSS + GLOBAL CSS VAR THEMING
+--------------------------------------------------
+
+3.1 Initialize Tailwind
+
+  npx tailwindcss init -p
+
+This creates `tailwind.config.cjs` (or .js) and `postcss.config.cjs`.
+
+Edit `tailwind.config` to include:
+
+  /** @type {import('tailwindcss').Config} */
+  export default {
+    content: [
+      "./index.html",
+      "./src/**/*.{ts,tsx}",
+    ],
+    theme: {
+      extend: {},
+    },
+    plugins: [
+      require('tailwindcss-animate'),
+    ],
+  };
+
+3.2 Global CSS tokens + themes
+
+Create:
+
+  src/theme/tokens.css
+
+Paste a token + theme setup, e.g.:
+
+  :root {
+    --radius-card: 1rem;
+    --radius-button: 0.55rem;
+
+    --shadow-card: 0 18px 40px rgba(0,0,0,0.65);
+    --shadow-soft: 0 10px 24px rgba(0,0,0,0.45);
+
+    --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+  }
+
+  .theme-dark {
+    --color-bg: #05060a;
+    --color-surface: #0b0d16;
+    --color-surface-soft: #141624;
+    --color-card-bg: rgba(10, 11, 22, 0.96);
+    --color-border: #262a3d;
+    --color-border-subtle: #191c29;
+
+    --color-text-primary: #f9f9ff;
+    --color-text-muted: #9ca3c7;
+    --color-text-soft: #6b6f91;
+
+    --color-accent: #4f46e5;
+    --color-accent-soft: rgba(79, 70, 229, 0.2);
+
+    --color-danger: #ef4444;
+    --color-success: #22c55e;
+
+    --color-nav-bg: rgba(3, 5, 12, 0.96);
+  }
+
+  .theme-cyberpunk {
+    --color-bg: #04010a;
+    --color-surface: #050418;
+    --color-surface-soft: #100821;
+    --color-card-bg: radial-gradient(circle at top left, #1b0b33 0, #04010a 55%);
+
+    --color-border: rgba(130, 87, 230, 0.85);
+    --color-border-subtle: rgba(130, 87, 230, 0.35);
+
+    --color-text-primary: #fdf2ff;
+    --color-text-muted: #c4b5fd;
+    --color-text-soft: #8b7acb;
+
+    --color-accent: #f97316;
+    --color-accent-soft: rgba(249, 115, 22, 0.23);
+
+    --color-danger: #fb7185;
+    --color-success: #22c55e;
+
+    --color-nav-bg: rgba(7, 6, 23, 0.96);
+  }
+
+  .theme-light {
+    --color-bg: #f5f5fa;
+    --color-surface: #ffffff;
+    --color-surface-soft: #eef1ff;
+    --color-card-bg: rgba(255,255,255,0.98);
+
+    --color-border: #cbd0f2;
+    --color-border-subtle: #dde1fb;
+
+    --color-text-primary: #111322;
+    --color-text-muted: #4b4d67;
+    --color-text-soft: #7b7d9a;
+
+    --color-accent: #2563eb;
+    --color-accent-soft: rgba(37, 99, 235, 0.12);
+
+    --color-danger: #b91c1c;
+    --color-success: #15803d;
+
+    --color-nav-bg: rgba(244,245,255,0.98);
+  }
+
+  .app-root {
+    background: var(--color-bg);
+    color: var(--color-text-primary);
+    font-family: var(--font-body);
+  }
+
+3.3 Tailwind base file
+
+Open `src/index.css` (or main CSS) and ensure:
+
+  @tailwind base;
+  @tailwind components;
+  @tailwind utilities;
+
+  @import "./theme/tokens.css";
+
+No color-specific Tailwind classes should be used for backgrounds/text in components;
+only semantic classes (app-root, card, etc.) that rely on CSS vars.
+
+
+--------------------------------------------------
+4. THEME PROVIDER + CN HELPER
+--------------------------------------------------
+
+4.1 `cn` helper
+
+Create file:
+
+  src/lib/cn.ts
+
+Content:
+
+  import { clsx } from "clsx";
+  import { twMerge } from "tailwind-merge";
+
+  export function cn(...inputs: any[]) {
+    return twMerge(clsx(inputs));
+  }
+
+4.2 ThemeContext
+
+Create:
+
+  src/theme/ThemeContext.tsx
+
+Content (simplified):
+
+  import { createContext, useContext, useEffect, useState } from "react";
+
+  export type ThemeId = "dark" | "light" | "cyberpunk";
+
+  interface ThemeContextValue {
+    theme: ThemeId;
+    setTheme: (t: ThemeId) => void;
+  }
+
+  const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
+  const THEME_STORAGE_KEY = "architect.theme";
+
+  export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [theme, setThemeState] = useState<ThemeId>("dark");
+
+    useEffect(() => {
+      const stored = window.localStorage.getItem(THEME_STORAGE_KEY) as ThemeId | null;
+      if (stored) setThemeState(stored);
+    }, []);
+
+    const setTheme = (t: ThemeId) => {
+      setThemeState(t);
+      window.localStorage.setItem(THEME_STORAGE_KEY, t);
+    };
+
+    return (
+      <ThemeContext.Provider value={{ theme, setTheme }}>
+        <div className={`app-root theme-${theme}`}>{children}</div>
+      </ThemeContext.Provider>
+    );
+  };
+
+  export function useTheme() {
+    const ctx = useContext(ThemeContext);
+    if (!ctx) throw new Error("useTheme must be used within ThemeProvider");
+    return ctx;
+  }
+
+
+--------------------------------------------------
+5. UI PRIMITIVES (BUTTON, CARD, TABS, SELECT)
+--------------------------------------------------
+
+5.1 Button
+
+Create:
+
+  src/components/ui/button.tsx
+
+Implement a Radix Slot + cva-based button that uses CSS vars, e.g. variants:
+- solid
+- ghost
+- outline
+- subtle
+- danger
+
+Make sure colors are expressed via:
+
+- bg-[var(--color-accent)]
+- bg-[var(--color-surface-soft)]
+- border-[var(--color-border)]
+- text-[var(--color-text-primary)]
+- etc.
+
+5.2 Card
+
+Create:
+
+  src/components/ui/card.tsx
+
+A simple wrapper:
+
+  import * as React from "react";
+  import { cn } from "../../lib/cn";
+
+  interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+    title?: React.ReactNode;
+    actions?: React.ReactNode;
+  }
+
+  export const Card = React.forwardRef<HTMLDivElement, CardProps>(
+    ({ title, actions, children, className, ...props }, ref) => (
+      <div
+        ref={ref}
+        className={cn(
+          "bg-[var(--color-card-bg)] border border-[var(--color-border)] rounded-[var(--radius-card)] shadow-[var(--shadow-card)] p-3 flex flex-col",
+          className,
+        )}
+        {...props}
+      >
+        {(title || actions) && (
+          <div className="flex items-center justify-between mb-2">
+            {title && (
+              <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">
+                {title}
+              </h2>
+            )}
+            {actions && <div className="flex items-center gap-2">{actions}</div>}
+          </div>
+        )}
+        <div className="flex-1 min-h-0">{children}</div>
+      </div>
+    ),
+  );
+  Card.displayName = "Card";
+
+5.3 Tabs, Select
+
+Create wrappers in `src/components/ui/tabs.tsx` and `src/components/ui/select.tsx`
+using @radix-ui/react-tabs and @radix-ui/react-select, styled via CSS vars.
+
+Example tabs list: rounded pill container with active tab using accent-soft background.
+
+
+--------------------------------------------------
+6. REACT QUERY SETUP
+--------------------------------------------------
+
+Install (already done) and add QueryClientProvider at the root.
+
+Create:
+
+  src/lib/queryClient.ts
+
+  import { QueryClient } from "@tanstack/react-query";
+
+  export const queryClient = new QueryClient();
+
+In main entry (usually `src/main.tsx`):
+
+  import React from "react";
+  import ReactDOM from "react-dom/client";
+  import { QueryClientProvider } from "@tanstack/react-query";
+  import { queryClient } from "./lib/queryClient";
+  import { ThemeProvider } from "./theme/ThemeContext";
+  import { App } from "./App";
+  import "./index.css";
+
+  ReactDOM.createRoot(document.getElementById("root")!).render(
+    <React.StrictMode>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <App />
+        </QueryClientProvider>
+      </ThemeProvider>
+    </React.StrictMode>,
+  );
+
+
+--------------------------------------------------
+7. BACKEND WIRES – BASIC TAURI COMMANDS
+--------------------------------------------------
+
+7.1 Tauri config
+
+`src-tauri/tauri.conf.json` (or .toml depending on version) is already set up by the scaffold.
+No big changes needed here for now.
+
+7.2 Add Rust dependencies
+
+Open `src-tauri/Cargo.toml`, add:
+
+  [dependencies]
+  tauri = { version = "2", features = ["shell", "dialog"] }
+  serde = { version = "1", features = ["derive"] }
+  serde_json = "1"
+  tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+  whoami = "1"
+
+(Adjust tauri version to match what the scaffold generated; just keep features aligned.)
+
+7.3 Implement `get_system_user` command
+
+Open `src-tauri/src/main.rs` (or where Tauri commands are defined) and add:
+
+  use tauri::Manager;
+
+  #[tauri::command]
+  fn get_system_user() -> String {
+    let real = whoami::realname();
+    if !real.is_empty() {
+      real
+    } else {
+      whoami::username()
+    }
+  }
+
+Register the command in `tauri::Builder`:
+
+  fn main() {
+    tauri::Builder::default()
+      .invoke_handler(tauri::generate_handler![
+        get_system_user,
+      ])
+      .run(tauri::generate_context!())
+      .expect("error while running tauri application");
+  }
+
+Later you will add more commands:
+- get_mixed_feed
+- get_upcoming_events
+- list_article_ideas
+- etc.
+For now, `get_system_user` is enough to power the NavBar and WelcomeBanner.
+
+7.4 Build & run dev to confirm the Rust side compiles:
+
+  pnpm tauri dev
+
+Fix any missing deps / version mismatches before proceeding.
+
+
+--------------------------------------------------
+8. FRONTEND SHELL – APP, NAVBAR, DASHBOARD
+--------------------------------------------------
+
+8.1 App shell
+
+Create `src/App.tsx`:
+
+  import { useState } from "react";
+  import { NavBar } from "./components/layout/NavBar";
+  import { DashboardView } from "./views/DashboardView";
+  import { WritingView } from "./views/WritingView";
+  import { RedditView } from "./views/RedditView";
+  import { CalendarView } from "./views/CalendarView";
+
+  type ViewId = "dashboard" | "writing" | "reddit" | "calendar" | "files";
+
+  export function App() {
+    const [view, setView] = useState<ViewId>("dashboard");
+
+    return (
+      <div className="h-screen flex flex-col">
+        <NavBar currentView={view} onChangeView={setView} />
+        <main className="flex-1 overflow-hidden bg-[var(--color-bg)]">
+          {view === "dashboard" && <DashboardView />}
+          {view === "writing" && <WritingView />}
+          {view === "reddit" && <RedditView />}
+          {view === "calendar" && <CalendarView />}
+          {view === "files" && <div className="p-3">Files view stub</div>}
+        </main>
+      </div>
+    );
+  }
+
+8.2 NavBar
+
+Create `src/components/layout/NavBar.tsx` that:
+
+- Uses React Query to load system user via Tauri `invoke("get_system_user")`.
+- Uses `useTheme()` to get `theme` and `setTheme`.
+- Shows tabs: Dashboard, Writing, Reddit, Calendar, Files.
+- Uses `Button` for tabs.
+- Uses Radix Select for theme switcher.
+
+8.3 DashboardView
+
+Create `src/views/DashboardView.tsx` with layout:
+
+- `WelcomeBanner` at top.
+- `CalendarPanel` in first row (full width).
+- Second row: grid with `FeedPanel` left, `IdeasPanel` + `AlertsPanel` stacked on the right.
+
+Use the `Card` component to wrap each panel. Initial content can be mocked:
+
+- `CalendarPanel`: just “Today & Upcoming” with a placeholder list.
+- `FeedPanel`: a simple list of dummy feed items.
+- `IdeasPanel`: simple input + hardcoded list.
+- `AlertsPanel`: placeholder “No alerts”.
+
+You can wire them to actual Tauri commands gradually.
+
+8.4 Theme test
+
+Run:
+
+  pnpm tauri dev
+
+Switch theme via the NavBar select (dark/cyberpunk/light) and confirm:
+
+- Background changes.
+- Card and nav colors update.
+- No component has hard-coded hex colors; everything is using CSS vars.
+
+If that works, your theming + app shell + dashboard scaffold is good.
+
+
+--------------------------------------------------
+9. FULL BUILD (PRODUCTION)
+--------------------------------------------------
+
+Once dev mode works and the dashboard + theming look right:
+
+1) Build frontend + Tauri bundle:
+
+  pnpm tauri build
+
+This will:
+
+- Run the Vite build for the React frontend.
+- Bundle the Rust backend + built frontend into a Tauri binary + installer under `src-tauri/target/release/` and `src-tauri/target/release/bundle/`.
+
+2) Test the built app:
+
+In `src-tauri/target/release/` (name may vary slightly):
+
+  ./architect-cockpit
+
+Verify:
+
+- App launches.
+- Themes switch.
+- NavBar tabs work (even if some views are stubs).
+- Dashboard shows and uses the system user name.
+
+
+--------------------------------------------------
+10. AFTER THIS POINT
+--------------------------------------------------
+
+After reaching this stage, you have:
+
+- A working Tauri app with a Rust backend.
+- A themed React UI scaffold with:
+  - ThemeProvider + tokens.css.
+  - Reusable Button + Card.
+  - NavBar with tabs + theme select.
+  - Dashboard layout (Calendar row, feeds, ideas, alerts).
+
+Next steps are just incremental:
+
+- Implement real Tauri commands:
+  - get_mixed_feed
+  - get_upcoming_events
+  - list_article_ideas, add_article_idea, etc.
+- Wire React Query hooks to those commands.
+- Flesh out WritingView, RedditView, and CalendarView per the training.txt spec.
+
+At this point, you should be able to “just move forward” adding functionality without touching the core build or theme plumbing again.

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Architect Cockpit",
+  "version": "0.1.0",
+  "identifier": "com.architect.cockpit",
+  "build": {
+    "beforeDevCommand": "npm run dev --prefix ./frontend -- --host --port 5173",
+    "beforeBuildCommand": "npm run build --prefix ./frontend",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../frontend/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Architect Cockpit",
+        "width": 1280,
+        "height": 800,
+        "fullscreen": false,
+        "resizable": true
+      }
+    ]
+  }
+}
