@@ -2,6 +2,7 @@ mod config;
 mod crypto;
 mod db;
 mod errors;
+mod ideas;
 mod logging;
 mod news;
 mod news_articles;
@@ -20,6 +21,12 @@ use tauri::{async_runtime, Manager, State};
 use tokio::sync::Mutex;
 
 use errors::AppError;
+use ideas::{
+    archive_idea_handler, create_idea_for_article_handler, create_idea_handler, get_idea_handler,
+    list_ideas_handler, update_idea_article_handler, update_idea_metadata_handler,
+    update_idea_notes_handler, CreateIdeaForArticleInput, CreateIdeaInput, IdeaDto,
+    UpdateIdeaArticleInput, UpdateIdeaMetadataInput, UpdateIdeaNotesInput,
+};
 use news::{
     dismiss_news_article_handler, get_news_settings_handler, list_news_articles_handler,
     mark_news_article_read_handler, save_news_settings_handler, sync_news_now_handler,
@@ -48,26 +55,6 @@ struct CalendarEvent {
     end_time: String,
     all_day: Option<bool>,
     location: Option<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "snake_case")]
-enum IdeaStatus {
-    Inbox,
-    Planned,
-    Drafting,
-    Archived,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ArticleIdea {
-    id: u32,
-    title: String,
-    notes: Option<String>,
-    source_url: Option<String>,
-    status: IdeaStatus,
-    created_at: String,
 }
 
 #[derive(Serialize)]
@@ -112,18 +99,6 @@ fn get_upcoming_events(_horizon_minutes: Option<i64>) -> Vec<CalendarEvent> {
         end_time: (chrono::Utc::now() + chrono::Duration::hours(1)).to_rfc3339(),
         all_day: Some(false),
         location: Some("Ops room".into()),
-    }]
-}
-
-#[tauri::command]
-fn list_article_ideas(_status: Option<String>) -> Vec<ArticleIdea> {
-    vec![ArticleIdea {
-        id: 1,
-        title: "Build a moderator autopilot".into(),
-        notes: Some("Blend Reddit mod actions with calendar events".into()),
-        source_url: None,
-        status: IdeaStatus::Inbox,
-        created_at: chrono::Utc::now().to_rfc3339(),
     }]
 }
 
@@ -258,6 +233,87 @@ async fn list_news_sources(
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn list_ideas(
+    status: Option<String>,
+    search: Option<String>,
+    include_removed: Option<bool>,
+    limit: Option<u64>,
+    offset: Option<u64>,
+    state: State<'_, AppState>,
+) -> Result<Vec<IdeaDto>, String> {
+    list_ideas_handler(status, search, include_removed, limit, offset, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_idea(id: i64, state: State<'_, AppState>) -> Result<IdeaDto, String> {
+    get_idea_handler(id, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn create_idea(
+    input: CreateIdeaInput,
+    state: State<'_, AppState>,
+) -> Result<IdeaDto, String> {
+    create_idea_handler(input, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn create_idea_for_article(
+    input: CreateIdeaForArticleInput,
+    state: State<'_, AppState>,
+) -> Result<IdeaDto, String> {
+    create_idea_for_article_handler(input, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn update_idea_metadata(
+    id: i64,
+    input: UpdateIdeaMetadataInput,
+    state: State<'_, AppState>,
+) -> Result<IdeaDto, String> {
+    update_idea_metadata_handler(id, input, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn update_idea_notes(
+    id: i64,
+    input: UpdateIdeaNotesInput,
+    state: State<'_, AppState>,
+) -> Result<IdeaDto, String> {
+    update_idea_notes_handler(id, input, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn update_idea_article(
+    id: i64,
+    input: UpdateIdeaArticleInput,
+    state: State<'_, AppState>,
+) -> Result<IdeaDto, String> {
+    update_idea_article_handler(id, input, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn archive_idea(id: i64, state: State<'_, AppState>) -> Result<IdeaDto, String> {
+    archive_idea_handler(id, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 fn main() {
     config::load_env();
     logging::init_logging();
@@ -284,7 +340,6 @@ fn main() {
             get_system_user,
             get_mixed_feed,
             get_upcoming_events,
-            list_article_ideas,
             list_scheduled_jobs,
             sync_calendar,
             list_system_tasks,
@@ -298,7 +353,15 @@ fn main() {
             mark_news_article_read,
             sync_news_now,
             sync_news_sources_now,
-            list_news_sources
+            list_news_sources,
+            list_ideas,
+            get_idea,
+            create_idea,
+            create_idea_for_article,
+            update_idea_metadata,
+            update_idea_notes,
+            update_idea_article,
+            archive_idea
         ])
         .run(tauri::generate_context!())
         .expect("error while running Architect Cockpit backend");
