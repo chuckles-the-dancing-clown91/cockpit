@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 export type FeedItem = {
   id: string;
@@ -22,10 +22,52 @@ export type CalendarEvent = {
 export type ArticleIdea = {
   id: number;
   title: string;
-  notes?: string;
-  sourceUrl?: string;
-  status: 'inbox' | 'planned' | 'drafting' | 'archived';
-  createdAt: string;
+  summary?: string | null;
+  status: 'in_progress' | 'stalled' | 'complete';
+  newsArticleId?: number | null;
+  target?: string | null;
+  tags: string[];
+  notesMarkdown?: string | null;
+  articleTitle?: string | null;
+  articleMarkdown?: string | null;
+  dateAdded?: string;
+  dateUpdated?: string | null;
+  dateCompleted?: string | null;
+  dateRemoved?: string | null;
+  priority?: number | null;
+  isPinned?: boolean;
+};
+
+export type CreateArticleIdeaInput = {
+  title: string;
+  summary?: string;
+  newsArticleId?: number;
+  target?: string;
+  tags?: string[];
+  priority?: number;
+};
+
+export type UpdateArticleIdeaMetadataInput = {
+  id: number;
+  title?: string;
+  summary?: string | null;
+  status?: ArticleIdea['status'];
+  newsArticleId?: number | null;
+  target?: string | null;
+  tags?: string[];
+  priority?: number | null;
+  isPinned?: boolean;
+};
+
+export type UpdateArticleIdeaNotesInput = {
+  id: number;
+  notesMarkdown: string;
+};
+
+export type UpdateArticleIdeaArticleInput = {
+  id: number;
+  articleTitle?: string | null;
+  articleMarkdown?: string | null;
 };
 
 export type Job = {
@@ -179,20 +221,75 @@ export function useUpcomingEvents(horizonMinutes = 480) {
 export function useArticleIdeas(status?: ArticleIdea['status']) {
   return useQuery({
     queryKey: ['articleIdeas', status],
-    queryFn: () =>
-      invokeWithFallback(
-        'list_article_ideas',
-        status ? { status } : {},
-        [
-          {
-            id: 1,
-            title: 'Build a moderator autopilot',
-            notes: 'Blend Reddit mod actions with calendar events',
-            status: 'inbox',
-            createdAt: new Date().toISOString(),
-          },
-        ] as ArticleIdea[]
-      ),
+    queryFn: () => invoke<ArticleIdea[]>('list_ideas', status ? { status } : {}),
+  });
+}
+
+export function useArticleIdea(id?: number) {
+  return useQuery({
+    queryKey: ['articleIdea', id],
+    queryFn: () => invoke<ArticleIdea>('get_idea', { id }),
+    enabled: typeof id === 'number',
+  });
+}
+
+export function useCreateArticleIdea() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateArticleIdeaInput) => invoke<ArticleIdea>('create_idea', input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['articleIdeas'] }),
+  });
+}
+
+export function useUpdateArticleIdeaMetadata() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateArticleIdeaMetadataInput) => invoke<ArticleIdea>('update_idea_metadata', input),
+    onSuccess: (updated) => {
+      qc.invalidateQueries({ queryKey: ['articleIdeas'] });
+      if (updated?.id) {
+        qc.invalidateQueries({ queryKey: ['articleIdea', updated.id] });
+      }
+    },
+  });
+}
+
+export function useUpdateArticleIdeaNotes() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateArticleIdeaNotesInput) => invoke<ArticleIdea>('update_idea_notes', input),
+    onSuccess: (updated) => {
+      qc.invalidateQueries({ queryKey: ['articleIdeas'] });
+      if (updated?.id) {
+        qc.invalidateQueries({ queryKey: ['articleIdea', updated.id] });
+      }
+    },
+  });
+}
+
+export function useUpdateArticleIdeaArticle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateArticleIdeaArticleInput) => invoke<ArticleIdea>('update_idea_article', input),
+    onSuccess: (updated) => {
+      qc.invalidateQueries({ queryKey: ['articleIdeas'] });
+      if (updated?.id) {
+        qc.invalidateQueries({ queryKey: ['articleIdea', updated.id] });
+      }
+    },
+  });
+}
+
+export function useArchiveArticleIdea() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => invoke<ArticleIdea>('archive_idea', { id }),
+    onSuccess: (updated) => {
+      qc.invalidateQueries({ queryKey: ['articleIdeas'] });
+      if (updated?.id) {
+        qc.invalidateQueries({ queryKey: ['articleIdea', updated.id] });
+      }
+    },
   });
 }
 

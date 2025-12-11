@@ -22,6 +22,8 @@ type Props = {
   defaultOpen?: boolean;
 };
 
+type NewsFeedStatus = NonNullable<Parameters<typeof useNewsArticles>[0]['status']>;
+
 type RunTaskNowResult = {
   status: string;
   result?: string | null;
@@ -31,7 +33,7 @@ type RunTaskNowResult = {
 
 export function NewsFeedDialog({ trigger, defaultOpen = false }: Props) {
   const [open, setOpen] = useState(defaultOpen);
-  const [status, setStatus] = useState<'unread' | 'all' | 'dismissed' | 'ideas'>('unread');
+  const [status, setStatus] = useState<NewsFeedStatus>('unread');
   const [showSettings, setShowSettings] = useState(true);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const [selected, setSelected] = useState<NewsArticle | null>(null);
@@ -135,11 +137,17 @@ export function NewsFeedDialog({ trigger, defaultOpen = false }: Props) {
               />
             </div>
               <div className="flex flex-wrap gap-2 items-center">
-                <Button variant="subtle" size="sm" onClick={() => setStatus('unread')}>
+                <Button variant={status === 'unread' ? 'solid' : 'subtle'} size="sm" onClick={() => setStatus('unread')}>
                   Unread
                 </Button>
-                <Button variant="subtle" size="sm" onClick={() => setStatus('all')}>
+                <Button variant={status === 'all' ? 'solid' : 'subtle'} size="sm" onClick={() => setStatus('all')}>
                   All
+                </Button>
+                <Button variant={status === 'dismissed' ? 'solid' : 'subtle'} size="sm" onClick={() => setStatus('dismissed')}>
+                  Dismissed
+                </Button>
+                <Button variant={status === 'ideas' ? 'solid' : 'subtle'} size="sm" onClick={() => setStatus('ideas')}>
+                  Ideas
                 </Button>
                 <Button
                   variant={showSettings ? 'outline' : 'subtle'}

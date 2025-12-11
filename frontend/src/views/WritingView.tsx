@@ -17,12 +17,34 @@ export function WritingView() {
         </div>
         <ScrollArea className="h-full">
           <div className="flex flex-col gap-2 pr-1">
-            {ideas?.map((idea) => (
-              <div key={idea.id} className="p-3 rounded-[var(--radius-button)] bg-[var(--color-surface-soft)] border border-[var(--color-border-subtle)]">
-                <div className="font-semibold">{idea.title}</div>
-                {idea.notes ? <div className="text-xs text-[var(--color-text-soft)]">{idea.notes}</div> : null}
-              </div>
-            )) || <div className="text-[var(--color-text-muted)]">No ideas yet.</div>}
+            {ideas && ideas.length
+              ? ideas.map((idea) => {
+                  const summary = idea.summary || idea.notesMarkdown || idea.articleTitle;
+                  return (
+                    <div
+                      key={idea.id}
+                      className="p-3 rounded-[var(--radius-button)] bg-[var(--color-surface-soft)] border border-[var(--color-border-subtle)]"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-semibold">{idea.title}</div>
+                        <span className="text-[11px] px-2 py-1 rounded-full bg-[var(--color-surface-strong)] text-[var(--color-text-soft)] capitalize">
+                          {idea.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                      {summary ? <div className="text-xs text-[var(--color-text-soft)] mt-1">{summary}</div> : null}
+                      {idea.tags?.length ? (
+                        <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-[var(--color-text-muted)]">
+                          {idea.tags.map((tag) => (
+                            <span key={tag} className="px-2 py-1 rounded-full bg-[var(--color-surface-strong)] border border-[var(--color-border-subtle)]">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })
+              : <div className="text-[var(--color-text-muted)]">No ideas yet.</div>}
           </div>
         </ScrollArea>
       </Card>
