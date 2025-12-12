@@ -58,7 +58,7 @@ export function NewsFeedDialog({ trigger, defaultOpen = false }: Props) {
   });
 
   const createIdeaMutation = useMutation({
-    mutationFn: async (id: number) => invoke('create_idea_for_article', { article_id: id }),
+    mutationFn: async (id: number) => invoke('create_idea_for_article', { input: { article_id: id } }),
     onSuccess: (_, articleId) => {
       toast.success('Added to Ideas inbox');
       qc.invalidateQueries({ queryKey: ['articleIdeas'] });

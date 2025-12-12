@@ -20,7 +20,8 @@ hex = "0.4"
 dotenvy = "0.15"
 thiserror = "1.0"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "ansi"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "ansi", "json"] }
+tracing-appender = "0.2"
 
 [build-dependencies]
 tauri-build = { version = "2.5.3", features = [] }

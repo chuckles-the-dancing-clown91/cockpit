@@ -1,3 +1,11 @@
+//! NewsData.io integration for fetching and managing news articles
+//!
+//! This module handles:
+//! - Fetching articles from NewsData API (latest and archive endpoints)
+//! - Managing news settings (filters, API keys, quotas)
+//! - Syncing news sources/providers
+//! - Article CRUD operations
+
 use crate::crypto;
 use crate::errors::{AppError, AppResult};
 use crate::logging;
@@ -5,7 +13,6 @@ use crate::news_articles::{self, Entity as EntityNewsArticles};
 use crate::news_settings::{self, Entity as EntityNewsSettings};
 use crate::news_sources::{self, Entity as EntityNewsSources};
 use crate::scheduler::TaskRunResult;
-use crate::AppState;
 use chrono::Datelike;
 use reqwest::Client;
 use sea_orm::{
@@ -95,6 +102,7 @@ pub struct NewsSourceDto {
 }
 
 #[derive(serde::Deserialize)]
+#[allow(dead_code)]
 struct NewsApiResponse {
     status: Option<String>,
     #[serde(rename = "totalResults")]
@@ -131,6 +139,7 @@ struct NewsApiArticle {
 }
 
 #[derive(serde::Deserialize)]
+#[allow(dead_code)]
 struct NewsSourceApiResponse {
     status: Option<String>,
     results: Option<Vec<NewsSourceApiItem>>,
@@ -139,6 +148,7 @@ struct NewsSourceApiResponse {
 }
 
 #[derive(serde::Deserialize)]
+#[allow(dead_code)]
 struct NewsSourceApiItem {
     #[serde(alias = "source_id", alias = "id")]
     source_id: String,
@@ -155,11 +165,6 @@ pub(crate) fn parse_vec(json: &Option<String>) -> Vec<String> {
     json.as_ref()
         .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
         .unwrap_or_default()
-}
-
-fn to_json_vec_str(v: &Option<Vec<String>>) -> Option<String> {
-    v.as_ref()
-        .map(|vec| serde_json::to_string(vec).unwrap_or_else(|_| "[]".into()))
 }
 
 fn to_json_vec(v: &Option<Vec<String>>) -> Option<String> {
@@ -243,7 +248,11 @@ pub async fn get_news_settings_handler(state: &crate::AppState) -> AppResult<New
         let mut active = ensure_news_settings_defaults(None);
         if let Some(env_key) = env_news_api_key() {
             info!("news_settings: seeding from env NEWSDATA_API_KEY");
-            let cipher = crypto::encrypt_api_key(&env_key).map_err(AppError::Crypto)?;
+            let cipher = crypto::encrypt_api_key(&env_key)
+                .map_err(|e| AppError::Crypto {
+                    operation: "encrypt_api_key".to_string(),
+                    reason: e.to_string(),
+                })?;
             active.api_key_encrypted = sea_orm::Set(cipher);
         }
         active.insert(&state.db).await?
@@ -253,7 +262,11 @@ pub async fn get_news_settings_handler(state: &crate::AppState) -> AppResult<New
     if existing.api_key_encrypted.is_empty() {
         if let Some(env_key) = env_news_api_key() {
             info!("news_settings: hydrating empty api_key from env");
-            let cipher = crypto::encrypt_api_key(&env_key).map_err(AppError::Crypto)?;
+            let cipher = crypto::encrypt_api_key(&env_key)
+                .map_err(|e| AppError::Crypto {
+                    operation: "encrypt_api_key".to_string(),
+                    reason: e.to_string(),
+                })?;
             let mut active: news_settings::ActiveModel = existing.clone().into();
             active.api_key_encrypted = sea_orm::Set(cipher);
             active.updated_at = sea_orm::Set(chrono::Utc::now());
@@ -275,7 +288,11 @@ pub async fn save_news_settings_handler(
         .await?;
     let mut active = ensure_news_settings_defaults(model);
     if let Some(api) = input.api_key {
-        let cipher = crypto::encrypt_api_key(&api).map_err(AppError::Crypto)?;
+        let cipher = crypto::encrypt_api_key(&api)
+            .map_err(|e| AppError::Crypto {
+                operation: "encrypt_api_key".to_string(),
+                reason: e.to_string(),
+            })?;
         active.api_key_encrypted = sea_orm::Set(cipher);
         active.calls_today = sea_orm::Set(0);
         active.last_reset_date = sea_orm::Set(Some(chrono::Utc::now().date_naive()));
@@ -412,7 +429,7 @@ pub async fn get_news_article_handler(
 ) -> AppResult<NewsArticleDto> {
     let model = EntityNewsArticles::find_by_id(id).one(&state.db).await?;
     let Some(m) = model else {
-        return Err(AppError::Other("not found".into()));
+        return Err(AppError::other("Not found"));
     };
     Ok(article_to_dto(m))
 }
@@ -420,7 +437,7 @@ pub async fn get_news_article_handler(
 pub async fn dismiss_news_article_handler(id: i64, state: &crate::AppState) -> AppResult<()> {
     let model = EntityNewsArticles::find_by_id(id).one(&state.db).await?;
     let Some(m) = model else {
-        return Err(AppError::Other("not found".into()));
+        return Err(AppError::other("Not found"));
     };
     let mut active: news_articles::ActiveModel = m.into();
     active.dismissed_at = sea_orm::Set(Some(chrono::Utc::now()));
@@ -437,7 +454,7 @@ pub async fn toggle_star_news_article_handler(
 ) -> AppResult<()> {
     let model = EntityNewsArticles::find_by_id(id).one(&state.db).await?;
     let Some(m) = model else {
-        return Err(AppError::Other("not found".into()));
+        return Err(AppError::other("Not found"));
     };
     let mut active: news_articles::ActiveModel = m.into();
     active.is_starred = sea_orm::Set(if starred { 1 } else { 0 });
@@ -449,7 +466,7 @@ pub async fn toggle_star_news_article_handler(
 pub async fn mark_news_article_read_handler(id: i64, state: &crate::AppState) -> AppResult<()> {
     let model = EntityNewsArticles::find_by_id(id).one(&state.db).await?;
     let Some(m) = model else {
-        return Err(AppError::Other("not found".into()));
+        return Err(AppError::other("Not found"));
     };
     if m.is_read == 1 {
         return Ok(());
@@ -742,7 +759,7 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
             Ok(b) => b,
             Err(e) => {
                 let preview = text.chars().take(320).collect::<String>();
-                logging::log_api_call("news_sync", endpoint, status_code, &preview);
+                logging::log_api_call("news_sync", endpoint, status_code, &preview, &state.config.logging.api_log_path);
                 return TaskRunResult {
                     status: "error",
                     result_json: None,
@@ -758,6 +775,7 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
             endpoint,
             status_code,
             &text.chars().take(512).collect::<String>(),
+            &state.config.logging.api_log_path,
         );
         calls_used += 1;
         if let Some(res_list) = body.results {
@@ -1002,6 +1020,7 @@ pub async fn run_news_sources_sync_task(state: &crate::AppState) -> TaskRunResul
                 "https://newsdata.io/api/1/sources",
                 status,
                 &preview,
+                &state.config.logging.api_log_path,
             );
             return TaskRunResult {
                 status: "error",
@@ -1018,6 +1037,7 @@ pub async fn run_news_sources_sync_task(state: &crate::AppState) -> TaskRunResul
                     "https://newsdata.io/api/1/sources",
                     status,
                     &preview,
+                    &state.config.logging.api_log_path,
                 );
                 return TaskRunResult {
                     status: "error",
@@ -1031,12 +1051,13 @@ pub async fn run_news_sources_sync_task(state: &crate::AppState) -> TaskRunResul
             "https://newsdata.io/api/1/sources",
             status,
             &text.chars().take(512).collect::<String>(),
+            &state.config.logging.api_log_path,
         );
 
         if let Some(list) = body.results {
             for item in list {
                 seen += 1;
-                let category = to_json_vec_str(&item.category);
+                let category = to_json_vec(&item.category);
                 let country = match item.country {
                     Some(StringOrVec::String(s)) => Some(s),
                     Some(StringOrVec::Vec(v)) => v.first().cloned(),

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import MDEditor from '@uiw/react-md-editor';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -10,23 +11,36 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/Tabs';
 import { useArticleIdeas, type ArticleIdea, type NewsArticle } from '../hooks/queries';
 import { cn } from '../lib/cn';
+import { useTheme } from '../theme/ThemeProvider';
+import WritingStats from '../components/writing/WritingStats';
 
 const statusTabs: { value: ArticleIdea['status'] | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
-  { value: 'inbox', label: 'Inbox' },
-  { value: 'planned', label: 'Planned' },
-  { value: 'drafting', label: 'Drafting' },
-  { value: 'archived', label: 'Archived' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'stalled', label: 'Stalled' },
+  { value: 'complete', label: 'Complete' },
 ];
 
 export function WritingView() {
-  const [status, setStatus] = useState<ArticleIdea['status'] | 'all'>('inbox');
+  const { theme } = useTheme();
+  const [status, setStatus] = useState<ArticleIdea['status'] | 'all'>('in_progress');
   const [search, setSearch] = useState('');
   const [selectedIdeaId, setSelectedIdeaId] = useState<number | null>(null);
   const queryClient = useQueryClient();
   const { data: ideas = [], isFetching } = useArticleIdeas({
     status,
     search: search.trim() || undefined,
+  });
+  const createIdea = useMutation({
+    mutationFn: async () => invoke<ArticleIdea>('create_idea', { input: { title: 'Untitled idea' } }),
+    onSuccess: (idea) => {
+      toast.success('New idea created');
+      queryClient.invalidateQueries({ queryKey: ['articleIdeas'] });
+      setSelectedIdeaId(idea.id);
+    },
+    onError: (err: any) => {
+      toast.error(err?.message ?? 'Failed to create idea');
+    },
   });
 
   const selectedIdea = useMemo(() => ideas.find((idea) => idea.id === selectedIdeaId) ?? ideas[0], [ideas, selectedIdeaId]);
@@ -38,7 +52,7 @@ export function WritingView() {
     priority: ArticleIdea['priority'] | undefined;
     isPinned: boolean;
     dateRemoved?: string | null;
-  }>({ status: 'inbox', priority: 'normal', isPinned: false });
+  }>({ status: 'in_progress', priority: 0, isPinned: false });
 
   useEffect(() => {
     if (!selectedIdea) return;
@@ -47,7 +61,7 @@ export function WritingView() {
     setNotesContent(selectedIdea.notesMarkdown ?? '');
     setMetadata({
       status: selectedIdea.status,
-      priority: selectedIdea.priority ?? 'normal',
+      priority: selectedIdea.priority ?? 0,
       isPinned: Boolean(selectedIdea.isPinned),
       dateRemoved: selectedIdea.dateRemoved,
     });
@@ -58,7 +72,7 @@ export function WritingView() {
     if (articleContent === (selectedIdea.articleMarkdown ?? '')) return;
     const handle = setTimeout(async () => {
       try {
-        await invoke('update_idea_article', { idea_id: selectedIdea.id, article_markdown: articleContent });
+        await invoke('update_idea_article', { id: selectedIdea.id, input: { article_markdown: articleContent } });
         updateIdeaCache(selectedIdea.id, { articleMarkdown: articleContent });
       } catch (err) {
         console.error('Failed to save article draft', err);
@@ -72,7 +86,7 @@ export function WritingView() {
     if (notesContent === (selectedIdea.notesMarkdown ?? '')) return;
     const handle = setTimeout(async () => {
       try {
-        await invoke('update_idea_notes', { idea_id: selectedIdea.id, notes_markdown: notesContent });
+        await invoke('update_idea_notes', { id: selectedIdea.id, input: { notes_markdown: notesContent } });
         updateIdeaCache(selectedIdea.id, { notesMarkdown: notesContent, notes: notesContent });
       } catch (err) {
         console.error('Failed to save notes', err);
@@ -91,36 +105,72 @@ export function WritingView() {
     if (!selectedIdea) return;
     const next = {
       status: patch.status ?? metadata.status,
-      priority: patch.priority ?? metadata.priority ?? 'normal',
+      priority: patch.priority ?? metadata.priority ?? 0,
       isPinned: patch.isPinned ?? metadata.isPinned,
-      dateRemoved: patch.dateRemoved ?? metadata.dateRemoved ?? null,
     } as const;
 
     try {
       await invoke('update_idea_metadata', {
-        idea_id: selectedIdea.id,
-        status: next.status,
-        priority: next.priority,
-        is_pinned: next.isPinned,
-        date_removed: next.dateRemoved,
+        id: selectedIdea.id,
+        input: {
+          status: next.status,
+          priority: next.priority,
+          is_pinned: next.isPinned,
+        },
       });
       setMetadata(next);
       updateIdeaCache(selectedIdea.id, {
         status: next.status,
         priority: next.priority,
         isPinned: next.isPinned,
-        dateRemoved: next.dateRemoved,
       });
     } catch (err) {
       console.error('Failed to update metadata', err);
     }
   }
 
+  async function handleArchive() {
+    if (!selectedIdea) return;
+    try {
+      const result = await invoke<any>('archive_idea', { id: selectedIdea.id });
+      const dateRemoved = result?.date_removed ?? result?.dateRemoved ?? new Date().toISOString();
+      const status = (result?.status as ArticleIdea['status']) ?? metadata.status;
+      updateIdeaCache(selectedIdea.id, { dateRemoved, status });
+      setMetadata((prev) => ({ ...prev, dateRemoved }));
+      toast.success('Idea archived');
+    } catch (err) {
+      console.error('Failed to archive idea', err);
+      toast.error('Failed to archive');
+    }
+  }
+
   const linkedArticle: NewsArticle | undefined = selectedIdea?.newsArticle;
+  const priorityLabel = (value?: number) => {
+    switch (value) {
+      case 2:
+        return 'High';
+      case 0:
+        return 'Low';
+      default:
+        return 'Normal';
+    }
+  };
+  const statusLabel = (value?: ArticleIdea['status']) => {
+    switch (value) {
+      case 'in_progress':
+        return 'In progress';
+      case 'stalled':
+        return 'Stalled';
+      case 'complete':
+        return 'Complete';
+      default:
+        return 'Unknown';
+    }
+  };
 
   return (
-    <div className="grid grid-cols-[320px_1fr_420px] gap-3 p-3 h-full">
-      <Card className="flex flex-col gap-3 overflow-hidden">
+    <div className="grid grid-cols-[320px_1fr_420px] gap-3 p-3 h-full min-h-0">
+      <Card className="flex flex-col gap-3 overflow-hidden h-full min-h-0">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Ideas</h3>
           <Button
@@ -178,16 +228,32 @@ export function WritingView() {
         </ScrollArea>
       </Card>
 
-      <Card className="flex flex-col gap-3 h-full">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Composer</h3>
-          <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
-            <span>Status: {metadata.status}</span>
-            <span>• Priority: {metadata.priority}</span>
+      <div className="flex flex-col gap-3 h-full min-h-0" data-color-mode={theme === 'light' ? 'light' : 'dark'}>
+        <Card className="flex flex-col gap-3 overflow-hidden flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Composer</h3>
+            <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+              <span>Status: {statusLabel(metadata.status)}</span>
+              <span>• Priority: {priorityLabel(metadata.priority)}</span>
+            </div>
           </div>
+        </Card>
+        <div className="flex-shrink-0">
+          <WritingStats content={articleContent} />
         </div>
-        <MDEditor value={articleContent} onChange={(val = '') => setArticleContent(val)} className="h-full" height={400} />
-      </Card>
+        <div className="flex-1 min-h-0">
+          <MDEditor
+            value={articleContent}
+            onChange={(val = '') => setArticleContent(val)}
+            height="100%"
+            preview="live"
+            hideToolbar={false}
+            enableScroll={true}
+            visibleDragbar={false}
+            highlightEnable={true}
+          />
+        </div>
+      </div>
 
       <div className="flex flex-col gap-3 h-full min-h-0">
         <Card className="flex flex-col gap-3">
@@ -207,12 +273,7 @@ export function WritingView() {
                 size="sm"
                 variant="ghost"
                 className="border border-[var(--color-border)]"
-                onClick={() =>
-                  handleMetadataChange({
-                    status: 'archived',
-                    dateRemoved: new Date().toISOString(),
-                  })
-                }
+                onClick={handleArchive}
                 disabled={!selectedIdea}
               >
                 Archive
@@ -244,30 +305,39 @@ export function WritingView() {
             <div className="flex flex-col gap-1">
               <span className="text-xs text-[var(--color-text-muted)]">Priority</span>
               <Select
-                value={metadata.priority ?? 'normal'}
-                onValueChange={(value) => handleMetadataChange({ priority: value as ArticleIdea['priority'] })}
+                value={String(metadata.priority ?? 1)}
+                onValueChange={(value) => handleMetadataChange({ priority: Number(value) })}
                 disabled={!selectedIdea}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Priority" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="normal">Normal</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="0">Low</SelectItem>
+                  <SelectItem value="1">Normal</SelectItem>
+                  <SelectItem value="2">High</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
         </Card>
 
-        <Card className="flex flex-col gap-3 min-h-[240px]">
-          <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3" data-color-mode={theme === 'light' ? 'light' : 'dark'}>
+          <Card className="flex items-center justify-between p-3">
             <h3 className="text-lg font-semibold">Notes</h3>
             <span className="text-xs text-[var(--color-text-muted)]">Autosaves while you type</span>
-          </div>
-          <MDEditor value={notesContent} onChange={(val = '') => setNotesContent(val)} height={180} />
-        </Card>
+          </Card>
+          <MDEditor
+            value={notesContent}
+            onChange={(val = '') => setNotesContent(val)}
+            height={200}
+            preview="edit"
+            hideToolbar={false}
+            enableScroll={true}
+            visibleDragbar={false}
+            highlightEnable={true}
+          />
+        </div>
 
         <Card className="flex flex-col gap-3 overflow-hidden">
           <h3 className="text-lg font-semibold">Reference</h3>

@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
-import { ScrollArea } from '../components/ui/ScrollArea';
+import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
+import { ScrollArea } from '../ui/ScrollArea';
 import {
   useArticleIdeas,
   useMixedFeed,
@@ -14,10 +14,10 @@ import {
   type FeedItem,
   type CalendarEvent,
   type Job,
-} from '../hooks/queries';
-import { NewsFeedDialog } from '../components/news/NewsFeedDialog';
+} from '../../hooks/queries';
+import { NewsFeedDialog } from '../news/NewsFeedDialog';
 
-export function DashboardView() {
+export function NewsFeedView() {
   const { data: systemUser, isLoading: userLoading } = useSystemUser();
   const {
     data: events,

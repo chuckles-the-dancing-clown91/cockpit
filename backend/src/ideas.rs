@@ -1,15 +1,21 @@
+//! Ideas management system for writing and content creation
+//!
+//! This module handles CRUD operations for ideas/articles:
+//! - Creating ideas from scratch or from news articles
+//! - Managing idea metadata (status, priority, tags)
+//! - Editing article content and notes
+//! - Archiving completed ideas
+
 use crate::errors::{AppError, AppResult};
 use crate::news_articles;
 use crate::AppState;
 use chrono::Utc;
 use sea_orm::entity::prelude::*;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
 };
 use serde::{Deserialize, Serialize};
 use tauri::State;
-
-pub const VALID_IDEA_STATUSES: [&str; 3] = ["in_progress", "stalled", "complete"];
 
 #[derive(Clone, Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "String", db_type = "String(Some(32))")]
@@ -36,7 +42,7 @@ impl IdeaStatus {
             "in_progress" => Ok(IdeaStatus::InProgress),
             "stalled" => Ok(IdeaStatus::Stalled),
             "complete" => Ok(IdeaStatus::Complete),
-            _ => Err(AppError::Other(format!("Invalid idea status: {value}"))),
+            _ => Err(AppError::other(format!("Invalid idea status: {value}"))),
         }
     }
 }
@@ -216,7 +222,7 @@ pub async fn list_ideas_handler(
     include_removed: Option<bool>,
     limit: Option<u64>,
     offset: Option<u64>,
-    state: &State<AppState>,
+    state: &State<'_, AppState>,
 ) -> AppResult<Vec<IdeaDto>> {
     let mut query = Entity::find();
 
@@ -250,21 +256,22 @@ pub async fn list_ideas_handler(
     Ok(results.into_iter().map(idea_to_dto).collect())
 }
 
-pub async fn get_idea_handler(id: i64, state: &State<AppState>) -> AppResult<IdeaDto> {
+pub async fn get_idea_handler(id: i64, state: &State<'_, AppState>) -> AppResult<IdeaDto> {
     let model = Entity::find_by_id(id)
         .one(&state.db)
         .await?
-        .ok_or_else(|| AppError::Other(format!("Idea not found: {id}")))?;
+        .ok_or_else(|| AppError::other(format!("Idea not found: {id}")))?;
 
     Ok(idea_to_dto(model))
 }
 
 pub async fn create_idea_handler(
     input: CreateIdeaInput,
-    state: &State<AppState>,
+    state: &State<'_, AppState>,
 ) -> AppResult<IdeaDto> {
     let now = Utc::now();
     let status = status_or_default(&input.status)?;
+    let is_complete = status == IdeaStatus::Complete;
 
     let model = ActiveModel {
         title: Set(input.title),
@@ -278,11 +285,7 @@ pub async fn create_idea_handler(
         article_markdown: Set(input.article_markdown),
         date_added: Set(now),
         date_updated: Set(now),
-        date_completed: Set(if matches!(status, IdeaStatus::Complete) {
-            Some(now)
-        } else {
-            None
-        }),
+        date_completed: Set(if is_complete { Some(now) } else { None }),
         date_removed: Set(None),
         priority: Set(input.priority.unwrap_or(0)),
         is_pinned: Set(bool_to_int(input.is_pinned)),
@@ -296,12 +299,12 @@ pub async fn create_idea_handler(
 
 pub async fn create_idea_for_article_handler(
     input: CreateIdeaForArticleInput,
-    state: &State<AppState>,
+    state: &State<'_, AppState>,
 ) -> AppResult<IdeaDto> {
     let article = news_articles::Entity::find_by_id(input.article_id)
         .one(&state.db)
         .await?
-        .ok_or_else(|| AppError::Other(format!("Article not found: {}", input.article_id)))?;
+        .ok_or_else(|| AppError::other(format!("Article not found: {}", input.article_id)))?;
 
     let tags = parse_tags(&article.tags);
 
@@ -333,12 +336,12 @@ pub async fn create_idea_for_article_handler(
 pub async fn update_idea_metadata_handler(
     id: i64,
     input: UpdateIdeaMetadataInput,
-    state: &State<AppState>,
+    state: &State<'_, AppState>,
 ) -> AppResult<IdeaDto> {
     let mut model: ActiveModel = Entity::find_by_id(id)
         .one(&state.db)
         .await?
-        .ok_or_else(|| AppError::Other(format!("Idea not found: {id}")))?
+        .ok_or_else(|| AppError::other(format!("Idea not found: {id}")))?
         .into();
 
     if let Some(title) = input.title {
@@ -375,12 +378,12 @@ pub async fn update_idea_metadata_handler(
 pub async fn update_idea_notes_handler(
     id: i64,
     input: UpdateIdeaNotesInput,
-    state: &State<AppState>,
+    state: &State<'_, AppState>,
 ) -> AppResult<IdeaDto> {
     let mut model: ActiveModel = Entity::find_by_id(id)
         .one(&state.db)
         .await?
-        .ok_or_else(|| AppError::Other(format!("Idea not found: {id}")))?
+        .ok_or_else(|| AppError::other(format!("Idea not found: {id}")))?
         .into();
 
     model.notes_markdown = Set(input.notes_markdown);
@@ -393,12 +396,12 @@ pub async fn update_idea_notes_handler(
 pub async fn update_idea_article_handler(
     id: i64,
     input: UpdateIdeaArticleInput,
-    state: &State<AppState>,
+    state: &State<'_, AppState>,
 ) -> AppResult<IdeaDto> {
     let mut model: ActiveModel = Entity::find_by_id(id)
         .one(&state.db)
         .await?
-        .ok_or_else(|| AppError::Other(format!("Idea not found: {id}")))?
+        .ok_or_else(|| AppError::other(format!("Idea not found: {id}")))?
         .into();
 
     model.article_title = Set(input.article_title);
@@ -409,11 +412,11 @@ pub async fn update_idea_article_handler(
     Ok(idea_to_dto(updated))
 }
 
-pub async fn archive_idea_handler(id: i64, state: &State<AppState>) -> AppResult<IdeaDto> {
+pub async fn archive_idea_handler(id: i64, state: &State<'_, AppState>) -> AppResult<IdeaDto> {
     let mut model: ActiveModel = Entity::find_by_id(id)
         .one(&state.db)
         .await?
-        .ok_or_else(|| AppError::Other(format!("Idea not found: {id}")))?
+        .ok_or_else(|| AppError::other(format!("Idea not found: {id}")))?
         .into();
 
     let now = Utc::now();

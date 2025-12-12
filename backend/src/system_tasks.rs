@@ -23,6 +23,3 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
-
-pub type EntitySystemTasks = Entity;
-pub type ColumnSystemTasks = Column;

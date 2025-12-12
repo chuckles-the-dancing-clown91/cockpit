@@ -1,3 +1,8 @@
+//! Encryption and decryption utilities using AES-256-GCM
+//!
+//! This module provides secure encryption for sensitive data like API keys.
+//! Requires COCKPIT_MASTER_KEY environment variable (32-byte hex string).
+
 use aes_gcm::{aead::Aead, aead::KeyInit, Aes256Gcm, Nonce};
 use rand::RngCore;
 use std::env;

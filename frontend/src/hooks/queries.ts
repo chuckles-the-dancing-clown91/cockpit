@@ -21,6 +21,22 @@ export type CalendarEvent = {
 
 export type IdeaStatus = 'in_progress' | 'stalled' | 'complete';
 
+export type ArticleIdea = {
+  id: number;
+  title: string;
+  status: IdeaStatus;
+  priority: number;
+  isPinned: boolean;
+  articleMarkdown: string;
+  notesMarkdown: string;
+  notes?: string;
+  sourceUrl?: string;
+  newsArticleId?: number | null;
+  newsArticle?: NewsArticle;
+  createdAt?: string;
+  dateRemoved?: string | null;
+};
+
 export type Idea = {
   id: number;
   title: string;
@@ -165,13 +181,66 @@ export type NewsSource = {
   is_muted: boolean;
 };
 
-async function invokeWithFallback<T>(command: string, args: Record<string, unknown> = {}, fallback: T): Promise<T> {
-  try {
-    return await invoke<T>(command, args);
-  } catch (err) {
-    console.warn(`[mock:${command}] using fallback`, err);
+/**
+ * Invoke Tauri command with retry logic and error handling
+ */
+async function invokeWithRetry<T>(
+  command: string,
+  args: Record<string, unknown> = {},
+  options: {
+    retries?: number;
+    retryDelay?: number;
+    fallback?: T;
+  } = {}
+): Promise<T> {
+  const { retries = 3, retryDelay = 1000, fallback } = options;
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      return await invoke<T>(command, args);
+    } catch (err) {
+      lastError = err as Error;
+      console.warn(
+        `[invoke:${command}] attempt ${attempt + 1}/${retries} failed:`,
+        err
+      );
+
+      // Don't retry on validation errors or 4xx errors
+      if (
+        lastError.message.includes('validation') ||
+        lastError.message.includes('400') ||
+        lastError.message.includes('404')
+      ) {
+        break;
+      }
+
+      // Wait before retrying (except on last attempt)
+      if (attempt < retries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelay * (attempt + 1)));
+      }
+    }
+  }
+
+  // If we have a fallback, use it
+  if (fallback !== undefined) {
+    console.warn(`[invoke:${command}] using fallback after ${retries} attempts`);
     return fallback;
   }
+
+  // Otherwise, throw the error
+  throw lastError;
+}
+
+/**
+ * Legacy function for backward compatibility
+ */
+async function invokeWithFallback<T>(
+  command: string,
+  args: Record<string, unknown> = {},
+  fallback: T
+): Promise<T> {
+  return invokeWithRetry(command, args, { fallback });
 }
 
 export function useSystemUser() {
@@ -235,8 +304,8 @@ function normalizeIdea(raw: any): ArticleIdea {
   return {
     id: raw.id,
     title: raw.title ?? 'Untitled idea',
-    status: raw.status ?? 'inbox',
-    priority: raw.priority ?? raw.idea_priority ?? 'normal',
+    status: (raw.status as IdeaStatus) ?? 'in_progress',
+    priority: Number(raw.priority ?? raw.idea_priority ?? 0),
     isPinned: raw.is_pinned ?? raw.pinned ?? false,
     articleMarkdown: raw.article_markdown ?? raw.articleMarkdown ?? '',
     notesMarkdown: raw.notes_markdown ?? raw.notesMarkdown ?? raw.notes ?? '',
@@ -246,7 +315,7 @@ function normalizeIdea(raw: any): ArticleIdea {
     newsArticle: raw.news_article ?? raw.newsArticle,
     createdAt: raw.created_at ?? raw.createdAt,
     dateRemoved: raw.date_removed ?? raw.dateRemoved ?? null,
-  } as ArticleIdea;
+  };
 }
 
 export function useArticleIdeas(params: { status?: ArticleIdea['status'] | 'all'; search?: string } = {}) {
@@ -263,7 +332,7 @@ export function useArticleIdeas(params: { status?: ArticleIdea['status'] | 'all'
             id: 1,
             title: 'Build a moderator autopilot',
             notes_markdown: 'Blend Reddit mod actions with calendar events',
-            status: 'inbox',
+            status: 'in_progress',
             article_markdown: '# Draft outline\n- automation\n- safety nets',
             news_article_id: 42,
             news_article: {

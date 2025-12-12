@@ -25,24 +25,28 @@ export function SelectTrigger({ className, children, ...props }: SelectPrimitive
 
 export function SelectContent({ className, ...props }: SelectPrimitive.SelectContentProps) {
   return (
-    <SelectPrimitive.Content
-      className={cn(
-        'overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-card-bg)] shadow-[var(--shadow-card)]',
-        className
-      )}
-      position="popper"
-      {...props}
-    >
-      <SelectPrimitive.ScrollUpButton className="flex items-center justify-center py-1 text-[var(--color-text-muted)]">
-        <ChevronUp size={14} />
-      </SelectPrimitive.ScrollUpButton>
-      <SelectPrimitive.Viewport className="p-1">
-        {props.children}
-      </SelectPrimitive.Viewport>
-      <SelectPrimitive.ScrollDownButton className="flex items-center justify-center py-1 text-[var(--color-text-muted)]">
-        <ChevronDown size={14} />
-      </SelectPrimitive.ScrollDownButton>
-    </SelectPrimitive.Content>
+    <SelectPrimitive.Portal>
+      <SelectPrimitive.Content
+        className={cn(
+          'overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-card-bg)] shadow-[var(--shadow-card)] z-50',
+          'min-w-[8rem] max-h-96',
+          className
+        )}
+        position="popper"
+        sideOffset={5}
+        {...props}
+      >
+        <SelectPrimitive.ScrollUpButton className="flex items-center justify-center py-1 text-[var(--color-text-muted)]">
+          <ChevronUp size={14} />
+        </SelectPrimitive.ScrollUpButton>
+        <SelectPrimitive.Viewport className="p-1">
+          {props.children}
+        </SelectPrimitive.Viewport>
+        <SelectPrimitive.ScrollDownButton className="flex items-center justify-center py-1 text-[var(--color-text-muted)]">
+          <ChevronDown size={14} />
+        </SelectPrimitive.ScrollDownButton>
+      </SelectPrimitive.Content>
+    </SelectPrimitive.Portal>
   );
 }
 

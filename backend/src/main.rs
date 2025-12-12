@@ -1,26 +1,27 @@
 mod config;
 mod crypto;
 mod db;
+mod db_backup;
 mod errors;
 mod ideas;
 mod logging;
+mod migrations;
 mod news;
 mod news_articles;
 mod news_settings;
 mod news_sources;
 mod scheduler;
+mod storage;
 mod system_task_runs;
 mod system_tasks;
 
 use sea_orm::DatabaseConnection;
 use serde::Serialize;
 use std::collections::HashSet;
-use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{async_runtime, Manager, State};
 use tokio::sync::Mutex;
 
-use errors::AppError;
 use ideas::{
     archive_idea_handler, create_idea_for_article_handler, create_idea_handler, get_idea_handler,
     list_ideas_handler, update_idea_article_handler, update_idea_metadata_handler,
@@ -28,9 +29,9 @@ use ideas::{
     UpdateIdeaArticleInput, UpdateIdeaMetadataInput, UpdateIdeaNotesInput,
 };
 use news::{
-    dismiss_news_article_handler, get_news_settings_handler, list_news_articles_handler,
-    mark_news_article_read_handler, save_news_settings_handler, sync_news_now_handler,
-    toggle_star_news_article_handler,
+    dismiss_news_article_handler, get_news_article_handler, get_news_settings_handler,
+    list_news_articles_handler, mark_news_article_read_handler, save_news_settings_handler,
+    sync_news_now_handler, toggle_star_news_article_handler,
 };
 use news::{NewsArticleDto, NewsSettingsDto, NewsSourceDto, SaveNewsSettingsInput};
 use scheduler::{start_scheduler, SystemTaskDto};
@@ -71,11 +72,69 @@ struct ScheduledJobStub {
 pub struct AppState {
     pub db: DatabaseConnection,
     pub running: Arc<Mutex<HashSet<i64>>>,
+    pub config: Arc<config::AppConfig>,
 }
 
 #[tauri::command]
 fn get_system_user() -> String {
     whoami::username()
+}
+
+#[tauri::command]
+fn log_frontend_error(
+    message: String,
+    stack: String,
+    component_stack: String,
+    action: Option<String>,
+    metadata: Option<String>,
+    severity: Option<String>,
+    timestamp: String,
+) {
+    let severity_level = severity.unwrap_or_else(|| "error".to_string());
+    
+    match severity_level.as_str() {
+        "critical" => tracing::error!(
+            "[FRONTEND] {} | action={} | time={}",
+            message,
+            action.unwrap_or_default(),
+            timestamp
+        ),
+        "error" => tracing::error!(
+            "[FRONTEND] {} | action={} | time={}",
+            message,
+            action.unwrap_or_default(),
+            timestamp
+        ),
+        "warning" => tracing::warn!(
+            "[FRONTEND] {} | action={} | time={}",
+            message,
+            action.unwrap_or_default(),
+            timestamp
+        ),
+        _ => tracing::info!(
+            "[FRONTEND] {} | action={} | time={}",
+            message,
+            action.unwrap_or_default(),
+            timestamp
+        ),
+    }
+    
+    // Log stack trace if available
+    if !stack.is_empty() {
+        tracing::debug!("Stack trace: {}", stack);
+    }
+    
+    // Log component stack if available
+    if !component_stack.is_empty() {
+        tracing::debug!("Component stack: {}", component_stack);
+    }
+    
+    // Log metadata if available
+    if let Some(meta) = metadata {
+        if !meta.is_empty() {
+            tracing::debug!("Metadata: {}", meta);
+        }
+    }
 }
 
 #[tauri::command]
@@ -176,6 +235,13 @@ async fn list_news_articles(
     state: State<'_, AppState>,
 ) -> Result<Vec<NewsArticleDto>, String> {
     list_news_articles_handler(status, limit, offset, include_dismissed, search, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_news_article(id: i64, state: State<'_, AppState>) -> Result<NewsArticleDto, String> {
+    get_news_article_handler(id, &state)
         .await
         .map_err(|e| e.to_string())
 }
@@ -315,10 +381,32 @@ async fn archive_idea(id: i64, state: State<'_, AppState>) -> Result<IdeaDto, St
 }
 
 fn main() {
-    config::load_env();
-    logging::init_logging();
+    // Load and validate configuration
+    let config = match config::AppConfig::from_env() {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            eprintln!("Configuration error: {}", e);
+            eprintln!("Please check your .env file or environment variables.");
+            std::process::exit(1);
+        }
+    };
+    
+    // Ensure required directories exist
+    if let Err(e) = config::ensure_directories(&config) {
+        eprintln!("Failed to create directories: {}", e);
+        std::process::exit(1);
+    }
+    
+    logging::init_logging(&config.logging);
+    
+    // Initialize storage management
+    if let Err(e) = storage::initialize_storage(&config) {
+        eprintln!("Storage initialization warning: {}", e);
+        // Don't exit - this is not critical
+    }
+    let config_arc = Arc::new(config);
     tauri::Builder::default()
-        .setup(|app| {
+        .setup(move |app| {
             let db =
                 async_runtime::block_on(async { db::init_db_from_env().await }).map_err(|e| {
                     tauri::Error::Setup((Box::new(e) as Box<dyn std::error::Error>).into())
@@ -326,6 +414,7 @@ fn main() {
             let state = AppState {
                 db,
                 running: Arc::new(Mutex::new(HashSet::new())),
+                config: config_arc.clone(),
             };
             app.manage(state);
             let handle = app.handle().clone();
@@ -338,6 +427,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             get_system_user,
+            log_frontend_error,
             get_mixed_feed,
             get_upcoming_events,
             list_scheduled_jobs,

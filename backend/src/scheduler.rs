@@ -1,7 +1,9 @@
-use std::collections::HashSet;
-use std::sync::Arc;
+//! Task scheduler for recurring system jobs
+//!
+//! Manages scheduled tasks like news sync and source sync using tokio-cron-scheduler.
+//! Tracks task execution, prevents overlapping runs, and emits events to frontend.
+
 use std::time::Duration;
-use tokio::sync::Mutex;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tauri::{async_runtime, AppHandle, Emitter};
 use sea_orm::{EntityTrait, QueryFilter, ColumnTrait, Set, ActiveModelTrait};
@@ -15,6 +17,7 @@ use crate::AppState;
 use crate::errors::{AppError, AppResult};
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct SystemTask {
     pub id: i64,
     pub name: String,
@@ -213,7 +216,7 @@ pub async fn run_system_task_now_handler(
         .one(&state.db)
         .await?;
     let Some(model) = maybe_task else {
-        return Err(AppError::Other("task not found".into()));
+        return Err(AppError::other("Not found"));
     };
     let task = SystemTask {
         id: model.id,
@@ -244,7 +247,7 @@ pub async fn update_system_task_handler(
         .one(&state.db)
         .await?;
     let Some(model) = maybe else {
-        return Err(AppError::Other("task not found".into()));
+        return Err(AppError::other("Not found"));
     };
     let mut active: crate::system_tasks::ActiveModel = model.into();
     if let Some(enabled) = input.enabled {
