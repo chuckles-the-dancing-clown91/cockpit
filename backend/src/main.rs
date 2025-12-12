@@ -17,7 +17,11 @@ use tracing::{error, warn};
 use reqwest::Client;
 
 // Import Tauri command handlers from domain command modules
-use core::commands::{get_app_settings, update_setting, update_settings};
+use core::commands::{
+    get_app_settings, update_setting, update_settings,
+    get_storage_statistics, create_database_backup, restore_database_from_backup, list_database_backups,
+    delete_database_backup, export_database, import_database,
+};
 use writing::commands::{
     list_ideas, get_idea, create_idea, create_idea_for_article,
     update_idea_metadata, update_idea_notes, update_idea_article, archive_idea,
@@ -71,6 +75,7 @@ fn main() {
     }
     let config_arc = Arc::new(config);
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
             let db =
                 async_runtime::block_on(async { core::db::init_db_from_env().await }).map_err(|e| {
@@ -116,6 +121,13 @@ fn main() {
             get_app_settings,
             update_setting,
             update_settings,
+            get_storage_statistics,
+            create_database_backup,
+            restore_database_from_backup,
+            list_database_backups,
+            delete_database_backup,
+            export_database,
+            import_database,
             get_news_settings,
             save_news_settings,
             list_news_articles,

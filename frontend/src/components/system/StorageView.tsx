@@ -5,50 +5,74 @@ import { Label } from '../ui/Label';
 import { Input } from '../ui/Input';
 import { ScrollArea } from '../ui/ScrollArea';
 import { Separator } from '../ui/Separator';
-
-// Mock storage data - will be replaced with backend integration
-const mockStorageStats = {
-  totalSize: 45.6, // MB
-  tables: [
-    { name: 'news_articles', size: 28.4, records: 1247 },
-    { name: 'ideas', size: 8.2, records: 156 },
-    { name: 'system_tasks', size: 2.1, records: 8 },
-    { name: 'system_task_runs', size: 4.3, records: 892 },
-    { name: 'news_sources', size: 0.8, records: 12 },
-    { name: 'news_settings', size: 1.8, records: 45 },
-  ],
-  backups: [
-    { name: 'backup-2024-12-11-09-00.db', size: 44.2, date: '2024-12-11 09:00:00' },
-    { name: 'backup-2024-12-10-09-00.db', size: 43.8, date: '2024-12-10 09:00:00' },
-    { name: 'backup-2024-12-09-09-00.db', size: 42.1, date: '2024-12-09 09:00:00' },
-  ],
-  lastBackup: '2024-12-11 09:00:00',
-  autoBackupEnabled: true,
-};
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { useStorageStats, useListBackups, useCreateBackup, useRestoreBackup, useDeleteBackup, useExportData, useImportData } from '../../hooks/queries';
 
 export default function StorageView() {
-  const [stats] = useState(mockStorageStats);
+  const { data: stats, isLoading: statsLoading, error: statsError } = useStorageStats();
+  const { data: backups, isLoading: backupsLoading, error: backupsError } = useListBackups();
+  const createBackup = useCreateBackup();
+  const restoreBackup = useRestoreBackup();
+  const deleteBackup = useDeleteBackup();
+  const exportData = useExportData();
+  const importData = useImportData();
+  
   const [exportDateRange, setExportDateRange] = useState({ start: '', end: '' });
   const [cleanupDays, setCleanupDays] = useState(90);
-  const [isExporting, setIsExporting] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
   const [isCleaningUp, setIsCleaningUp] = useState(false);
-  const [isCreatingBackup, setIsCreatingBackup] = useState(false);
 
   const handleExport = async () => {
-    setIsExporting(true);
-    // TODO: Call backend to export database
-    console.log('Exporting database with date range:', exportDateRange);
-    // invoke('export_database', { startDate: exportDateRange.start, endDate: exportDateRange.end })
-    setTimeout(() => setIsExporting(false), 1500);
+    try {
+      const result = await exportData.mutateAsync();
+      const fileName = result.filePath.split('/').pop() || result.filePath;
+      toast.success('Data exported successfully', {
+        description: `${result.recordCounts.ideas} ideas, ${result.recordCounts.newsArticles} articles exported to ${fileName}`,
+      });
+    } catch (error) {
+      toast.error('Failed to export data', {
+        description: String(error),
+      });
+    }
   };
 
   const handleImport = async () => {
-    setIsImporting(true);
-    // TODO: Call backend to import database
-    console.log('Importing database');
-    // invoke('import_database')
-    setTimeout(() => setIsImporting(false), 1500);
+    try {
+      // Use Tauri dialog plugin for file picker
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      
+      const filePath = await open({
+        multiple: false,
+        directory: false,
+        title: 'Select Export File to Import',
+        filters: [{
+          name: 'JSON Export Files',
+          extensions: ['json']
+        }]
+      });
+      
+      if (!filePath) {
+        // User cancelled
+        return;
+      }
+      
+      const result = await importData.mutateAsync(filePath);
+      
+      toast.success('Data imported successfully', {
+        description: `Added ${result.recordsAdded} records, skipped ${result.recordsSkipped} duplicates${result.errors.length > 0 ? `, ${result.errors.length} errors` : ''}`,
+      });
+      
+      if (result.errors.length > 0) {
+        console.error('Import errors:', result.errors);
+        toast.warning('Some records had errors', {
+          description: `${result.errors.length} records failed to import. Check console for details.`,
+        });
+      }
+    } catch (error) {
+      toast.error('Failed to import data', {
+        description: String(error),
+      });
+    }
   };
 
   const handleCleanup = async () => {
@@ -63,34 +87,60 @@ export default function StorageView() {
   };
 
   const handleCreateBackup = async () => {
-    setIsCreatingBackup(true);
-    // TODO: Call backend to create backup
-    console.log('Creating manual backup');
-    // invoke('create_backup')
-    setTimeout(() => setIsCreatingBackup(false), 1500);
+    try {
+      const result = await createBackup.mutateAsync();
+      toast.success('Backup created successfully', {
+        description: `Saved to ${result.filePath.split('/').pop()}`,
+      });
+    } catch (error) {
+      toast.error('Failed to create backup', {
+        description: String(error),
+      });
+    }
   };
 
-  const handleRestoreBackup = async (backupName: string) => {
-    if (!confirm(`Restore from ${backupName}? Current data will be overwritten.`)) {
+  const handleRestoreBackup = async (backupPath: string) => {
+    const backupName = backupPath.split('/').pop() || backupPath;
+    if (!confirm(`Restore from ${backupName}? Current data will be overwritten and the app will need to restart.`)) {
       return;
     }
-    // TODO: Call backend to restore backup
-    console.log('Restoring backup:', backupName);
-    // invoke('restore_backup', { filename: backupName })
+    
+    try {
+      await restoreBackup.mutateAsync(backupPath);
+      toast.success('Backup restored successfully', {
+        description: 'Please restart the application',
+      });
+    } catch (error) {
+      toast.error('Failed to restore backup', {
+        description: String(error),
+      });
+    }
   };
 
-  const handleDeleteBackup = async (backupName: string) => {
-    if (!confirm(`Delete backup ${backupName}?`)) {
+  const handleDeleteBackup = async (backupPath: string) => {
+    const fileName = backupPath.split('/').pop() || backupPath;
+    if (!confirm(`Delete backup ${fileName}?`)) {
       return;
     }
-    // TODO: Call backend to delete backup
-    console.log('Deleting backup:', backupName);
-    // invoke('delete_backup', { filename: backupName })
+    
+    try {
+      await deleteBackup.mutateAsync(backupPath);
+      toast.success('Backup deleted', {
+        description: `${fileName} has been removed`,
+      });
+    } catch (error) {
+      toast.error('Failed to delete backup', {
+        description: String(error),
+      });
+    }
   };
 
-  const formatSize = (mb: number) => {
-    if (mb < 1) return `${(mb * 1024).toFixed(1)} KB`;
-    return `${mb.toFixed(1)} MB`;
+  const formatSize = (bytes: number) => {
+    const mb = bytes / (1024 * 1024);
+    const gb = bytes / (1024 * 1024 * 1024);
+    if (gb >= 1) return `${gb.toFixed(2)} GB`;
+    if (mb >= 1) return `${mb.toFixed(1)} MB`;
+    return `${(bytes / 1024).toFixed(1)} KB`;
   };
 
   const formatDate = (dateStr: string) => {
@@ -103,6 +153,41 @@ export default function StorageView() {
       minute: '2-digit'
     });
   };
+
+  // Loading state
+  if (statsLoading || backupsLoading) {
+    return (
+      <div className="layout-container flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-accent" />
+          <p className="text-muted-foreground">Loading storage information...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (statsError || backupsError) {
+    return (
+      <div className="layout-container flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-destructive font-semibold mb-2">Failed to load storage data</p>
+          <p className="text-sm text-muted-foreground">{String(statsError || backupsError)}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!stats) return null;
+
+  const totalSize = stats.totalBytes;
+  const dataSize = stats.dataBytes;
+  const logsSize = stats.logsBytes;
+  const cacheSize = stats.cacheBytes;
+  const backupSize = stats.backupBytes;
+  const exportSize = stats.exportBytes;
+  
+  const lastBackupTimestamp = backups && backups.length > 0 ? backups[0].timestamp : null;
 
   return (
     <div className="layout-container">
@@ -119,43 +204,47 @@ export default function StorageView() {
           {/* Overview Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="p-4">
-              <div className="text-sm text-muted-foreground">Total Database Size</div>
-              <div className="text-3xl font-bold mt-1">{formatSize(stats.totalSize)}</div>
+              <div className="text-sm text-muted-foreground">Total Storage Size</div>
+              <div className="text-3xl font-bold mt-1">{formatSize(totalSize)}</div>
             </Card>
             <Card className="p-4">
-              <div className="text-sm text-muted-foreground">Total Records</div>
-              <div className="text-3xl font-bold mt-1">
-                {stats.tables.reduce((sum, t) => sum + t.records, 0).toLocaleString()}
-              </div>
+              <div className="text-sm text-muted-foreground">Database Size</div>
+              <div className="text-3xl font-bold mt-1">{formatSize(dataSize)}</div>
             </Card>
             <Card className="p-4">
               <div className="text-sm text-muted-foreground">Last Backup</div>
               <div className="text-lg font-semibold mt-1">
-                {stats.lastBackup ? formatDate(stats.lastBackup) : 'Never'}
+                {lastBackupTimestamp ? formatDate(lastBackupTimestamp) : 'Never'}
               </div>
               <div className="text-xs text-muted-foreground mt-1">
-                Auto-backup: {stats.autoBackupEnabled ? '✓ Enabled' : '✗ Disabled'}
+                {backups?.length || 0} backup{backups && backups.length !== 1 ? 's' : ''} available
               </div>
             </Card>
           </div>
 
-          {/* Table Sizes */}
+          {/* Storage Breakdown */}
           <Card className="p-6">
             <div className="mb-4">
-              <h2 className="text-xl font-semibold">💾 Table Statistics</h2>
+              <h2 className="text-xl font-semibold">💾 Storage Breakdown</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Storage breakdown by database table
+                Storage usage by category
               </p>
             </div>
             <div className="space-y-3">
-              {stats.tables.map((table) => {
-                const percentage = (table.size / stats.totalSize) * 100;
+              {[
+                { name: 'Database', size: dataSize, color: 'bg-blue-500' },
+                { name: 'Logs', size: logsSize, color: 'bg-yellow-500' },
+                { name: 'Backups', size: backupSize, color: 'bg-green-500' },
+                { name: 'Cache', size: cacheSize, color: 'bg-purple-500' },
+                { name: 'Exports', size: exportSize, color: 'bg-orange-500' },
+              ].map((item) => {
+                const percentage = totalSize > 0 ? (item.size / totalSize) * 100 : 0;
                 return (
-                  <div key={table.name} className="space-y-1">
+                  <div key={item.name} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{table.name}</span>
+                      <span className="font-medium">{item.name}</span>
                       <span className="text-muted-foreground">
-                        {formatSize(table.size)} · {table.records.toLocaleString()} records
+                        {formatSize(item.size)} ({percentage.toFixed(1)}%)
                       </span>
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -207,18 +296,32 @@ export default function StorageView() {
               <div className="flex gap-3">
                 <Button 
                   onClick={handleExport}
-                  disabled={isExporting}
+                  disabled={exportData.isPending}
                   className="flex-1"
                 >
-                  {isExporting ? 'Exporting...' : '📤 Export Database'}
+                  {exportData.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Exporting...
+                    </>
+                  ) : (
+                    '📤 Export Database'
+                  )}
                 </Button>
                 <Button 
                   onClick={handleImport}
-                  disabled={isImporting}
+                  disabled={importData.isPending}
                   variant="outline"
                   className="flex-1"
                 >
-                  {isImporting ? 'Importing...' : '📥 Import Database'}
+                  {importData.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Importing...
+                    </>
+                  ) : (
+                    '📥 Import Database'
+                  )}
                 </Button>
               </div>
 
@@ -240,14 +343,21 @@ export default function StorageView() {
               </div>
               <Button 
                 onClick={handleCreateBackup}
-                disabled={isCreatingBackup}
+                disabled={createBackup.isPending}
                 size="sm"
               >
-                {isCreatingBackup ? 'Creating...' : '+ Create Backup'}
+                {createBackup.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Creating...
+                  </>
+                ) : (
+                  '+ Create Backup'
+                )}
               </Button>
             </div>
 
-            {stats.backups.length === 0 ? (
+            {!backups || backups.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <div className="text-4xl mb-2">💾</div>
                 <p>No backups yet</p>
@@ -255,36 +365,47 @@ export default function StorageView() {
               </div>
             ) : (
               <div className="space-y-2">
-                {stats.backups.map((backup) => (
-                  <div 
-                    key={backup.name}
-                    className="flex items-center justify-between p-3 rounded-lg border border-border hover:border-accent transition-colors"
-                  >
-                    <div className="flex-1">
-                      <div className="font-medium">{backup.name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {formatDate(backup.date)} · {formatSize(backup.size)}
+                {backups.map((backup) => {
+                  const backupName = backup.filePath.split('/').pop() || backup.filePath;
+                  return (
+                    <div 
+                      key={backup.filePath}
+                      className="flex items-center justify-between p-3 rounded-lg border border-border hover:border-accent transition-colors"
+                    >
+                      <div className="flex-1">
+                        <div className="font-medium font-mono text-sm">{backupName}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {formatDate(backup.timestamp)} · {formatSize(backup.fileSize)}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleRestoreBackup(backup.filePath)}
+                          disabled={restoreBackup.isPending}
+                        >
+                          {restoreBackup.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              Restoring...
+                            </>
+                          ) : (
+                            'Restore'
+                          )}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleDeleteBackup(backup.filePath)}
+                          className="text-red-500 hover:text-red-600"
+                        >
+                          Delete
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => handleRestoreBackup(backup.name)}
-                      >
-                        Restore
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => handleDeleteBackup(backup.name)}
-                        className="text-red-500 hover:text-red-600"
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </Card>

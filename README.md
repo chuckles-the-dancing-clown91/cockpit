@@ -282,6 +282,93 @@ Each domain is self-contained with minimal cross-dependencies, reducing merge co
 4. **Use handlers** - separate business logic from framework code
 5. **Domain isolation** - minimize cross-domain dependencies
 
+### Adding Tauri Plugins
+
+Tauri v2 uses a capability-based security model (ACL - Access Control List). When adding new plugins, you must configure permissions:
+
+**1. Add Plugin Dependencies**
+
+Backend (`backend/Cargo.toml`):
+```toml
+[dependencies]
+tauri-plugin-dialog = "2"
+```
+
+Frontend:
+```bash
+cd frontend
+npm install @tauri-apps/plugin-dialog
+```
+
+**2. Register Plugin in main.rs**
+
+```rust
+// backend/src/main.rs
+tauri::Builder::default()
+    .plugin(tauri_plugin_dialog::init())  // <-- Add plugin
+    .setup(move |app| {
+        // ... existing setup
+    })
+```
+
+**3. Configure Permissions (ACL)**
+
+Create or update `backend/capabilities/default.json`:
+
+```json
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default permissions for the main window",
+  "windows": ["*"],
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "dialog:allow-open",      // Allow file open dialog
+    "dialog:allow-save"       // Allow file save dialog
+  ]
+}
+```
+
+**Common Plugin Permissions:**
+- **dialog**: `dialog:allow-open`, `dialog:allow-save`, `dialog:allow-message`
+- **fs**: `fs:allow-read-file`, `fs:allow-write-file`, `fs:allow-read-dir`
+- **shell**: `shell:allow-execute`, `shell:allow-open`
+- **http**: `http:default`, `http:allow-fetch`
+- **notification**: `notification:default`, `notification:allow-show`
+
+**4. Rebuild to Generate ACL Manifests**
+
+```bash
+cd backend
+cargo build --release
+```
+
+This regenerates `backend/gen/schemas/acl-manifests.json` with the new permissions.
+
+**5. Use Plugin in Frontend**
+
+```typescript
+import { open } from '@tauri-apps/plugin-dialog';
+
+const filePath = await open({
+  multiple: false,
+  filters: [{ name: 'JSON', extensions: ['json'] }]
+});
+```
+
+**Important Notes:**
+- **Always rebuild** after changing capabilities - permissions are compiled into the app
+- **Test permissions** - missing ACL entries cause "not allowed by ACL" runtime errors
+- **Minimal permissions** - only grant what's needed for security
+- **Wildcard windows** - `"windows": ["*"]` applies to all windows, or specify exact window names
+
+**Troubleshooting ACL Errors:**
+```
+Error: Command plugin:dialog|open not allowed by ACL
+```
+→ Solution: Add `dialog:allow-open` to `capabilities/default.json` and rebuild
+
 **Frontend build only:**
 ```bash
 cd frontend

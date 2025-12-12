@@ -95,7 +95,10 @@ See [REFACTOR_SUMMARY.md](./REFACTOR_SUMMARY.md) for full details.
 
 **Goal**: Complete backend integration for Settings, Storage, Logs, and Tasks views
 **Timeline**: December 12-19, 2025
-**Status**: 2/10 tasks complete (20%) - Ready for testing!
+**Status**: 4/10 tasks complete (40%) ✅
+
+### ✅ Completed: Settings View
+Both backend and frontend are fully integrated and tested! Settings persist correctly, validation works, and the UI provides real-time feedback.
 
 ### 📋 Logging Standards
 **Apply to ALL new code**:
@@ -135,39 +138,46 @@ See [REFACTOR_SUMMARY.md](./REFACTOR_SUMMARY.md) for full details.
 - [x] Add loading states (Loader2 spinner, disabled buttons)
 - [x] Add error boundaries (error state display)
 - [x] Validation errors prevent saving
-- [ ] Test settings persistence across app restarts (requires testing)
+- [x] Test settings persistence across app restarts ✅
 **Completed**: December 12, 2025
 
-### Task #3: Storage View - Backend Stats & Backup 🔴
-- [ ] Create `get_storage_stats` command
-  - Database size (backend/storage/data/db.sql)
-  - Logs directory size (backend/storage/logs/)
-  - Cache size (if applicable)
-  - Breakdown by table (ideas, news_articles, etc.)
-- [ ] Create `backup_database` command
-  - Use SQLite VACUUM INTO for consistent backups
-  - Store in backend/storage/backups/ with timestamp
-  - Return backup file path and size
-- [ ] Create `restore_database` command
-  - Validate backup file integrity
-  - Close all connections before restore
-  - Copy backup to main db.sql location
-  - Reconnect database pool
-- [ ] Add proper error handling for I/O operations
+### Task #3: Storage View - Backend Stats & Backup ✅
+- [x] Create `get_storage_stats` command
+  - Database size (backend/storage/data/db.sql) ✅
+  - Logs directory size (backend/storage/logs/) ✅
+  - Cache size (if applicable) ✅
+  - Breakdown by table (ideas, news_articles, etc.) ✅
+- [x] Create `backup_database` command
+  - Use SQLite VACUUM INTO for consistent backups ✅
+  - Store in backend/storage/backups/ with timestamp ✅
+  - Return backup file path and size ✅
+- [x] Create `restore_database` command
+  - Validate backup file integrity ✅
+  - Close all connections before restore ✅
+  - Copy backup to main db.sql location ✅
+  - Reconnect database pool ✅
+- [x] Add proper error handling for I/O operations ✅
+- [x] Create `list_backups` command for UI ✅
+**Completed**: December 12, 2025
 
-### Task #4: Storage View - Export/Import Data 🔴
-- [ ] Create `export_data` command
-  - Export ideas table to JSON
-  - Export news_articles table to JSON
-  - Export app_settings table to JSON
-  - Bundle into single timestamped JSON file
-  - Return export file path
-- [ ] Create `import_data` command
-  - Parse and validate JSON structure
-  - Check for duplicate IDs
-  - Use transactions for atomic import
-  - Return import summary (records added, skipped, errors)
-- [ ] Add data validation on import (schemas, constraints)
+### Task #4: Storage View - Export/Import Data ✅
+- [x] Create `export_data` command
+  - Export ideas table to JSON ✅
+  - Export news_articles table to JSON ✅
+  - Export app_settings table to JSON (including value_type column) ✅
+  - Bundle into single timestamped JSON file ✅
+  - Return export file path ✅
+- [x] Create `import_data` command
+  - Parse and validate JSON structure ✅
+  - Check for duplicate IDs ✅
+  - Use transactions for atomic import ✅
+  - Return import summary (records added, skipped, errors) ✅
+- [x] Add data validation on import (schemas, constraints) ✅
+- [x] Wire up frontend with useExportData and useImportData hooks ✅
+- [x] Add native file picker dialog for import (tauri-plugin-dialog) ✅
+- [x] Create `delete_backup` command with path validation ✅
+- [x] Wire up delete backup in frontend with confirmation ✅
+**Completed**: December 12, 2025
 
 ### Task #5: Storage View - Cleanup & Frontend 🔴
 - [ ] Create `cleanup_old_logs` command
@@ -325,6 +335,53 @@ See [REFACTOR_SUMMARY.md](./REFACTOR_SUMMARY.md) for full details.
   - No more Vite warnings!
   - Chunks: react-vendor (11KB), tanstack-query (36KB), radix-ui (102KB), ui-vendor (26KB)
   - Views load on-demand: WritingView (21KB), NewsFeedView (25KB), etc.
+
+---
+
+## 🎯 Future Roadmap
+
+### Phase 13: News Feed Management (Lower Priority)
+Separate feed configuration from general settings for better organization.
+
+#### Feed Sources View
+- [ ] Create dedicated News Feeds management page
+- [ ] Backend: Add news source CRUD operations
+- [ ] Backend: Store API keys per source (encrypted)
+- [ ] Backend: Source enable/disable toggle
+- [ ] Frontend: Feed configuration UI
+  - API key management (show/hide, test connection)
+  - Source selection (NewsData.io, Reddit, RSS, etc.)
+  - Fetch frequency per source
+  - Category/topic filters per source
+- [ ] Frontend: Test connection button with feedback
+- [ ] Frontend: Source statistics (articles fetched, errors)
+
+#### Posts Management View
+- [ ] Create Posts/Publishing management page
+- [ ] Backend: Add publishing destinations table
+- [ ] Backend: Store API keys for publishing platforms
+  - Twitter/X API
+  - LinkedIn API
+  - Medium API
+  - Dev.to API
+  - Custom webhooks
+- [ ] Backend: Post queue/scheduling system
+- [ ] Frontend: Publishing destinations UI
+  - Add/edit/delete destinations
+  - API key management
+  - Test connection
+  - Enable/disable per destination
+- [ ] Frontend: Post queue viewer
+  - Schedule posts
+  - View publishing history
+  - Retry failed posts
+
+**Note**: This is a substantial feature requiring:
+- API integration for multiple platforms
+- OAuth flows for some platforms
+- Secure credential storage (consider using system keyring)
+- Rate limiting and retry logic
+- Post formatting per platform
 
 ---
 
