@@ -14,10 +14,10 @@ use tauri::Manager;
 use chrono::Utc;
 use tracing::error;
 
-use crate::system_tasks::{Column, Entity};
-use crate::news;
+use crate::system::components::tasks::{Column, Entity};
+use crate::research::components::feed as news;
 use crate::AppState;
-use crate::errors::{AppError, AppResult};
+use crate::core::components::errors::{AppError, AppResult};
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -71,7 +71,7 @@ pub struct UpdateTaskInput {
     pub name: Option<String>,
 }
 
-fn model_to_dto(m: crate::system_tasks::Model) -> SystemTaskDto {
+fn model_to_dto(m: crate::system::components::tasks::Model) -> SystemTaskDto {
     SystemTaskDto {
         id: m.id,
         name: m.name,
@@ -145,7 +145,7 @@ async fn run_task_once(app: &AppHandle, state: &AppState, task: SystemTask) -> T
         },
     };
 
-    if let Err(e) = crate::system_tasks::Entity::update_many()
+    if let Err(e) = crate::system::components::tasks::Entity::update_many()
         .col_expr(Column::LastRunAt, Expr::value(Utc::now()))
         .col_expr(Column::LastStatus, Expr::value(result.status))
         .col_expr(Column::LastResult, Expr::value(result.result_json.clone()))

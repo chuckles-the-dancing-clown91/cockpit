@@ -6,7 +6,7 @@
 //! - Sensible defaults
 //! - Clear error messages
 
-use crate::errors::AppError;
+use super::errors::AppError;
 use std::path::PathBuf;
 use std::time::Duration;
 

@@ -1,0 +1,122 @@
+//! Research domain Tauri commands
+
+use tauri::State;
+use crate::AppState;
+use super::components::feed::{
+    get_news_settings_handler, save_news_settings_handler,
+    list_news_articles_handler, get_news_article_handler,
+    dismiss_news_article_handler, toggle_star_news_article_handler,
+    mark_news_article_read_handler, sync_news_now_handler,
+    sync_news_sources_now_handler, list_news_sources_handler,
+    NewsArticleDto, NewsSettingsDto, SaveNewsSettingsInput, NewsSourceDto,
+};
+use crate::system;
+
+#[tauri::command]
+pub async fn get_news_settings(state: State<'_, AppState>) -> Result<NewsSettingsDto, String> {
+    get_news_settings_handler(&state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn save_news_settings(
+    input: SaveNewsSettingsInput,
+    state: State<'_, AppState>,
+) -> Result<NewsSettingsDto, String> {
+    save_news_settings_handler(input, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// List news articles with filtering and pagination
+/// 
+/// # Parameters
+/// - `status`: Filter by read status ("unread", "read", "all")
+/// - `limit`: Max number of results (default: 50)
+/// - `offset`: Pagination offset (default: 0)
+/// - `include_dismissed`: Include dismissed articles (default: false)
+/// - `search`: Text search in title/excerpt
+/// 
+/// # Returns
+/// Paginated list of news articles sorted by published date (newest first)
+#[tauri::command]
+pub async fn list_news_articles(
+    status: Option<String>,
+    limit: Option<u64>,
+    offset: Option<u64>,
+    include_dismissed: Option<bool>,
+    search: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<NewsArticleDto>, String> {
+    list_news_articles_handler(status, limit, offset, include_dismissed, search, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_news_article(id: i64, state: State<'_, AppState>) -> Result<NewsArticleDto, String> {
+    get_news_article_handler(id, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn dismiss_news_article(id: i64, state: State<'_, AppState>) -> Result<(), String> {
+    dismiss_news_article_handler(id, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn toggle_star_news_article(
+    id: i64,
+    starred: bool,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    toggle_star_news_article_handler(id, starred, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn mark_news_article_read(id: i64, state: State<'_, AppState>) -> Result<(), String> {
+    mark_news_article_read_handler(id, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Manually trigger news synchronization
+/// 
+/// Fetches latest articles from NewsData.io API based on current settings.
+/// Respects daily API call limits configured in news settings.
+/// 
+/// # Returns
+/// Task run result with inserted/updated counts and status
+#[tauri::command]
+pub async fn sync_news_now(state: State<'_, AppState>) -> Result<system::scheduler::RunTaskNowResult, String> {
+    sync_news_now_handler(&state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn sync_news_sources_now(
+    state: State<'_, AppState>,
+) -> Result<system::scheduler::RunTaskNowResult, String> {
+    sync_news_sources_now_handler(&state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_news_sources(
+    country: Option<String>,
+    language: Option<String>,
+    search: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<NewsSourceDto>, String> {
+    list_news_sources_handler(country, language, search, &state)
+        .await
+        .map_err(|e| e.to_string())
+}

@@ -3,8 +3,8 @@
 //! Simplified database setup that delegates schema management to migrations.
 //! All schema changes should be done through migrations going forward.
 
-use crate::errors::AppError;
-use crate::migrations;
+use super::errors::AppError;
+use super::migrations;
 use sea_orm::{ConnectOptions, Database, DatabaseConnection, Statement, ConnectionTrait};
 use std::path::PathBuf;
 use std::time::Duration;

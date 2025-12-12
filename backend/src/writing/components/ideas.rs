@@ -6,8 +6,8 @@
 //! - Editing article content and notes
 //! - Archiving completed ideas
 
-use crate::errors::{AppError, AppResult};
-use crate::news_articles;
+use crate::core::components::errors::{AppError, AppResult};
+use crate::research::components::articles as news_articles;
 use crate::AppState;
 use chrono::Utc;
 use sea_orm::entity::prelude::*;

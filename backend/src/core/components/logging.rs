@@ -29,7 +29,7 @@ use std::io::Write;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, Layer, EnvFilter};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 
-use crate::config::LoggingConfig;
+use super::config::LoggingConfig;
 
 /// Sanitize URLs by redacting API keys in query parameters
 fn sanitize_url(raw: &str) -> String {

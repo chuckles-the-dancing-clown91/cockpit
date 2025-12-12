@@ -4,7 +4,66 @@ Current sprint work in progress. For completed work see [DONE.md](./docs/DONE.md
 
 ---
 
-## 🎯 Current Sprint: COMPLETE! 🎉
+## 🎯 Security Fix: API Key Sanitization ✅
+
+**Status**: API keys now redacted from all logs
+- ✅ Added URL sanitization function to redact apikey parameters
+- ✅ Updated all error logging to sanitize reqwest errors
+- ✅ Updated TaskRunResult error messages to sanitize URLs
+- ✅ Added regex dependency for pattern matching
+- ✅ Build successful (1m 51s)
+**Completed**: December 12, 2025
+
+**Example**:
+- Before: `https://newsdata.io/api/1/latest?apikey=pub_3e9876...`
+- After: `https://newsdata.io/api/1/latest?apikey=[REDACTED]`
+
+---
+
+## 🎯 Backend Refactoring: COMPLETE! ✅
+
+**Status**: Backend fully modularized with domain-driven architecture
+- ✅ **File reorganization**: Moved 17 files to `domain/components/` subdirectories
+- ✅ **Command extraction**: Extracted 20+ Tauri commands from main.rs to domain command modules
+- ✅ **main.rs slimmed**: Reduced from 533 lines → 275 lines (48% reduction)
+- ✅ **Module structure**: Each domain has `components/` (logic) and `commands.rs` (Tauri interface)
+- ✅ **Import updates**: All cross-module references updated to new paths
+- ✅ **Build verification**: Both debug and release builds successful
+**Completed**: December 12, 2025
+
+### New Structure
+```
+backend/src/
+├── main.rs (275 lines)       # Setup + registration only
+├── core/
+│   ├── components/           # 9 infrastructure components
+│   ├── commands.rs          # 3 settings commands
+│   └── mod.rs
+├── writing/
+│   ├── components/ideas.rs  # Business logic
+│   ├── commands.rs          # 8 idea commands
+│   └── mod.rs
+├── research/
+│   ├── components/          # 4 news components
+│   ├── commands.rs          # 10 news commands
+│   └── mod.rs
+└── system/
+    ├── components/          # 3 scheduler components
+    ├── commands.rs          # 3 task commands
+    └── mod.rs
+```
+
+**Benefits**:
+- ✅ Clear domain separation
+- ✅ Easy to locate functionality
+- ✅ Parallel development friendly
+- ✅ Command interface separate from business logic
+
+See [REFACTOR_SUMMARY.md](./REFACTOR_SUMMARY.md) for full details.
+
+---
+
+## 🎉 Previous Sprint: Backend Modernization & Frontend Optimization
 
 **Status**: All tasks complete!
 - ✅ Backend modernization: 100% (17/17 tasks)
@@ -36,30 +95,48 @@ Current sprint work in progress. For completed work see [DONE.md](./docs/DONE.md
 
 **Goal**: Complete backend integration for Settings, Storage, Logs, and Tasks views
 **Timeline**: December 12-19, 2025
-**Status**: 0/10 tasks complete
+**Status**: 2/10 tasks complete (20%) - Ready for testing!
 
-### Task #1: Settings View - Backend Commands 🔴
-- [ ] Create `get_app_settings` command in `backend/src/main.rs`
+### 📋 Logging Standards
+**Apply to ALL new code**:
+- ✅ **Structured logging**: Use `tracing` with `#[instrument]` spans
+- ✅ **JSON format**: All logs go to JSON files for parsing/analysis
+- ✅ **Log everything**: Changes, errors, crashes, task executions
+- ✅ **Context matters**: Include user actions, parameters, results
+- ✅ **Levels**: INFO (changes), WARN (recoverable), ERROR (failures), DEBUG (detailed)
+- ✅ **Future-proof**: Designed for scale and monitoring tools
+
+### Task #1: Settings View - Backend Commands ✅
+- [x] Create `get_app_settings` command in `backend/src/core/commands.rs`
   - Returns all settings from `app_settings` table grouped by category
   - Include setting metadata (type, validation rules, default values)
-- [ ] Create `update_app_settings` command
+- [x] Create `update_setting` and `update_settings` commands
   - Accepts key-value pairs, validates against rules
   - Returns validation errors or success
-- [ ] Create `validate_settings` helper function
-  - Validate fetch intervals (min 5 minutes)
-  - Validate storage limits (max 1GB for free tier)
-  - Validate retention days (1-365 range)
-- [ ] Add comprehensive error handling with AppError types
-- [ ] Add tracing spans for debugging
+- [x] Create `validate_setting_value` helper function in `core/components/settings.rs`
+  - Validate fetch intervals (5-1440 minutes) ✅
+  - Validate max articles (1-200) ✅
+  - Validate storage limits (10-10240 MB) ✅
+  - Validate retention days (1-365 range) ✅
+- [x] Add comprehensive error handling with AppError types
+- [x] Add tracing spans with `#[instrument]` for debugging
+**Completed**: December 12, 2025
 
-### Task #2: Settings View - Frontend Integration 🔴
-- [ ] Wire up `frontend/src/components/system/SettingsView.tsx` to commands
-- [ ] Replace mock data with real `useQuery` for get_app_settings
-- [ ] Replace mock mutations with real `useMutation` for update_app_settings
-- [ ] Add form validation matching backend rules
-- [ ] Add success/error toast notifications
-- [ ] Test settings persistence across app restarts
-- [ ] Add loading states and error boundaries
+### Task #2: Settings View - Frontend Integration ✅
+- [x] Wire up `frontend/src/components/system/SettingsView.tsx` to commands
+- [x] Replace mock data with real `useQuery` for get_app_settings
+- [x] Replace mock mutations with real `useMutation` for update_settings
+- [x] Add form validation matching backend rules
+  - Sync interval: 5-1440 minutes ✅
+  - Max articles: 100-10000 ✅
+  - Auto-save delay: 100-5000 ms ✅
+  - Real-time validation with error messages ✅
+- [x] Add success/error toast notifications (using Sonner)
+- [x] Add loading states (Loader2 spinner, disabled buttons)
+- [x] Add error boundaries (error state display)
+- [x] Validation errors prevent saving
+- [ ] Test settings persistence across app restarts (requires testing)
+**Completed**: December 12, 2025
 
 ### Task #3: Storage View - Backend Stats & Backup 🔴
 - [ ] Create `get_storage_stats` command

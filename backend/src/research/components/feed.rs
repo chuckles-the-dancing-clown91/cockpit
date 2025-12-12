@@ -6,13 +6,13 @@
 //! - Syncing news sources/providers
 //! - Article CRUD operations
 
-use crate::crypto;
-use crate::errors::{AppError, AppResult};
-use crate::logging;
-use crate::news_articles::{self, Entity as EntityNewsArticles};
-use crate::news_settings::{self, Entity as EntityNewsSettings};
-use crate::news_sources::{self, Entity as EntityNewsSources};
-use crate::scheduler::TaskRunResult;
+use crate::core::components::crypto;
+use crate::core::components::errors::{AppError, AppResult};
+use crate::core::components::logging;
+use crate::research::components::articles::{self as news_articles, Entity as EntityNewsArticles};
+use crate::research::components::settings::{self as news_settings, Entity as EntityNewsSettings};
+use crate::research::components::sources::{self as news_sources, Entity as EntityNewsSources};
+use crate::system::components::scheduler::TaskRunResult;
 use chrono::Datelike;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter,
@@ -177,6 +177,22 @@ fn to_json_vec(v: &Option<Vec<String>>) -> Option<String> {
         .map(|vec| serde_json::to_string(vec).unwrap_or_else(|_| "[]".into()))
 }
 
+/// Sanitize URL for logging by redacting API keys
+/// 
+/// Replaces apikey parameter values with [REDACTED] to prevent
+/// API key exposure in logs.
+fn sanitize_url_for_logging(url: &str) -> String {
+    // Replace apikey parameter value with [REDACTED]
+    let re = regex::Regex::new(r"apikey=([^&\s]+)").unwrap();
+    re.replace_all(url, "apikey=[REDACTED]").to_string()
+}
+
+/// Sanitize error message for logging by redacting API keys from URLs
+fn sanitize_error_for_logging(error: &reqwest::Error) -> String {
+    let error_str = error.to_string();
+    sanitize_url_for_logging(&error_str)
+}
+
 /// Retry an HTTP request with exponential backoff
 /// 
 /// Retries up to 3 times with delays of 1s, 2s, 4s
@@ -225,7 +241,8 @@ where
                 }
                 
                 let delay = 1u64 << attempt; // Exponential backoff
-                warn!(target: "news", "Request failed: {}, retrying in {}s (attempt {}/{})", e, delay, attempt + 1, max_retries);
+                let sanitized_error = sanitize_error_for_logging(&e);
+                warn!(target: "news", "Request failed: {}, retrying in {}s (attempt {}/{})", sanitized_error, delay, attempt + 1, max_retries);
                 tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
                 attempt += 1;
             }
@@ -625,7 +642,7 @@ pub async fn list_news_sources_handler(
 
 pub async fn sync_news_now_handler(
     state: &crate::AppState,
-) -> AppResult<crate::scheduler::RunTaskNowResult> {
+) -> AppResult<crate::system::scheduler::RunTaskNowResult> {
     info!("news_sync: manual trigger invoked");
     let res = run_news_sync_task(state).await;
     let finished_at = chrono::Utc::now().to_rfc3339();
@@ -634,7 +651,7 @@ pub async fn sync_news_now_handler(
         "skipped" => warn!("news_sync: skipped - {:?}", res.result_json),
         _ => error!("news_sync: error - {:?}", res.error_message),
     }
-    Ok(crate::scheduler::RunTaskNowResult {
+    Ok(crate::system::scheduler::RunTaskNowResult {
         status: res.status.to_string(),
         result: res.result_json,
         error_message: res.error_message,
@@ -644,7 +661,7 @@ pub async fn sync_news_now_handler(
 
 pub async fn sync_news_sources_now_handler(
     state: &crate::AppState,
-) -> AppResult<crate::scheduler::RunTaskNowResult> {
+) -> AppResult<crate::system::scheduler::RunTaskNowResult> {
     info!("news_sources_sync: manual trigger invoked");
     let res = run_news_sources_sync_task(state).await;
     let finished_at = chrono::Utc::now().to_rfc3339();
@@ -653,7 +670,7 @@ pub async fn sync_news_sources_now_handler(
         "skipped" => warn!("news_sources_sync: skipped - {:?}", res.result_json),
         _ => error!("news_sources_sync: error - {:?}", res.error_message),
     }
-    Ok(crate::scheduler::RunTaskNowResult {
+    Ok(crate::system::scheduler::RunTaskNowResult {
         status: res.status.to_string(),
         result: res.result_json,
         error_message: res.error_message,
@@ -844,10 +861,11 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
         let resp = match retry_request(|| req.try_clone().unwrap().send()).await {
             Ok(r) => r,
             Err(e) => {
+                let sanitized_error = sanitize_error_for_logging(&e);
                 return TaskRunResult {
                     status: "error",
                     result_json: None,
-                    error_message: Some(format!("HTTP request failed after retries: {}", e)),
+                    error_message: Some(format!("HTTP request failed after retries: {}", sanitized_error)),
                 }
             }
         };
@@ -1129,10 +1147,11 @@ pub async fn run_news_sources_sync_task(state: &crate::AppState) -> TaskRunResul
         let resp = match retry_request(|| req.try_clone().unwrap().send()).await {
             Ok(r) => r,
             Err(e) => {
+                let sanitized_error = sanitize_error_for_logging(&e);
                 return TaskRunResult {
                     status: "error",
                     result_json: None,
-                    error_message: Some(format!("HTTP request failed after retries: {}", e)),
+                    error_message: Some(format!("HTTP request failed after retries: {}", sanitized_error)),
                 }
             }
         };

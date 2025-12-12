@@ -6,7 +6,7 @@
 //! - Rollback capability
 //! - Export/import functionality
 
-use crate::errors::{AppError, AppResult};
+use super::errors::{AppError, AppResult};
 use sea_orm::{ConnectionTrait, DatabaseConnection, Statement};
 use std::collections::HashMap;
 use tracing::{info, warn};
@@ -26,20 +26,20 @@ pub fn all_migrations() -> Vec<Migration> {
         Migration {
             version: 1,
             name: "initial_schema",
-            up: include_str!("../migrations/001_initial_schema_up.sql"),
-            down: include_str!("../migrations/001_initial_schema_down.sql"),
+            up: include_str!("../../../migrations/001_initial_schema_up.sql"),
+            down: include_str!("../../../migrations/001_initial_schema_down.sql"),
         },
         Migration {
             version: 2,
             name: "app_settings",
-            up: include_str!("../migrations/002_app_settings_up.sql"),
-            down: include_str!("../migrations/002_app_settings_down.sql"),
+            up: include_str!("../../../migrations/002_app_settings_up.sql"),
+            down: include_str!("../../../migrations/002_app_settings_down.sql"),
         },
         Migration {
             version: 3,
             name: "performance_indexes",
-            up: include_str!("../migrations/003_performance_indexes_up.sql"),
-            down: include_str!("../migrations/003_performance_indexes_down.sql"),
+            up: include_str!("../../../migrations/003_performance_indexes_up.sql"),
+            down: include_str!("../../../migrations/003_performance_indexes_down.sql"),
         },
     ]
 }

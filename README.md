@@ -57,47 +57,79 @@ Cockpit is a unified workspace organized into three specialized modes:
 
 ## Project Structure
 
+### Backend Architecture (Domain-Driven Design)
+
+The backend follows a modular, domain-driven architecture where each domain owns its business logic and command interface:
+
 ```
-cockpit/
-├── backend/
-│   ├── src/
-│   │   ├── main.rs              # Application entry point
+backend/src/
+├── main.rs (140 lines)           # Application entry point & setup
+│
+├── core/                         # Infrastructure layer
+│   ├── components/               # Core business logic
 │   │   ├── config.rs            # Configuration management
 │   │   ├── crypto.rs            # API key encryption
-│   │   ├── db.rs                # Database connection & entities
-│   │   ├── errors.rs            # Error handling
+│   │   ├── db.rs                # Database connection
+│   │   ├── db_backup.rs         # Backup operations
+│   │   ├── errors.rs            # Error types
 │   │   ├── logging.rs           # Structured logging
-│   │   ├── scheduler.rs         # Cron scheduler
-│   │   ├── news.rs              # News sync logic
-│   │   ├── news_articles.rs     # Article CRUD operations
-│   │   ├── news_settings.rs     # News configuration
-│   │   ├── news_sources.rs      # Source management
-│   │   ├── ideas.rs             # Idea management
-│   │   ├── system_tasks.rs      # Task definitions
-│   │   └── system_task_runs.rs  # Task execution tracking
-│   ├── storage/
-│   │   ├── data/db.sql         # SQLite database
-│   │   └── logs/               # Application logs
-│   ├── Cargo.toml              # Rust dependencies
-│   └── tauri.conf.json         # Tauri configuration
+│   │   ├── migrations.rs        # Schema migrations
+│   │   ├── settings.rs          # App settings CRUD
+│   │   └── storage.rs           # Storage management
+│   ├── commands.rs              # 3 Tauri commands (settings)
+│   └── mod.rs
 │
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── navigation/      # TopNav, SideNav, ModeContext
-│   │   │   ├── writing/         # Writing mode views
-│   │   │   ├── research/        # Research mode views
-│   │   │   ├── system/          # System mode views
-│   │   │   ├── news/            # News-specific components
-│   │   │   ├── ui/              # Reusable UI components
-│   │   │   └── layout/          # Layout components
-│   │   ├── hooks/               # React hooks
-│   │   ├── theme/               # Theme system
-│   │   ├── vendor/              # Custom MDEditor
-│   │   ├── views/               # Legacy views (to be removed)
-│   │   ├── App.tsx              # Main application
-│   │   ├── main.tsx             # React entry point
-│   │   └── index.css            # Global styles
+├── writing/                      # Content creation domain
+│   ├── components/
+│   │   └── ideas.rs             # Idea management logic
+│   ├── commands.rs              # 8 Tauri commands (ideas)
+│   └── mod.rs
+│
+├── research/                     # News & research domain
+│   ├── components/
+│   │   ├── feed.rs              # News sync & fetching
+│   │   ├── articles.rs          # Article CRUD
+│   │   ├── sources.rs           # Source management
+│   │   └── settings.rs          # News configuration
+│   ├── commands.rs              # 10 Tauri commands (news)
+│   └── mod.rs
+│
+├── system/                       # Scheduling & tasks domain
+│   ├── components/
+│   │   ├── scheduler.rs         # Cron scheduler
+│   │   ├── tasks.rs             # Task definitions
+│   │   └── task_runs.rs         # Execution tracking
+│   ├── commands.rs              # 3 Tauri commands (tasks)
+│   └── mod.rs
+│
+└── util/                         # Cross-domain utilities
+    ├── commands.rs              # 6 utility commands
+    └── mod.rs
+```
+
+**Architecture Pattern:**
+- **`domain/components/`** - Business logic & handlers (pure Rust)
+- **`domain/commands.rs`** - Tauri command interface (wraps handlers)
+- **`main.rs`** - Application setup & command registration only
+
+### Frontend Structure
+
+```
+frontend/src/
+├── components/
+│   ├── navigation/      # TopNav, SideNav, ModeContext
+│   ├── writing/         # Writing mode views
+│   ├── research/        # Research mode views
+│   ├── system/          # System mode views
+│   ├── news/            # News-specific components
+│   ├── ui/              # Reusable UI components
+│   └── layout/          # Layout components
+├── hooks/               # React hooks & queries
+├── theme/               # Theme system
+├── vendor/              # Custom MDEditor
+├── App.tsx              # Main application
+├── main.tsx             # React entry point
+└── index.css            # Global styles
 │   ├── package.json             # Node dependencies
 │   ├── vite.config.ts           # Vite configuration
 │   └── tsconfig.json            # TypeScript configuration
@@ -165,6 +197,90 @@ cargo tauri build
 ```
 
 Creates platform-specific installers in `backend/target/release/bundle/`.
+
+## Developer Workflow
+
+### Adding a New Feature
+
+The modular architecture makes it easy to add features in isolation:
+
+**1. Identify the Domain**
+- **Core** - Infrastructure, settings, storage
+- **Writing** - Content creation, ideas
+- **Research** - News, articles, sources
+- **System** - Scheduling, tasks, jobs
+- **Util** - Cross-domain utilities
+
+**2. Implement Business Logic**
+
+Add your handler function in `domain/components/feature.rs`:
+
+```rust
+// backend/src/research/components/articles.rs
+pub async fn mark_article_read_handler(
+    id: i64,
+    state: &AppState,
+) -> AppResult<()> {
+    // Business logic here
+}
+```
+
+**3. Create Tauri Command**
+
+Wrap the handler in `domain/commands.rs`:
+
+```rust
+// backend/src/research/commands.rs
+#[tauri::command]
+pub async fn mark_article_read(
+    id: i64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    mark_article_read_handler(id, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+```
+
+**4. Register Command**
+
+Add to the invoke handler in `main.rs`:
+
+```rust
+.invoke_handler(tauri::generate_handler![
+    // ... existing commands
+    mark_article_read,  // <-- Add here
+])
+```
+
+**5. Call from Frontend**
+
+Use the command in your React component:
+
+```typescript
+import { invoke } from '@tauri-apps/api/core';
+
+await invoke('mark_article_read', { id: articleId });
+```
+
+### Working in Parallel
+
+The modular structure enables multiple developers to work simultaneously:
+
+- **Writing features** → `writing/` directory
+- **Research features** → `research/` directory
+- **System features** → `system/` directory
+- **Core infrastructure** → `core/` directory
+
+Each domain is self-contained with minimal cross-dependencies, reducing merge conflicts.
+
+### Code Organization Principles
+
+1. **Business logic** lives in `domain/components/`
+2. **Tauri commands** live in `domain/commands.rs`
+3. **Keep main.rs thin** - only setup and registration
+4. **Use handlers** - separate business logic from framework code
+5. **Domain isolation** - minimize cross-domain dependencies
 
 **Frontend build only:**
 ```bash

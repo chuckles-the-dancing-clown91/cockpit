@@ -11,8 +11,8 @@ use std::path::Path;
 use chrono::{Duration, Utc};
 use tracing::{info, warn, error};
 
-use crate::config::StorageConfig;
-use crate::errors::AppError;
+use super::config::StorageConfig;
+use super::errors::AppError;
 
 /// Storage statistics
 #[derive(Debug, Clone)]
@@ -337,7 +337,7 @@ pub fn log_storage_stats(config: &StorageConfig) -> Result<(), AppError> {
 }
 
 /// Cleanup temp files and ensure directories exist
-pub fn initialize_storage(config: &crate::config::AppConfig) -> Result<(), AppError> {
+pub fn initialize_storage(config: &super::config::AppConfig) -> Result<(), AppError> {
     let storage_config = &config.storage;
     
     // Log initial storage state

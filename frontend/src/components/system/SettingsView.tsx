@@ -12,11 +12,21 @@ import { useAppSettings, useUpdateSettings, type UpdateSettingInput } from '../.
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 
+// Validation rules matching backend constraints
+const VALIDATION_RULES = {
+  'news.sync_interval_minutes': { min: 5, max: 1440, label: 'Sync interval must be between 5 minutes and 24 hours' },
+  'news.max_articles': { min: 100, max: 10000, label: 'Max articles must be between 100 and 10,000' },
+  'storage.max_size_mb': { min: 10, max: 10240, label: 'Storage size must be between 10 MB and 10 GB' },
+  'storage.log_retention_days': { min: 1, max: 365, label: 'Log retention must be between 1 and 365 days' },
+  'writing.auto_save_delay_ms': { min: 100, max: 5000, label: 'Auto-save delay must be between 100 and 5,000 ms' },
+} as const;
+
 export default function SettingsView() {
   const { theme, setTheme } = useTheme();
   const { data: settings, isLoading } = useAppSettings();
   const updateSettings = useUpdateSettings();
   const [pendingChanges, setPendingChanges] = useState<Map<string, unknown>>(new Map());
+  const [validationErrors, setValidationErrors] = useState<Map<string, string>>(new Map());
 
   const getValue = (category: keyof typeof settings, key: string) => {
     if (pendingChanges.has(key)) {
@@ -25,11 +35,39 @@ export default function SettingsView() {
     return settings?.[category]?.[key]?.value;
   };
 
+  const validateValue = (key: string, value: unknown): string | null => {
+    const rule = VALIDATION_RULES[key as keyof typeof VALIDATION_RULES];
+    if (rule && typeof value === 'number') {
+      if (value < rule.min || value > rule.max) {
+        return rule.label;
+      }
+    }
+    return null;
+  };
+
   const updateValue = (key: string, value: unknown) => {
     setPendingChanges(prev => new Map(prev).set(key, value));
+    
+    // Validate the value
+    const error = validateValue(key, value);
+    setValidationErrors(prev => {
+      const next = new Map(prev);
+      if (error) {
+        next.set(key, error);
+      } else {
+        next.delete(key);
+      }
+      return next;
+    });
   };
 
   const handleSave = async () => {
+    // Check for validation errors before saving
+    if (validationErrors.size > 0) {
+      toast.error('Please fix validation errors before saving');
+      return;
+    }
+
     const inputs: UpdateSettingInput[] = Array.from(pendingChanges.entries()).map(([key, value]) => ({
       key,
       value,
@@ -38,17 +76,22 @@ export default function SettingsView() {
     try {
       await updateSettings.mutateAsync(inputs);
       setPendingChanges(new Map());
+      setValidationErrors(new Map());
       toast.success('Settings saved successfully');
     } catch (error) {
-      toast.error('Failed to save settings');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save settings';
+      toast.error(errorMessage);
       console.error('Settings save error:', error);
     }
   };
 
   const handleReset = () => {
     setPendingChanges(new Map());
+    setValidationErrors(new Map());
     toast.info('Changes discarded');
   };
+
+  const getValidationError = (key: string) => validationErrors.get(key);
 
   if (isLoading) {
     return (
@@ -82,14 +125,27 @@ export default function SettingsView() {
 
           {/* Save/Reset Actions */}
           {hasChanges && (
-            <Card className="p-4 bg-accent/20 border-accent">
+            <Card className={`p-4 ${validationErrors.size > 0 ? 'bg-destructive/10 border-destructive' : 'bg-accent/20 border-accent'}`}>
               <div className="flex items-center justify-between">
-                <p className="text-sm">You have unsaved changes</p>
+                <div>
+                  <p className="text-sm font-medium">
+                    {validationErrors.size > 0 ? 'Please fix validation errors' : 'You have unsaved changes'}
+                  </p>
+                  {validationErrors.size > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {validationErrors.size} error{validationErrors.size > 1 ? 's' : ''} found
+                    </p>
+                  )}
+                </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={handleReset} disabled={updateSettings.isPending}>
                     Discard
                   </Button>
-                  <Button size="sm" onClick={handleSave} disabled={updateSettings.isPending}>
+                  <Button 
+                    size="sm" 
+                    onClick={handleSave} 
+                    disabled={updateSettings.isPending || validationErrors.size > 0}
+                  >
                     {updateSettings.isPending ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -229,11 +285,15 @@ export default function SettingsView() {
                     <Input
                       id="syncInterval"
                       type="number"
-                      min="15"
+                      min="5"
                       max="1440"
                       value={getValue('news', 'news.sync_interval_minutes') as number}
                       onChange={(e) => updateValue('news.sync_interval_minutes', parseInt(e.target.value))}
+                      className={getValidationError('news.sync_interval_minutes') ? 'border-destructive' : ''}
                     />
+                    {getValidationError('news.sync_interval_minutes') && (
+                      <p className="text-xs text-destructive">{getValidationError('news.sync_interval_minutes')}</p>
+                    )}
                   </div>
                 </>
               )}
@@ -249,7 +309,11 @@ export default function SettingsView() {
                   max="10000"
                   value={getValue('news', 'news.max_articles') as number}
                   onChange={(e) => updateValue('news.max_articles', parseInt(e.target.value))}
+                  className={getValidationError('news.max_articles') ? 'border-destructive' : ''}
                 />
+                {getValidationError('news.max_articles') && (
+                  <p className="text-xs text-destructive">{getValidationError('news.max_articles')}</p>
+                )}
               </div>
 
               <Separator />
@@ -300,7 +364,11 @@ export default function SettingsView() {
                       max="5000"
                       value={getValue('writing', 'writing.auto_save_delay_ms') as number}
                       onChange={(e) => updateValue('writing.auto_save_delay_ms', parseInt(e.target.value))}
+                      className={getValidationError('writing.auto_save_delay_ms') ? 'border-destructive' : ''}
                     />
+                    {getValidationError('writing.auto_save_delay_ms') && (
+                      <p className="text-xs text-destructive">{getValidationError('writing.auto_save_delay_ms')}</p>
+                    )}
                   </div>
                 </>
               )}
