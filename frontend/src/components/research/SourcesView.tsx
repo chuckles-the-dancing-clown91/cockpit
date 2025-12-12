@@ -12,7 +12,7 @@ const mockSources = [
   { id: 4, name: 'Wired', url: 'https://wired.com/feed', enabled: true, category: 'Technology' },
 ];
 
-export function SourcesView() {
+export default function SourcesView() {
   const [sources, setSources] = useState(mockSources);
   const [search, setSearch] = useState('');
 

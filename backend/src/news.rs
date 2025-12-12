@@ -484,11 +484,41 @@ pub async fn list_news_articles_handler(
             );
         }
     }
+    // Optimize by excluding heavy content field in list view
+    // Content can be large, only fetch when viewing individual articles
     let items = query
+        .select_only()
+        .columns([
+            news_articles::Column::Id,
+            news_articles::Column::UserId,
+            news_articles::Column::Provider,
+            news_articles::Column::ProviderArticleId,
+            news_articles::Column::Title,
+            news_articles::Column::Excerpt,
+            news_articles::Column::Url,
+            news_articles::Column::ImageUrl,
+            news_articles::Column::SourceName,
+            news_articles::Column::SourceDomain,
+            news_articles::Column::SourceId,
+            news_articles::Column::Tags,
+            news_articles::Column::Country,
+            news_articles::Column::Language,
+            news_articles::Column::Category,
+            news_articles::Column::PublishedAt,
+            news_articles::Column::FetchedAt,
+            news_articles::Column::AddedVia,
+            news_articles::Column::IsStarred,
+            news_articles::Column::IsDismissed,
+            news_articles::Column::IsRead,
+            news_articles::Column::AddedToIdeasAt,
+            news_articles::Column::DismissedAt,
+        ])
+        // Exclude: Content (can be large text field)
         .order_by_desc(news_articles::Column::PublishedAt)
         .order_by_desc(news_articles::Column::FetchedAt)
         .limit(limit.unwrap_or(30))
         .offset(offset.unwrap_or(0))
+        .into_model::<news_articles::Model>()
         .all(&state.db)
         .await?;
     Ok(items.into_iter().map(article_to_dto).collect())

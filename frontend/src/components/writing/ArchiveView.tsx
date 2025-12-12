@@ -14,7 +14,7 @@ interface ArchivedIdea {
   updated_at: string;
 }
 
-export function ArchiveView() {
+export default function ArchiveView() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Fetch archived ideas (status = 'done')

@@ -12,7 +12,7 @@ import { useAppSettings, useUpdateSettings, type UpdateSettingInput } from '../.
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 
-export function SettingsView() {
+export default function SettingsView() {
   const { theme, setTheme } = useTheme();
   const { data: settings, isLoading } = useAppSettings();
   const updateSettings = useUpdateSettings();

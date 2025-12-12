@@ -110,7 +110,7 @@ const mockTaskRuns: TaskRun[] = [
   { id: '7', taskId: '5', taskName: 'rotate_logs', startTime: '2024-12-11 00:00:00', endTime: '2024-12-11 00:00:01', duration: 0.8, status: 'success', error: null },
 ];
 
-export function TasksView() {
+export default function TasksView() {
   const [tasks] = useState(mockTasks);
   const [taskRuns] = useState(mockTaskRuns);
   const [selectedTask, setSelectedTask] = useState<string | null>(null);

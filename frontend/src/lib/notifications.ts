@@ -4,6 +4,13 @@ export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
 /**
  * Enhanced toast notifications with consistent styling and behavior
+ * 
+ * Built on Sonner v2 for improved performance and accessibility.
+ * All notifications are automatically positioned and dismissable.
+ * 
+ * @example
+ * notify.success('Article saved', 'Your changes have been saved successfully')
+ * notify.error('Failed to sync', 'Check your API key settings')
  */
 export const notify = {
   success: (message: string, description?: string) => {

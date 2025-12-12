@@ -21,7 +21,7 @@ const statusTabs: { value: ArticleIdea['status'] | 'all'; label: string }[] = [
   { value: 'complete', label: 'Complete' },
 ];
 
-export function WritingView() {
+export default function WritingView() {
   const { theme } = useTheme();
   const [status, setStatus] = useState<ArticleIdea['status'] | 'all'>('in_progress');
   const [search, setSearch] = useState('');

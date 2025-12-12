@@ -1,16 +1,28 @@
+import { lazy, Suspense } from 'react';
 import { ModeProvider, useMode } from './components/navigation/ModeContext';
 import { TopNav } from './components/navigation/TopNav';
 import { SideNav } from './components/navigation/SideNav';
-import { WritingView } from './views/WritingView';
-import { IdeasLibraryView } from './components/writing/IdeasLibraryView';
-import { ArchiveView } from './components/writing/ArchiveView';
-import { NewsFeedView } from './components/research/NewsFeedView';
-import { RedditView } from './components/research/RedditView';
-import { SourcesView } from './components/research/SourcesView';
-import { SettingsView } from './components/system/SettingsView';
-import { StorageView } from './components/system/StorageView';
-import { LogsView } from './components/system/LogsView';
-import { TasksView } from './components/system/TasksView';
+
+// Lazy load views for code splitting
+const WritingView = lazy(() => import('./views/WritingView'));
+const IdeasLibraryView = lazy(() => import('./components/writing/IdeasLibraryView'));
+const ArchiveView = lazy(() => import('./components/writing/ArchiveView'));
+const NewsFeedView = lazy(() => import('./components/research/NewsFeedView'));
+const RedditView = lazy(() => import('./components/research/RedditView'));
+const SourcesView = lazy(() => import('./components/research/SourcesView'));
+const SettingsView = lazy(() => import('./components/system/SettingsView'));
+const StorageView = lazy(() => import('./components/system/StorageView'));
+const LogsView = lazy(() => import('./components/system/LogsView'));
+const TasksView = lazy(() => import('./components/system/TasksView'));
+
+// Loading fallback component
+function ViewLoader() {
+  return (
+    <div className="flex items-center justify-center h-full">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    </div>
+  );
+}
 
 function AppContent() {
   const { mode, view } = useMode();
@@ -47,7 +59,8 @@ function AppContent() {
       <TopNav />
       <div className="flex flex-1 overflow-hidden relative">
         <SideNav />
-        <main 
+        <Suspense fallback={<ViewLoader />}>
+          <main 
           className="flex-1 overflow-auto transition-all duration-300"
           role="main"
           aria-label="Main content"
@@ -55,7 +68,8 @@ function AppContent() {
           <div className="animate-fade-in">
             {renderView()}
           </div>
-        </main>
+          </main>
+        </Suspense>
       </div>
     </div>
   );

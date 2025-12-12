@@ -23,7 +23,7 @@ const mockItems = [
   },
 ];
 
-export function RedditView() {
+export default function RedditView() {
   const [tab, setTab] = useState<'posts' | 'queue' | 'messages' | 'stats'>('posts');
   const [selectedId, setSelectedId] = useState<string | null>(mockItems[0]?.id ?? null);
   const selected = useMemo(() => mockItems.find((i) => i.id === selectedId), [selectedId]);

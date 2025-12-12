@@ -26,7 +26,7 @@ const mockStorageStats = {
   autoBackupEnabled: true,
 };
 
-export function StorageView() {
+export default function StorageView() {
   const [stats] = useState(mockStorageStats);
   const [exportDateRange, setExportDateRange] = useState({ start: '', end: '' });
   const [cleanupDays, setCleanupDays] = useState(90);

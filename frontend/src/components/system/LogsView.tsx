@@ -39,7 +39,7 @@ const mockLogStats = {
   newestEntry: '2024-12-11 20:45:23',
 };
 
-export function LogsView() {
+export default function LogsView() {
   const [logs] = useState(mockLogs);
   const [stats] = useState(mockLogStats);
   

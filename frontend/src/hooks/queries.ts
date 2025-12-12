@@ -1,3 +1,15 @@
+/**
+ * TanStack Query hooks for Tauri backend commands
+ * 
+ * All hooks use TanStack Query v5 best practices:
+ * - Proper TypeScript typing with generic parameters
+ * - Automatic retries with exponential backoff
+ * - Cache invalidation for related queries
+ * - Error handling with fallback values
+ * 
+ * Query configuration in main.tsx provides global defaults.
+ */
+
 import { invoke } from '@tauri-apps/api/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 

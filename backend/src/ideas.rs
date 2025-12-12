@@ -252,11 +252,31 @@ pub async fn list_ideas_handler(
         );
     }
 
+    // Optimize by excluding heavy markdown columns in list view
+    // Only fetch them when viewing individual ideas
     let results = query
+        .select_only()
+        .columns([
+            Column::Id,
+            Column::Title,
+            Column::Summary,
+            Column::Status,
+            Column::NewsArticleId,
+            Column::Target,
+            Column::Tags,
+            Column::Priority,
+            Column::IsPinned,
+            Column::DateAdded,
+            Column::DateUpdated,
+            Column::DateCompleted,
+            Column::DateRemoved,
+        ])
+        // Exclude: NotesMarkdown, ArticleTitle, ArticleMarkdown
         .order_by_desc(Column::DateUpdated)
         .order_by_desc(Column::DateAdded)
         .limit(limit.unwrap_or(50))
         .offset(offset.unwrap_or(0))
+        .into_model::<Model>()
         .all(&state.db)
         .await?;
 

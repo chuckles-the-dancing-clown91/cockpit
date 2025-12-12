@@ -17,7 +17,7 @@ interface Idea {
 type StatusFilter = 'all' | 'backlog' | 'in_progress' | 'done';
 type PriorityFilter = 'all' | 'low' | 'medium' | 'high';
 
-export function IdeasLibraryView() {
+export default function IdeasLibraryView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');

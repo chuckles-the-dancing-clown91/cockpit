@@ -17,7 +17,7 @@ import {
 } from '../../hooks/queries';
 import { NewsFeedDialog } from '../news/NewsFeedDialog';
 
-export function NewsFeedView() {
+export default function NewsFeedView() {
   const { data: systemUser, isLoading: userLoading } = useSystemUser();
   const {
     data: events,
