@@ -13,10 +13,10 @@
     "windows": [
       {
         "title": "Architect Cockpit",
-        "width": 1280,
-        "height": 800,
-        "minWidth": 1024,
-        "minHeight": 600,
+        "width": 1700,
+        "height": 950,
+        "minWidth": 1700,
+        "minHeight": 800,
         "fullscreen": false,
         "resizable": true
       }

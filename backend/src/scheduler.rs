@@ -6,10 +6,13 @@
 use std::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tauri::{async_runtime, AppHandle, Emitter};
-use sea_orm::{EntityTrait, QueryFilter, ColumnTrait, Set, ActiveModelTrait};
+use sea_orm::{
+    EntityTrait, QueryFilter, ColumnTrait, Set, ActiveModelTrait, IntoActiveModel,
+};
 use sea_orm::prelude::Expr;
 use tauri::Manager;
 use chrono::Utc;
+use tracing::error;
 
 use crate::system_tasks::{Column, Entity};
 use crate::news;
@@ -142,14 +145,17 @@ async fn run_task_once(app: &AppHandle, state: &AppState, task: SystemTask) -> T
         },
     };
 
-    let _ = crate::system_tasks::Entity::update_many()
+    if let Err(e) = crate::system_tasks::Entity::update_many()
         .col_expr(Column::LastRunAt, Expr::value(Utc::now()))
         .col_expr(Column::LastStatus, Expr::value(result.status))
         .col_expr(Column::LastResult, Expr::value(result.result_json.clone()))
         .col_expr(Column::UpdatedAt, Expr::value(Utc::now()))
         .filter(Column::Id.eq(task.id))
         .exec(&state.db)
-        .await;
+        .await
+    {
+        error!(target: "scheduler", "Failed to update task status for task_id={}: {}", task.id, e);
+    }
 
     let now = chrono::Utc::now().to_rfc3339();
     let payload = serde_json::json!({
@@ -160,7 +166,9 @@ async fn run_task_once(app: &AppHandle, state: &AppState, task: SystemTask) -> T
         "errorMessage": result.error_message,
         "finishedAt": now,
     });
-    let _ = app.emit("system_task_run", payload);
+    if let Err(e) = app.emit("system_task_run", payload) {
+        error!(target: "scheduler", "Failed to emit task completion event: {}", e);
+    }
 
     let mut running = state.running.lock().await;
     running.remove(&task.id);
@@ -182,7 +190,12 @@ pub async fn start_scheduler(app: AppHandle) -> Result<(), String> {
                 let state_clone = state_clone.clone();
                 let task = task.clone();
                 Box::pin(async move {
-                    let _ = run_task_once(&app_handle, &state_clone, task).await;
+                    let result = run_task_once(&app_handle, &state_clone, task).await;
+                    if result.status == "error" {
+                        if let Some(err) = result.error_message {
+                            error!(target: "scheduler", "Scheduled task failed: {}", err);
+                        }
+                    }
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -249,7 +262,7 @@ pub async fn update_system_task_handler(
     let Some(model) = maybe else {
         return Err(AppError::other("Not found"));
     };
-    let mut active: crate::system_tasks::ActiveModel = model.into();
+    let mut active = model.into_active_model();
     if let Some(enabled) = input.enabled {
         active.enabled = Set(if enabled { 1 } else { 0 });
     }

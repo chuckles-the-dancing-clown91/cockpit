@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -8,66 +8,65 @@ import { Switch } from '../ui/Switch';
 import { Separator } from '../ui/Separator';
 import { ScrollArea } from '../ui/ScrollArea';
 import { useTheme } from '../../theme/ThemeProvider';
-
-// Mock settings data - will be replaced with backend integration
-const defaultSettings = {
-  // App Preferences
-  appName: 'Cockpit',
-  autoSave: true,
-  autoSaveInterval: 30, // seconds
-  startupMode: 'writing' as 'writing' | 'research' | 'system',
-  
-  // News API
-  newsApiKey: '',
-  newsApiKeySet: false,
-  newsFetchInterval: 15, // minutes
-  maxArticlesPerSource: 50,
-  
-  // Logging
-  logLevel: 'info' as 'debug' | 'info' | 'warn' | 'error',
-  logRetentionDays: 30,
-  enableFileLogging: true,
-  enableConsoleLogging: true,
-  
-  // Storage
-  databasePath: './storage/data/db.sql',
-  autoBackup: true,
-  backupInterval: 24, // hours
-  maxBackups: 7,
-  autoCleanup: true,
-  cleanupThreshold: 90, // days
-  
-  // Theme
-  defaultTheme: 'dark' as 'dark' | 'cyberpunk' | 'light',
-  
-  // Notifications
-  enableNotifications: true,
-  notifyOnNewArticles: true,
-  notifyOnErrors: true,
-};
+import { useAppSettings, useUpdateSettings, type UpdateSettingInput } from '../../hooks/queries';
+import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 
 export function SettingsView() {
   const { theme, setTheme } = useTheme();
-  const [settings, setSettings] = useState(defaultSettings);
-  const [apiKeyVisible, setApiKeyVisible] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const { data: settings, isLoading } = useAppSettings();
+  const updateSettings = useUpdateSettings();
+  const [pendingChanges, setPendingChanges] = useState<Map<string, unknown>>(new Map());
 
-  const updateSetting = <K extends keyof typeof settings>(key: K, value: typeof settings[K]) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
-    setHasUnsavedChanges(true);
+  const getValue = (category: keyof typeof settings, key: string) => {
+    if (pendingChanges.has(key)) {
+      return pendingChanges.get(key);
+    }
+    return settings?.[category]?.[key]?.value;
   };
 
-  const handleSave = () => {
-    // TODO: Call backend to save settings
-    console.log('Saving settings:', settings);
-    setHasUnsavedChanges(false);
-    // In future: invoke('update_app_settings', { settings })
+  const updateValue = (key: string, value: unknown) => {
+    setPendingChanges(prev => new Map(prev).set(key, value));
+  };
+
+  const handleSave = async () => {
+    const inputs: UpdateSettingInput[] = Array.from(pendingChanges.entries()).map(([key, value]) => ({
+      key,
+      value,
+    }));
+
+    try {
+      await updateSettings.mutateAsync(inputs);
+      setPendingChanges(new Map());
+      toast.success('Settings saved successfully');
+    } catch (error) {
+      toast.error('Failed to save settings');
+      console.error('Settings save error:', error);
+    }
   };
 
   const handleReset = () => {
-    setSettings(defaultSettings);
-    setHasUnsavedChanges(false);
+    setPendingChanges(new Map());
+    toast.info('Changes discarded');
   };
+
+  if (isLoading) {
+    return (
+      <div className="layout-container flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!settings) {
+    return (
+      <div className="layout-container flex items-center justify-center">
+        <p className="text-muted-foreground">Failed to load settings</p>
+      </div>
+    );
+  }
+
+  const hasChanges = pendingChanges.size > 0;
 
   return (
     <div className="layout-container">
@@ -82,280 +81,341 @@ export function SettingsView() {
           </div>
 
           {/* Save/Reset Actions */}
-          {hasUnsavedChanges && (
+          {hasChanges && (
             <Card className="p-4 bg-accent/20 border-accent">
               <div className="flex items-center justify-between">
                 <p className="text-sm">You have unsaved changes</p>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={handleReset}>
-                    Reset
+                  <Button variant="outline" size="sm" onClick={handleReset} disabled={updateSettings.isPending}>
+                    Discard
                   </Button>
-                  <Button size="sm" onClick={handleSave}>
-                    Save Changes
+                  <Button size="sm" onClick={handleSave} disabled={updateSettings.isPending}>
+                    {updateSettings.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Changes'
+                    )}
                   </Button>
                 </div>
               </div>
             </Card>
           )}
 
-          {/* App Preferences */}
+          {/* General Settings */}
           <Card className="p-6">
             <div className="mb-4">
-              <h2 className="text-xl font-semibold">⚙️ App Preferences</h2>
+              <h2 className="text-xl font-semibold">⚙️ General</h2>
             </div>
             <div className="space-y-4">
-              <div className="grid gap-2">
-                <Label htmlFor="appName">Application Name</Label>
-                <Input
-                  id="appName"
-                  value={settings.appName}
-                  onChange={(e) => updateSetting('appName', e.target.value)}
-                  placeholder="Cockpit"
-                />
-              </div>
-
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="autoSave">Auto-save</Label>
+                  <Label>Auto Start</Label>
                   <p className="text-sm text-muted-foreground">
-                    Automatically save content while editing
+                    {settings.general?.['app.auto_start']?.description}
                   </p>
                 </div>
                 <Switch
-                  id="autoSave"
-                  checked={settings.autoSave}
-                  onCheckedChange={(checked) => updateSetting('autoSave', checked)}
+                  checked={getValue('general', 'app.auto_start') as boolean}
+                  onCheckedChange={(checked) => updateValue('app.auto_start', checked)}
                 />
               </div>
 
-              {settings.autoSave && (
-                <div className="grid gap-2 pl-6">
-                  <Label htmlFor="autoSaveInterval">Auto-save interval (seconds)</Label>
-                  <Input
-                    id="autoSaveInterval"
-                    type="number"
-                    min="5"
-                    max="300"
-                    value={settings.autoSaveInterval}
-                    onChange={(e) => updateSetting('autoSaveInterval', parseInt(e.target.value))}
-                  />
+              <Separator />
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Minimize to Tray</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {settings.general?.['app.minimize_to_tray']?.description}
+                  </p>
                 </div>
+                <Switch
+                  checked={getValue('general', 'app.minimize_to_tray') as boolean}
+                  onCheckedChange={(checked) => updateValue('app.minimize_to_tray', checked)}
+                />
+              </div>
+
+              <Separator />
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Desktop Notifications</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {settings.general?.['app.notifications_enabled']?.description}
+                  </p>
+                </div>
+                <Switch
+                  checked={getValue('general', 'app.notifications_enabled') as boolean}
+                  onCheckedChange={(checked) => updateValue('app.notifications_enabled', checked)}
+                />
+              </div>
+            </div>
+          </Card>
+
+          {/* Appearance */}
+          <Card className="p-6">
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold">🎨 Appearance</h2>
+            </div>
+            <div className="space-y-4">
+              <div className="grid gap-2">
+                <Label>Theme</Label>
+                <p className="text-sm text-muted-foreground">
+                  {settings.appearance?.['app.theme']?.description}
+                </p>
+                <Select
+                  value={theme}
+                  onValueChange={(value) => {
+                    // Theme changes are immediate - no pending changes needed
+                    setTheme(value as any);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="light">Light</SelectItem>
+                    <SelectItem value="dark">Dark</SelectItem>
+                    <SelectItem value="cyberpunk">Cyberpunk</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </Card>
+
+          {/* News Settings */}
+          <Card className="p-6">
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold">📰 News</h2>
+            </div>
+            <div className="space-y-4">
+              <div className="grid gap-2">
+                <Label htmlFor="newsApiKey">NewsData.io API Key</Label>
+                <p className="text-sm text-muted-foreground">
+                  {settings.news?.['news.newsdata_api_key']?.description}
+                </p>
+                <Input
+                  id="newsApiKey"
+                  type="password"
+                  value={(getValue('news', 'news.newsdata_api_key') as string) || ''}
+                  onChange={(e) => updateValue('news.newsdata_api_key', e.target.value)}
+                  placeholder="Enter your API key"
+                />
+              </div>
+
+              <Separator />
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Auto Sync</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {settings.news?.['news.auto_sync']?.description}
+                  </p>
+                </div>
+                <Switch
+                  checked={getValue('news', 'news.auto_sync') as boolean}
+                  onCheckedChange={(checked) => updateValue('news.auto_sync', checked)}
+                />
+              </div>
+
+              {getValue('news', 'news.auto_sync') && (
+                <>
+                  <Separator />
+                  <div className="grid gap-2">
+                    <Label htmlFor="syncInterval">Sync Interval (minutes)</Label>
+                    <Input
+                      id="syncInterval"
+                      type="number"
+                      min="15"
+                      max="1440"
+                      value={getValue('news', 'news.sync_interval_minutes') as number}
+                      onChange={(e) => updateValue('news.sync_interval_minutes', parseInt(e.target.value))}
+                    />
+                  </div>
+                </>
               )}
 
-              <div className="grid gap-2">
-                <Label htmlFor="startupMode">Default mode on startup</Label>
-                <Select
-                  value={settings.startupMode}
-                  onValueChange={(value) => updateSetting('startupMode', value as any)}
-                >
-                  <SelectTrigger id="startupMode">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="writing">Writing</SelectItem>
-                    <SelectItem value="research">Research</SelectItem>
-                    <SelectItem value="system">System</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </Card>
-
-          {/* News API Configuration */}
-          <Card className="p-6">
-            <div className="mb-4">
-              <h2 className="text-xl font-semibold">🔑 News API</h2>
-            </div>
-            <div className="space-y-4">
-              <div className="grid gap-2">
-                <Label htmlFor="newsApiKey">API Key</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="newsApiKey"
-                    type={apiKeyVisible ? 'text' : 'password'}
-                    value={settings.newsApiKey}
-                    onChange={(e) => updateSetting('newsApiKey', e.target.value)}
-                    placeholder={settings.newsApiKeySet ? '••••••••••••••••' : 'Enter your News API key'}
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={() => setApiKeyVisible(!apiKeyVisible)}
-                  >
-                    {apiKeyVisible ? 'Hide' : 'Show'}
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Get your API key from{' '}
-                  <a href="https://newsapi.org" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
-                    newsapi.org
-                  </a>
-                </p>
-              </div>
-
               <Separator />
 
               <div className="grid gap-2">
-                <Label htmlFor="newsFetchInterval">Fetch interval (minutes)</Label>
+                <Label htmlFor="maxArticles">Maximum Articles to Store</Label>
                 <Input
-                  id="newsFetchInterval"
+                  id="maxArticles"
                   type="number"
-                  min="5"
-                  max="120"
-                  value={settings.newsFetchInterval}
-                  onChange={(e) => updateSetting('newsFetchInterval', parseInt(e.target.value))}
+                  min="100"
+                  max="10000"
+                  value={getValue('news', 'news.max_articles') as number}
+                  onChange={(e) => updateValue('news.max_articles', parseInt(e.target.value))}
                 />
-                <p className="text-xs text-muted-foreground">
-                  How often to check for new articles
-                </p>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="maxArticlesPerSource">Max articles per source</Label>
-                <Input
-                  id="maxArticlesPerSource"
-                  type="number"
-                  min="10"
-                  max="200"
-                  value={settings.maxArticlesPerSource}
-                  onChange={(e) => updateSetting('maxArticlesPerSource', parseInt(e.target.value))}
-                />
-              </div>
-            </div>
-          </Card>
-
-          {/* Logging Configuration */}
-          <Card className="p-6">
-            <div className="mb-4">
-              <h2 className="text-xl font-semibold">📄 Logging</h2>
-            </div>
-            <div className="space-y-4">
-              <div className="grid gap-2">
-                <Label htmlFor="logLevel">Log level</Label>
-                <Select
-                  value={settings.logLevel}
-                  onValueChange={(value) => updateSetting('logLevel', value as any)}
-                >
-                  <SelectTrigger id="logLevel">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="debug">Debug (Most verbose)</SelectItem>
-                    <SelectItem value="info">Info</SelectItem>
-                    <SelectItem value="warn">Warn</SelectItem>
-                    <SelectItem value="error">Error (Least verbose)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Lower levels show more detailed information
-                </p>
               </div>
 
               <Separator />
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="enableFileLogging">File logging</Label>
+                  <Label>Auto-dismiss Read Articles</Label>
                   <p className="text-sm text-muted-foreground">
-                    Write logs to files
+                    {settings.news?.['news.auto_dismiss_read']?.description}
                   </p>
                 </div>
                 <Switch
-                  id="enableFileLogging"
-                  checked={settings.enableFileLogging}
-                  onCheckedChange={(checked) => updateSetting('enableFileLogging', checked)}
+                  checked={getValue('news', 'news.auto_dismiss_read') as boolean}
+                  onCheckedChange={(checked) => updateValue('news.auto_dismiss_read', checked)}
                 />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="enableConsoleLogging">Console logging</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Show logs in developer console
-                  </p>
-                </div>
-                <Switch
-                  id="enableConsoleLogging"
-                  checked={settings.enableConsoleLogging}
-                  onCheckedChange={(checked) => updateSetting('enableConsoleLogging', checked)}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="logRetentionDays">Log retention (days)</Label>
-                <Input
-                  id="logRetentionDays"
-                  type="number"
-                  min="1"
-                  max="365"
-                  value={settings.logRetentionDays}
-                  onChange={(e) => updateSetting('logRetentionDays', parseInt(e.target.value))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Automatically delete logs older than this
-                </p>
               </div>
             </div>
           </Card>
 
-          {/* Storage Configuration */}
+          {/* Writing Settings */}
           <Card className="p-6">
             <div className="mb-4">
-              <h2 className="text-xl font-semibold">💾 Storage</h2>
+              <h2 className="text-xl font-semibold">✍️ Writing</h2>
             </div>
             <div className="space-y-4">
-              <div className="grid gap-2">
-                <Label htmlFor="databasePath">Database path</Label>
-                <Input
-                  id="databasePath"
-                  value={settings.databasePath}
-                  onChange={(e) => updateSetting('databasePath', e.target.value)}
-                  readOnly
-                  className="font-mono text-sm"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Location of the SQLite database file
-                </p>
-              </div>
-
-              <Separator />
-
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="autoBackup">Auto-backup</Label>
+                  <Label>Auto-save</Label>
                   <p className="text-sm text-muted-foreground">
-                    Automatically backup database
+                    {settings.writing?.['writing.auto_save']?.description}
                   </p>
                 </div>
                 <Switch
-                  id="autoBackup"
-                  checked={settings.autoBackup}
-                  onCheckedChange={(checked) => updateSetting('autoBackup', checked)}
+                  checked={getValue('writing', 'writing.auto_save') as boolean}
+                  onCheckedChange={(checked) => updateValue('writing.auto_save', checked)}
                 />
               </div>
 
-              {settings.autoBackup && (
+              {getValue('writing', 'writing.auto_save') && (
                 <>
-                  <div className="grid gap-2 pl-6">
-                    <Label htmlFor="backupInterval">Backup interval (hours)</Label>
+                  <Separator />
+                  <div className="grid gap-2">
+                    <Label htmlFor="autoSaveDelay">Auto-save Delay (milliseconds)</Label>
+                    <Input
+                      id="autoSaveDelay"
+                      type="number"
+                      min="100"
+                      max="5000"
+                      value={getValue('writing', 'writing.auto_save_delay_ms') as number}
+                      onChange={(e) => updateValue('writing.auto_save_delay_ms', parseInt(e.target.value))}
+                    />
+                  </div>
+                </>
+              )}
+
+              <Separator />
+
+              <div className="grid gap-2">
+                <Label htmlFor="defaultStatus">Default Status for New Ideas</Label>
+                <Select
+                  value={getValue('writing', 'writing.default_status') as string}
+                  onValueChange={(value) => updateValue('writing.default_status', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="stalled">Stalled</SelectItem>
+                    <SelectItem value="complete">Complete</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Separator />
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Spell Check</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {settings.writing?.['writing.spell_check']?.description}
+                  </p>
+                </div>
+                <Switch
+                  checked={getValue('writing', 'writing.spell_check') as boolean}
+                  onCheckedChange={(checked) => updateValue('writing.spell_check', checked)}
+                />
+              </div>
+            </div>
+          </Card>
+
+          {/* Advanced Settings */}
+          <Card className="p-6">
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold">🔧 Advanced</h2>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Auto Cleanup</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {settings.advanced?.['storage.auto_cleanup']?.description}
+                  </p>
+                </div>
+                <Switch
+                  checked={getValue('advanced', 'storage.auto_cleanup') as boolean}
+                  onCheckedChange={(checked) => updateValue('storage.auto_cleanup', checked)}
+                />
+              </div>
+
+              {getValue('advanced', 'storage.auto_cleanup') && (
+                <>
+                  <Separator />
+                  <div className="grid gap-2">
+                    <Label htmlFor="cleanupDays">Days to Keep Old Articles</Label>
+                    <Input
+                      id="cleanupDays"
+                      type="number"
+                      min="7"
+                      max="365"
+                      value={getValue('advanced', 'storage.cleanup_days') as number}
+                      onChange={(e) => updateValue('storage.cleanup_days', parseInt(e.target.value))}
+                    />
+                  </div>
+                </>
+              )}
+
+              <Separator />
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Auto Backup</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {settings.advanced?.['storage.auto_backup']?.description}
+                  </p>
+                </div>
+                <Switch
+                  checked={getValue('advanced', 'storage.auto_backup') as boolean}
+                  onCheckedChange={(checked) => updateValue('storage.auto_backup', checked)}
+                />
+              </div>
+
+              {getValue('advanced', 'storage.auto_backup') && (
+                <>
+                  <Separator />
+                  <div className="grid gap-2">
+                    <Label htmlFor="backupInterval">Backup Interval (days)</Label>
                     <Input
                       id="backupInterval"
                       type="number"
                       min="1"
-                      max="168"
-                      value={settings.backupInterval}
-                      onChange={(e) => updateSetting('backupInterval', parseInt(e.target.value))}
+                      max="30"
+                      value={getValue('advanced', 'storage.backup_interval_days') as number}
+                      onChange={(e) => updateValue('storage.backup_interval_days', parseInt(e.target.value))}
                     />
                   </div>
 
-                  <div className="grid gap-2 pl-6">
-                    <Label htmlFor="maxBackups">Max backups to keep</Label>
+                  <div className="grid gap-2">
+                    <Label htmlFor="maxBackups">Maximum Backups to Keep</Label>
                     <Input
                       id="maxBackups"
                       type="number"
                       min="1"
                       max="50"
-                      value={settings.maxBackups}
-                      onChange={(e) => updateSetting('maxBackups', parseInt(e.target.value))}
+                      value={getValue('advanced', 'storage.max_backup_count') as number}
+                      onChange={(e) => updateValue('storage.max_backup_count', parseInt(e.target.value))}
                     />
                   </div>
                 </>
@@ -363,142 +423,52 @@ export function SettingsView() {
 
               <Separator />
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="autoCleanup">Auto-cleanup</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Automatically remove old data
-                  </p>
-                </div>
-                <Switch
-                  id="autoCleanup"
-                  checked={settings.autoCleanup}
-                  onCheckedChange={(checked) => updateSetting('autoCleanup', checked)}
-                />
-              </div>
-
-              {settings.autoCleanup && (
-                <div className="grid gap-2 pl-6">
-                  <Label htmlFor="cleanupThreshold">Cleanup threshold (days)</Label>
-                  <Input
-                    id="cleanupThreshold"
-                    type="number"
-                    min="7"
-                    max="365"
-                    value={settings.cleanupThreshold}
-                    onChange={(e) => updateSetting('cleanupThreshold', parseInt(e.target.value))}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Delete articles and archived content older than this
-                  </p>
-                </div>
-              )}
-            </div>
-          </Card>
-
-          {/* Theme Configuration */}
-          <Card className="p-6">
-            <div className="mb-4">
-              <h2 className="text-xl font-semibold">🎨 Theme</h2>
-            </div>
-            <div className="space-y-4">
               <div className="grid gap-2">
-                <Label htmlFor="defaultTheme">Default theme</Label>
+                <Label htmlFor="logLevel">Log Level</Label>
                 <Select
-                  value={theme}
-                  onValueChange={(value) => {
-                    setTheme(value as any);
-                    updateSetting('defaultTheme', value as any);
-                  }}
+                  value={getValue('advanced', 'logging.level') as string}
+                  onValueChange={(value) => updateValue('logging.level', value)}
                 >
-                  <SelectTrigger id="defaultTheme">
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="dark">Dark</SelectItem>
-                    <SelectItem value="cyberpunk">Cyberpunk</SelectItem>
-                    <SelectItem value="light">Light</SelectItem>
+                    <SelectItem value="trace">Trace</SelectItem>
+                    <SelectItem value="debug">Debug</SelectItem>
+                    <SelectItem value="info">Info</SelectItem>
+                    <SelectItem value="warn">Warn</SelectItem>
+                    <SelectItem value="error">Error</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Theme Preview */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <div className="h-20 rounded-lg border-2 border-border bg-[hsl(240,6%,10%)] flex items-center justify-center text-white text-sm">
-                    Dark
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="h-20 rounded-lg border-2 border-border bg-[hsl(20,100%,10%)] flex items-center justify-center text-orange-500 text-sm">
-                    Cyberpunk
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="h-20 rounded-lg border-2 border-border bg-[hsl(210,40%,98%)] flex items-center justify-center text-gray-900 text-sm">
-                    Light
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
+              <Separator />
 
-          {/* Notifications */}
-          <Card className="p-6">
-            <div className="mb-4">
-              <h2 className="text-xl font-semibold">🔔 Notifications</h2>
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="enableNotifications">Enable notifications</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Show system notifications
-                  </p>
-                </div>
-                <Switch
-                  id="enableNotifications"
-                  checked={settings.enableNotifications}
-                  onCheckedChange={(checked) => updateSetting('enableNotifications', checked)}
+              <div className="grid gap-2">
+                <Label htmlFor="maxLogSize">Max Log File Size (MB)</Label>
+                <Input
+                  id="maxLogSize"
+                  type="number"
+                  min="1"
+                  max="500"
+                  value={getValue('advanced', 'logging.max_file_size_mb') as number}
+                  onChange={(e) => updateValue('logging.max_file_size_mb', parseInt(e.target.value))}
                 />
               </div>
 
-              {settings.enableNotifications && (
-                <>
-                  <div className="flex items-center justify-between pl-6">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="notifyOnNewArticles">New articles</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Notify when new articles are fetched
-                      </p>
-                    </div>
-                    <Switch
-                      id="notifyOnNewArticles"
-                      checked={settings.notifyOnNewArticles}
-                      onCheckedChange={(checked) => updateSetting('notifyOnNewArticles', checked)}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between pl-6">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="notifyOnErrors">Errors</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Notify when errors occur
-                      </p>
-                    </div>
-                    <Switch
-                      id="notifyOnErrors"
-                      checked={settings.notifyOnErrors}
-                      onCheckedChange={(checked) => updateSetting('notifyOnErrors', checked)}
-                    />
-                  </div>
-                </>
-              )}
+              <div className="grid gap-2">
+                <Label htmlFor="maxLogFiles">Max Log Files to Keep</Label>
+                <Input
+                  id="maxLogFiles"
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={getValue('advanced', 'logging.max_files') as number}
+                  onChange={(e) => updateValue('logging.max_files', parseInt(e.target.value))}
+                />
+              </div>
             </div>
           </Card>
-
-          {/* Bottom spacing */}
-          <div className="h-8" />
         </div>
       </ScrollArea>
     </div>

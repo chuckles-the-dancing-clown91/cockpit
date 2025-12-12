@@ -1,10 +1,28 @@
 import { useMode, AppMode } from './ModeContext';
-import { useTheme } from '../../theme/ThemeProvider';
-import { Moon, Sun, Menu, X } from 'lucide-react';
+import { useTheme, type ThemeId } from '../../theme/ThemeProvider';
+import { Moon, Sun, Menu, X, Zap } from 'lucide-react';
 
 export function TopNav() {
   const { mode, setMode, isSideNavOpen, toggleSideNav } = useMode();
   const { theme, setTheme } = useTheme();
+
+  const cycleTheme = () => {
+    const themes: ThemeId[] = ['dark', 'light', 'cyberpunk'];
+    const currentIndex = themes.indexOf(theme);
+    const nextIndex = (currentIndex + 1) % themes.length;
+    setTheme(themes[nextIndex]);
+  };
+
+  const getThemeIcon = () => {
+    switch (theme) {
+      case 'light':
+        return <Sun className="h-5 w-5" />;
+      case 'cyberpunk':
+        return <Zap className="h-5 w-5" />;
+      default:
+        return <Moon className="h-5 w-5" />;
+    }
+  };
 
   const modes: { id: AppMode; label: string }[] = [
     { id: 'writing', label: 'Writing' },
@@ -81,15 +99,12 @@ export function TopNav() {
 
         {/* Theme Switcher */}
         <button
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          onClick={cycleTheme}
           className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-all duration-200 hover:scale-110"
-          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+          aria-label={`Current theme: ${theme}. Click to cycle themes`}
+          title={`Current: ${theme}`}
         >
-          {theme === 'dark' ? (
-            <Sun className="h-5 w-5" />
-          ) : (
-            <Moon className="h-5 w-5" />
-          )}
+          {getThemeIcon()}
         </button>
 
         {/* User Menu Placeholder */}

@@ -1,8 +1,76 @@
 //! Error types for Architect Cockpit backend
 //!
-//! Centralized error handling using thiserror for consistent, helpful error messages.
+//! Centralized error handling using thiserror 2.0 for consistent, helpful error messages.
+//! 
+//! # Features
+//! - Structured error variants with context
+//! - Error codes for frontend display
+//! - Actionable suggestions where possible
+//! - Proper error source chains for debugging
+//! - Automatic conversion from common error types
+//!
+//! # Usage
+//! ```ignore
+//! use crate::errors::{AppError, AppResult};
+//! 
+//! fn process_file(path: &str) -> AppResult<String> {
+//!     let content = std::fs::read_to_string(path)
+//!         .map_err(|e| AppError::file_operation("read", path, e))?;
+//!     Ok(content)
+//! }
+//! ```
 
 use thiserror::Error;
+
+/// Error codes for frontend display and error categorization
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ErrorCode {
+    // Configuration: 1xxx
+    ConfigInvalid = 1001,
+    ConfigValidationFailed = 1002,
+    
+    // Database: 2xxx
+    DatabaseConnection = 2001,
+    DatabaseQuery = 2002,
+    DatabaseMigration = 2003,
+    DatabaseConstraint = 2004,
+    
+    // Storage: 3xxx
+    StorageLimitExceeded = 3001,
+    StorageOperationFailed = 3002,
+    
+    // API/Network: 4xxx
+    ApiRateLimit = 4001,
+    ApiRequestFailed = 4002,
+    NetworkError = 4003,
+    
+    // Crypto: 5xxx
+    CryptoEncryptionFailed = 5001,
+    CryptoInvalidKey = 5002,
+    
+    // File I/O: 6xxx
+    FileOperationFailed = 6001,
+    FileNotFound = 6002,
+    PermissionDenied = 6003,
+    
+    // Validation: 7xxx
+    ValidationFailed = 7001,
+    
+    // Generic: 9xxx
+    Unknown = 9999,
+}
+
+impl ErrorCode {
+    /// Get the error code as an integer
+    pub fn as_u32(self) -> u32 {
+        self as u32
+    }
+    
+    /// Get the error code as a string (e.g., "E2001")
+    pub fn as_string(self) -> String {
+        format!("E{:04}", self as u32)
+    }
+}
 
 #[derive(Debug, Error)]
 pub enum AppError {
@@ -135,6 +203,66 @@ pub enum AppError {
 pub type AppResult<T> = Result<T, AppError>;
 
 impl AppError {
+    /// Get the error code for this error
+    pub fn code(&self) -> ErrorCode {
+        match self {
+            Self::Config { .. } => ErrorCode::ConfigInvalid,
+            Self::ConfigValidation { .. } => ErrorCode::ConfigValidationFailed,
+            Self::Database { .. } => ErrorCode::DatabaseConnection,
+            Self::DatabaseMigration { .. } => ErrorCode::DatabaseMigration,
+            Self::DatabaseQuery { .. } => ErrorCode::DatabaseQuery,
+            Self::StorageLimitExceeded { .. } => ErrorCode::StorageLimitExceeded,
+            Self::StorageOperation { .. } => ErrorCode::StorageOperationFailed,
+            Self::ApiRateLimit { .. } => ErrorCode::ApiRateLimit,
+            Self::ApiRequest { .. } => ErrorCode::ApiRequestFailed,
+            Self::Network { .. } => ErrorCode::NetworkError,
+            Self::Crypto { .. } => ErrorCode::CryptoEncryptionFailed,
+            Self::InvalidKey { .. } => ErrorCode::CryptoInvalidKey,
+            Self::FileOperation { .. } => ErrorCode::FileOperationFailed,
+            Self::FileNotFound { .. } => ErrorCode::FileNotFound,
+            Self::PermissionDenied { .. } => ErrorCode::PermissionDenied,
+            Self::Validation { .. } => ErrorCode::ValidationFailed,
+            Self::Other { .. } => ErrorCode::Unknown,
+        }
+    }
+    
+    /// Get error code as string (e.g., "E2001")
+    pub fn code_string(&self) -> String {
+        self.code().as_string()
+    }
+    
+    /// Check if this error is retryable
+    pub fn is_retryable(&self) -> bool {
+        matches!(
+            self,
+            Self::Network { .. } | Self::ApiRequest { .. } | Self::DatabaseQuery { .. }
+        )
+    }
+    
+    /// Check if this error requires user action
+    pub fn requires_user_action(&self) -> bool {
+        matches!(
+            self,
+            Self::ConfigValidation { .. }
+                | Self::InvalidKey { .. }
+                | Self::ApiRateLimit { .. }
+                | Self::StorageLimitExceeded { .. }
+                | Self::PermissionDenied { .. }
+        )
+    }
+    
+    /// Get a user-friendly suggestion if available
+    pub fn suggestion(&self) -> Option<&str> {
+        match self {
+            Self::ConfigValidation { suggestion, .. } => suggestion.as_deref(),
+            Self::InvalidKey { suggestion, .. } => Some(suggestion.as_str()),
+            Self::FileNotFound { suggestion, .. } => suggestion.as_deref(),
+            Self::PermissionDenied { suggestion, .. } => Some(suggestion.as_str()),
+            Self::StorageLimitExceeded { suggestion, .. } => Some(suggestion.as_str()),
+            _ => None,
+        }
+    }
+    
     /// Create a config error with a message
     pub fn config(message: impl Into<String>) -> Self {
         Self::Config {
@@ -195,16 +323,41 @@ impl AppError {
         }
     }
     
-    /// Add a suggestion to a Config error
+    /// Add context to any error with additional message
+    pub fn with_context(self, context: impl Into<String>) -> Self {
+        let ctx = context.into();
+        match self {
+            Self::Other { message, source } => Self::Other {
+                message: format!("{}: {}", ctx, message),
+                source,
+            },
+            _ => Self::Other {
+                message: format!("{}: {}", ctx, self),
+                source: Some(Box::new(self)),
+            },
+        }
+    }
+    
+    /// Add a suggestion to errors that support it
     pub fn with_suggestion(self, suggestion: impl Into<String>) -> Self {
+        let sug = suggestion.into();
         match self {
             Self::ConfigValidation { field, reason, .. } => {
                 Self::ConfigValidation {
                     field,
                     reason,
-                    suggestion: Some(suggestion.into()),
+                    suggestion: Some(sug),
                 }
             }
+            Self::FileNotFound { path, .. } => Self::FileNotFound {
+                path,
+                suggestion: Some(sug),
+            },
+            Self::StorageOperation { operation, reason, path } => Self::StorageOperation {
+                operation,
+                reason: format!("{} ({})", reason, sug),
+                path,
+            },
             _ => self,
         }
     }

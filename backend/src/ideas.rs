@@ -12,13 +12,15 @@ use crate::AppState;
 use chrono::Utc;
 use sea_orm::entity::prelude::*;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+    ActiveModelTrait, ColumnTrait, Condition, EntityTrait, IntoActiveModel, QueryFilter,
+    QueryOrder, QuerySelect, Set, TransactionTrait, ConnectionTrait,
 };
 use serde::{Deserialize, Serialize};
 use tauri::State;
+use tracing::{instrument, info};
 
 #[derive(Clone, Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
-#[sea_orm(rs_type = "String", db_type = "String(Some(32))")]
+#[sea_orm(rs_type = "String", db_type = "String(StringLen::N(32))")]
 pub enum IdeaStatus {
     #[sea_orm(string_value = "in_progress")]
     InProgress,
@@ -131,7 +133,7 @@ pub struct CreateIdeaInput {
     pub is_pinned: Option<bool>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateIdeaForArticleInput {
     pub article_id: i64,
@@ -216,6 +218,11 @@ fn bool_to_int(value: Option<bool>) -> i32 {
     }
 }
 
+/// List writing ideas with filtering, search, and pagination
+/// 
+/// Supports filtering by status, text search, and archived status.
+/// Returns ideas sorted by last updated (newest first).
+#[instrument(skip(state), fields(limit = ?limit, offset = ?offset))]
 pub async fn list_ideas_handler(
     status: Option<String>,
     search: Option<String>,
@@ -265,10 +272,24 @@ pub async fn get_idea_handler(id: i64, state: &State<'_, AppState>) -> AppResult
     Ok(idea_to_dto(model))
 }
 
+/// Create a new writing idea
+/// 
+/// Creates idea with initial metadata and content.
+/// Uses default status if not provided.
+#[instrument(skip(state, input), fields(title = %input.title))]
 pub async fn create_idea_handler(
     input: CreateIdeaInput,
     state: &State<'_, AppState>,
 ) -> AppResult<IdeaDto> {
+    info!("Creating new idea");
+    create_idea_with_conn(input, &state.db).await
+}
+
+/// Internal helper that accepts any database connection (for transactions)
+async fn create_idea_with_conn<C>(input: CreateIdeaInput, db: &C) -> AppResult<IdeaDto>
+where
+    C: ConnectionTrait,
+{
     let now = Utc::now();
     let status = status_or_default(&input.status)?;
     let is_complete = status == IdeaStatus::Complete;
@@ -292,23 +313,33 @@ pub async fn create_idea_handler(
         ..Default::default()
     };
 
-    let result = model.insert(&state.db).await?;
+    let result = model.insert(db).await?;
 
     Ok(idea_to_dto(result))
 }
 
+/// Create a writing idea from a news article
+/// 
+/// Converts a news article into an idea, linking them together.
+/// Uses a transaction to ensure atomicity.
+#[instrument(skip(state), fields(article_id = input.article_id))]
 pub async fn create_idea_for_article_handler(
     input: CreateIdeaForArticleInput,
     state: &State<'_, AppState>,
 ) -> AppResult<IdeaDto> {
+    info!("Creating idea from news article");
+    // Use transaction to ensure both operations succeed or both fail
+    let txn = state.db.begin().await?;
+
     let article = news_articles::Entity::find_by_id(input.article_id)
-        .one(&state.db)
+        .one(&txn)
         .await?
         .ok_or_else(|| AppError::other(format!("Article not found: {}", input.article_id)))?;
 
     let tags = parse_tags(&article.tags);
 
-    let idea = create_idea_handler(
+    // Create idea within transaction
+    let idea = create_idea_with_conn(
         CreateIdeaInput {
             title: article.title.clone(),
             summary: article.excerpt.clone().or(article.content.clone()),
@@ -322,13 +353,17 @@ pub async fn create_idea_for_article_handler(
             priority: Some(0),
             is_pinned: Some(article.is_pinned != 0),
         },
-        state,
+        &txn,
     )
     .await?;
 
-    let mut article_model: news_articles::ActiveModel = article.into();
+    // Update article within same transaction
+    let mut article_model = article.into_active_model();
     article_model.added_to_ideas_at = Set(Some(Utc::now()));
-    let _ = article_model.update(&state.db).await?;
+    article_model.update(&txn).await?;
+
+    // Commit transaction - both operations succeed together
+    txn.commit().await?;
 
     Ok(idea)
 }

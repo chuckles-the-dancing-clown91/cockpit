@@ -14,12 +14,11 @@ use crate::news_settings::{self, Entity as EntityNewsSettings};
 use crate::news_sources::{self, Entity as EntityNewsSources};
 use crate::scheduler::TaskRunResult;
 use chrono::Datelike;
-use reqwest::Client;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set,
+    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set,
 };
-use tracing::{error, info, warn};
+use tracing::{error, info, warn, instrument};
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -163,13 +162,75 @@ struct NewsSourceApiItem {
 
 pub(crate) fn parse_vec(json: &Option<String>) -> Vec<String> {
     json.as_ref()
-        .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
+        .and_then(|s| match serde_json::from_str::<Vec<String>>(s) {
+            Ok(vec) => Some(vec),
+            Err(e) => {
+                warn!(target: "news", "Failed to parse JSON vector: {}", e);
+                None
+            }
+        })
         .unwrap_or_default()
 }
 
 fn to_json_vec(v: &Option<Vec<String>>) -> Option<String> {
     v.as_ref()
         .map(|vec| serde_json::to_string(vec).unwrap_or_else(|_| "[]".into()))
+}
+
+/// Retry an HTTP request with exponential backoff
+/// 
+/// Retries up to 3 times with delays of 1s, 2s, 4s
+/// Handles transient network errors and rate limits (429)
+async fn retry_request<F, Fut>(mut f: F) -> Result<reqwest::Response, reqwest::Error>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<reqwest::Response, reqwest::Error>>,
+{
+    let max_retries = 3;
+    let mut attempt = 0;
+    
+    loop {
+        match f().await {
+            Ok(resp) => {
+                // Check for rate limiting
+                if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
+                    if attempt >= max_retries {
+                        warn!(target: "news", "Rate limited after {} retries", max_retries);
+                        return Ok(resp);
+                    }
+                    
+                    // Check Retry-After header
+                    let delay = if let Some(retry_after) = resp.headers().get("retry-after") {
+                        retry_after
+                            .to_str()
+                            .ok()
+                            .and_then(|s| s.parse::<u64>().ok())
+                            .unwrap_or(1u64 << attempt)
+                    } else {
+                        1u64 << attempt // Exponential backoff: 1s, 2s, 4s
+                    };
+                    
+                    warn!(target: "news", "Rate limited, retrying in {}s (attempt {}/{})", delay, attempt + 1, max_retries);
+                    tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
+                    attempt += 1;
+                    continue;
+                }
+                
+                return Ok(resp);
+            }
+            Err(e) => {
+                // Only retry on transient errors
+                if attempt >= max_retries || !e.is_timeout() && !e.is_connect() {
+                    return Err(e);
+                }
+                
+                let delay = 1u64 << attempt; // Exponential backoff
+                warn!(target: "news", "Request failed: {}, retrying in {}s (attempt {}/{})", e, delay, attempt + 1, max_retries);
+                tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
+                attempt += 1;
+            }
+        }
+    }
 }
 
 fn env_news_api_key() -> Option<String> {
@@ -236,6 +297,11 @@ fn ensure_news_settings_defaults(
     }
 }
 
+/// Get news settings for the current user
+/// 
+/// Fetches settings with decrypted API key status.
+/// Creates default settings if none exist.
+#[instrument(skip(state))]
 pub async fn get_news_settings_handler(state: &crate::AppState) -> AppResult<NewsSettingsDto> {
     let model = EntityNewsSettings::find()
         .filter(news_settings::Column::UserId.eq(1))
@@ -267,7 +333,7 @@ pub async fn get_news_settings_handler(state: &crate::AppState) -> AppResult<New
                     operation: "encrypt_api_key".to_string(),
                     reason: e.to_string(),
                 })?;
-            let mut active: news_settings::ActiveModel = existing.clone().into();
+            let mut active = existing.clone().into_active_model();
             active.api_key_encrypted = sea_orm::Set(cipher);
             active.updated_at = sea_orm::Set(chrono::Utc::now());
             existing = active.update(&state.db).await?;
@@ -377,6 +443,11 @@ fn article_to_dto(m: news_articles::Model) -> NewsArticleDto {
     }
 }
 
+/// List news articles with filtering, search, and pagination
+/// 
+/// Supports filtering by read status, dismissal, search text.
+/// Returns articles sorted by published date (newest first).
+#[instrument(skip(state), fields(limit = ?limit, offset = ?offset))]
 pub async fn list_news_articles_handler(
     status: Option<String>,
     limit: Option<u64>,
@@ -439,7 +510,7 @@ pub async fn dismiss_news_article_handler(id: i64, state: &crate::AppState) -> A
     let Some(m) = model else {
         return Err(AppError::other("Not found"));
     };
-    let mut active: news_articles::ActiveModel = m.into();
+    let mut active = m.into_active_model();
     active.dismissed_at = sea_orm::Set(Some(chrono::Utc::now()));
     active.is_dismissed = sea_orm::Set(1);
     active.updated_at = sea_orm::Set(chrono::Utc::now());
@@ -456,7 +527,7 @@ pub async fn toggle_star_news_article_handler(
     let Some(m) = model else {
         return Err(AppError::other("Not found"));
     };
-    let mut active: news_articles::ActiveModel = m.into();
+    let mut active = m.into_active_model();
     active.is_starred = sea_orm::Set(if starred { 1 } else { 0 });
     active.updated_at = sea_orm::Set(chrono::Utc::now());
     active.update(&state.db).await?;
@@ -471,7 +542,7 @@ pub async fn mark_news_article_read_handler(id: i64, state: &crate::AppState) ->
     if m.is_read == 1 {
         return Ok(());
     }
-    let mut active: news_articles::ActiveModel = m.into();
+    let mut active = m.into_active_model();
     active.is_read = sea_orm::Set(1);
     active.updated_at = sea_orm::Set(chrono::Utc::now());
     active.update(&state.db).await?;
@@ -560,8 +631,13 @@ pub async fn sync_news_sources_now_handler(
     })
 }
 
+/// Scheduled task: Fetch latest news articles from NewsData.io API
+/// 
+/// Runs periodically to sync new articles based on user settings.
+/// Respects daily API call quotas and handles rate limiting.
+#[instrument(skip(state))]
 pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
-    let client = Client::new();
+    let client = &state.http_client;
     let provider = "newsdata".to_string();
     let maybe_settings = EntityNewsSettings::find()
         .filter(news_settings::Column::UserId.eq(1))
@@ -627,7 +703,7 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
                     }
                 }
             };
-            let mut active: news_settings::ActiveModel = settings.clone().into();
+            let mut active = settings.clone().into_active_model();
             active.api_key_encrypted = sea_orm::Set(cipher);
             active.updated_at = sea_orm::Set(chrono::Utc::now());
             settings = match active.update(&state.db).await {
@@ -734,13 +810,14 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
             req = req.query(&[("page", page.as_str())]);
         }
 
-        let resp = match req.send().await {
+        // Use retry logic for transient errors and rate limits
+        let resp = match retry_request(|| req.try_clone().unwrap().send()).await {
             Ok(r) => r,
             Err(e) => {
                 return TaskRunResult {
                     status: "error",
                     result_json: None,
-                    error_message: Some(e.to_string()),
+                    error_message: Some(format!("HTTP request failed after retries: {}", e)),
                 }
             }
         };
@@ -779,24 +856,45 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
         );
         calls_used += 1;
         if let Some(res_list) = body.results {
+            // Batch fetch existing articles to avoid N+1 queries
+            let urls: Vec<String> = res_list
+                .iter()
+                .filter_map(|art| art.link.clone())
+                .collect();
+            
+            let existing_articles = if !urls.is_empty() {
+                match EntityNewsArticles::find()
+                    .filter(news_articles::Column::UserId.eq(1))
+                    .filter(news_articles::Column::Provider.eq(provider.clone()))
+                    .filter(news_articles::Column::Url.is_in(urls))
+                    .all(&state.db)
+                    .await
+                {
+                    Ok(articles) => articles,
+                    Err(e) => {
+                        error!(target: "news_sync", "Failed to fetch existing articles: {}", e);
+                        vec![]
+                    }
+                }
+            } else {
+                vec![]
+            };
+            
+            // Create lookup map for O(1) access
+            let existing_map: std::collections::HashMap<String, news_articles::Model> = 
+                existing_articles
+                    .into_iter()
+                    .filter_map(|m| m.url.clone().map(|url| (url, m)))
+                    .collect();
+            
             for art in res_list {
                 let title = match art.title {
                     Some(t) if !t.trim().is_empty() => t,
                     _ => continue,
                 };
                 let url = art.link.clone();
-                let existing = if let Some(u) = &url {
-                    EntityNewsArticles::find()
-                        .filter(news_articles::Column::UserId.eq(1))
-                        .filter(news_articles::Column::Provider.eq(provider.clone()))
-                        .filter(news_articles::Column::Url.eq(u.clone()))
-                        .one(&state.db)
-                        .await
-                        .ok()
-                        .flatten()
-                } else {
-                    None
-                };
+                let existing = url.as_ref().and_then(|u| existing_map.get(u));
+                
                 let tags_vec = match art.category {
                     Some(StringOrVec::String(s)) => vec![s],
                     Some(StringOrVec::Vec(v)) => v,
@@ -815,8 +913,8 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
                     .and_then(|d| chrono::DateTime::parse_from_rfc3339(d).ok())
                     .map(|dt| dt.with_timezone(&chrono::Utc));
 
-                if let Some(existing) = existing {
-                    let mut active: news_articles::ActiveModel = existing.into();
+                if let Some(existing) = existing.cloned() {
+                    let mut active = existing.into_active_model();
                     active.title = Set(title.clone());
                     active.excerpt = Set(art.description.clone());
                     active.content = Set(art.content.clone());
@@ -829,7 +927,7 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
                     active.published_at = Set(published_at);
                     active.updated_at = Set(chrono::Utc::now());
                     if let Err(e) = active.update(&state.db).await {
-                        eprintln!("[news_sync] update failed: {e}");
+                        error!(target: "news_sync", "Article update failed: {}", e);
                     } else {
                         updated += 1;
                     }
@@ -863,7 +961,7 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
                         ..Default::default()
                     };
                     if let Err(e) = active.insert(&state.db).await {
-                        eprintln!("[news_sync] insert failed: {e}");
+                        error!(target: "news_sync", "Article insert failed: {}", e);
                     } else {
                         inserted += 1;
                     }
@@ -887,7 +985,7 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
     {
         if total as i64 > max_keep {
             let to_delete = total as i64 - max_keep;
-            let ids = EntityNewsArticles::find()
+            let ids: Vec<i32> = EntityNewsArticles::find()
                 .filter(news_articles::Column::UserId.eq(1))
                 .filter(news_articles::Column::IsPinned.eq(0))
                 .filter(news_articles::Column::IsStarred.eq(0))
@@ -897,27 +995,32 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
                 .order_by_asc(news_articles::Column::PublishedAt)
                 .order_by_asc(news_articles::Column::FetchedAt)
                 .limit(to_delete as u64)
+                .select_only()
+                .column(news_articles::Column::Id)
+                .into_tuple()
                 .all(&state.db)
                 .await
-                .unwrap_or_default()
-                .into_iter()
-                .map(|m| m.id)
-                .collect::<Vec<_>>();
+                .unwrap_or_default();
             if !ids.is_empty() {
-                let _ = EntityNewsArticles::delete_many()
+                if let Err(e) = EntityNewsArticles::delete_many()
                     .filter(news_articles::Column::Id.is_in(ids))
                     .exec(&state.db)
-                    .await;
+                    .await
+                {
+                    error!(target: "news_sync", "Failed to delete old articles: {}", e);
+                }
             }
         }
     }
 
-    let mut active: news_settings::ActiveModel = settings.into();
+    let mut active = settings.into_active_model();
     active.calls_today = Set(calls_today + calls_used);
     active.last_reset_date = Set(last_reset);
     active.last_synced_at = Set(Some(chrono::Utc::now()));
     active.updated_at = Set(chrono::Utc::now());
-    let _ = active.update(&state.db).await;
+    if let Err(e) = active.update(&state.db).await {
+        error!(target: "news_sync", "Failed to update news settings: {}", e);
+    }
 
     TaskRunResult {
         status: "success",
@@ -930,7 +1033,7 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
 }
 
 pub async fn run_news_sources_sync_task(state: &crate::AppState) -> TaskRunResult {
-    let client = Client::new();
+    let client = &state.http_client;
     let settings = EntityNewsSettings::find()
         .filter(news_settings::Column::UserId.eq(1))
         .filter(news_settings::Column::Provider.eq("newsdata"))
@@ -992,13 +1095,14 @@ pub async fn run_news_sources_sync_task(state: &crate::AppState) -> TaskRunResul
             req = req.query(&[("page", next.as_str())]);
         }
 
-        let resp = match req.send().await {
+        // Use retry logic for transient errors and rate limits
+        let resp = match retry_request(|| req.try_clone().unwrap().send()).await {
             Ok(r) => r,
             Err(e) => {
                 return TaskRunResult {
                     status: "error",
                     result_json: None,
-                    error_message: Some(e.to_string()),
+                    error_message: Some(format!("HTTP request failed after retries: {}", e)),
                 }
             }
         };
@@ -1075,7 +1179,7 @@ pub async fn run_news_sources_sync_task(state: &crate::AppState) -> TaskRunResul
                     .ok()
                     .flatten();
                 if let Some(existing) = existing {
-                    let mut active: news_sources::ActiveModel = existing.into();
+                    let mut active = existing.into_active_model();
                     active.name = Set(item.name.clone());
                     active.url = Set(item.url.clone());
                     active.country = Set(country.clone());

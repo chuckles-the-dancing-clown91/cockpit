@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import MDEditor from '@uiw/react-md-editor';
+import MDEditor from '../vendor/MDEditor';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Card } from '../components/ui/Card';
@@ -169,7 +169,7 @@ export function WritingView() {
   };
 
   return (
-    <div className="grid grid-cols-[320px_1fr_420px] gap-3 p-3 h-full min-h-0">
+    <div className="grid grid-cols-[320px_1fr_420px] gap-2 p-2 h-full min-h-0">
       <Card className="flex flex-col gap-3 overflow-hidden h-full min-h-0">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Ideas</h3>
@@ -228,14 +228,12 @@ export function WritingView() {
         </ScrollArea>
       </Card>
 
-      <div className="flex flex-col gap-3 h-full min-h-0" data-color-mode={theme === 'light' ? 'light' : 'dark'}>
-        <Card className="flex flex-col gap-3 overflow-hidden flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Composer</h3>
-            <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
-              <span>Status: {statusLabel(metadata.status)}</span>
-              <span>• Priority: {priorityLabel(metadata.priority)}</span>
-            </div>
+      <div className="flex flex-col gap-1.5 h-full min-h-0" data-color-mode={theme === 'light' ? 'light' : 'dark'}>
+        <Card className="flex items-center justify-between p-2 flex-shrink-0">
+          <h3 className="text-base font-semibold">Composer</h3>
+          <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+            <span>Status: {statusLabel(metadata.status)}</span>
+            <span>• Priority: {priorityLabel(metadata.priority)}</span>
           </div>
         </Card>
         <div className="flex-shrink-0">
@@ -245,12 +243,8 @@ export function WritingView() {
           <MDEditor
             value={articleContent}
             onChange={(val = '') => setArticleContent(val)}
-            height="100%"
             preview="live"
             hideToolbar={false}
-            enableScroll={true}
-            visibleDragbar={false}
-            highlightEnable={true}
           />
         </div>
       </div>
@@ -327,16 +321,14 @@ export function WritingView() {
             <h3 className="text-lg font-semibold">Notes</h3>
             <span className="text-xs text-[var(--color-text-muted)]">Autosaves while you type</span>
           </Card>
-          <MDEditor
-            value={notesContent}
-            onChange={(val = '') => setNotesContent(val)}
-            height={200}
-            preview="edit"
-            hideToolbar={false}
-            enableScroll={true}
-            visibleDragbar={false}
-            highlightEnable={true}
-          />
+          <div className="h-[200px]">
+            <MDEditor
+              value={notesContent}
+              onChange={(val = '') => setNotesContent(val)}
+              preview="edit"
+              hideToolbar={false}
+            />
+          </div>
         </div>
 
         <Card className="flex flex-col gap-3 overflow-hidden">

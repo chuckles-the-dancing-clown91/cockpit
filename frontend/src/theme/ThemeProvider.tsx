@@ -1,33 +1,70 @@
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 
 type ThemeId = 'dark' | 'cyberpunk' | 'light';
 
 type ThemeContextValue = {
   theme: ThemeId;
   setTheme: (next: ThemeId) => void;
+  isLoading: boolean;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-function getInitialTheme(): ThemeId {
-  if (typeof window === 'undefined') return 'dark';
-  const stored = window.localStorage.getItem('cockpit-theme');
-  if (stored === 'dark' || stored === 'cyberpunk' || stored === 'light') return stored;
-  return 'dark';
+interface AppSettings {
+  [category: string]: {
+    [key: string]: {
+      value: string | number | boolean;
+      description: string;
+    };
+  };
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<ThemeId>(getInitialTheme);
+  const [theme, setThemeState] = useState<ThemeId>('dark');
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Load initial theme from database
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem('cockpit-theme', theme);
+    const loadTheme = async () => {
+      try {
+        const settings = await invoke<AppSettings>('get_app_settings');
+        const dbTheme = settings?.appearance?.['app.theme']?.value as string;
+        if (dbTheme === 'dark' || dbTheme === 'cyberpunk' || dbTheme === 'light') {
+          setThemeState(dbTheme);
+        }
+      } catch (error) {
+        console.error('Failed to load theme from database:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadTheme();
+  }, []);
+
+  // Apply theme to DOM
+  useEffect(() => {
     const root = document.documentElement;
     root.classList.remove('theme-dark', 'theme-cyberpunk', 'theme-light');
     root.classList.add(`theme-${theme}`);
   }, [theme]);
 
-  const value = useMemo(() => ({ theme, setTheme }), [theme]);
+  // Wrapper to update both state and database
+  const setTheme = async (next: ThemeId) => {
+    setThemeState(next);
+    try {
+      await invoke('update_setting', {
+        input: {
+          key: 'app.theme',
+          value: next,
+        },
+      });
+    } catch (error) {
+      console.error('Failed to save theme to database:', error);
+    }
+  };
+
+  const value = useMemo(() => ({ theme, setTheme, isLoading }), [theme, isLoading]);
 
   return (
     <ThemeContext.Provider value={value}>
@@ -41,5 +78,7 @@ export function useTheme() {
   if (!ctx) throw new Error('useTheme must be used within ThemeProvider');
   return ctx;
 }
+
+export type { ThemeId };
 
 export type { ThemeId };

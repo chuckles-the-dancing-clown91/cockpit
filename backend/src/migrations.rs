@@ -29,6 +29,18 @@ pub fn all_migrations() -> Vec<Migration> {
             up: include_str!("../migrations/001_initial_schema_up.sql"),
             down: include_str!("../migrations/001_initial_schema_down.sql"),
         },
+        Migration {
+            version: 2,
+            name: "app_settings",
+            up: include_str!("../migrations/002_app_settings_up.sql"),
+            down: include_str!("../migrations/002_app_settings_down.sql"),
+        },
+        Migration {
+            version: 3,
+            name: "performance_indexes",
+            up: include_str!("../migrations/003_performance_indexes_up.sql"),
+            down: include_str!("../migrations/003_performance_indexes_down.sql"),
+        },
     ]
 }
 
@@ -103,13 +115,10 @@ pub async fn run_migrations(db: &DatabaseConnection) -> AppResult<()> {
         }
         
         // Record migration
-        let record_sql = format!(
-            "INSERT INTO _migrations (version, name) VALUES ({}, '{}')",
-            migration.version, migration.name
-        );
-        db.execute(Statement::from_string(
+        db.execute(Statement::from_sql_and_values(
             db.get_database_backend(),
-            record_sql,
+            "INSERT INTO _migrations (version, name) VALUES (?, ?)",
+            vec![migration.version.into(), migration.name.into()],
         ))
         .await?;
         
@@ -137,7 +146,8 @@ pub async fn rollback_last_migration(db: &DatabaseConnection) -> AppResult<()> {
         return Ok(());
     }
     
-    let max_version = *applied.keys().max().unwrap();
+    let max_version = *applied.keys().max()
+        .ok_or_else(|| AppError::other("No migrations found"))?;
     let migrations = all_migrations();
     let migration = migrations
         .iter()
