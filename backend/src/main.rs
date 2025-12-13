@@ -20,7 +20,8 @@ use reqwest::Client;
 use core::commands::{
     get_app_settings, update_setting, update_settings,
     get_storage_statistics, create_database_backup, restore_database_from_backup, list_database_backups,
-    delete_database_backup, export_database, import_database,
+    delete_database_backup, export_database, import_database, cleanup_logs, cleanup_news,
+    get_application_logs, get_application_log_stats, export_application_logs, clear_application_logs,
 };
 use writing::commands::{
     list_ideas, get_idea, create_idea, create_idea_for_article,
@@ -128,6 +129,12 @@ fn main() {
             delete_database_backup,
             export_database,
             import_database,
+            cleanup_logs,
+            cleanup_news,
+            get_application_logs,
+            get_application_log_stats,
+            export_application_logs,
+            clear_application_logs,
             get_news_settings,
             save_news_settings,
             list_news_articles,

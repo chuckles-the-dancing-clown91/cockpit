@@ -125,12 +125,131 @@ Wire up all System mode views to Tauri backend:
 ### ⏳ Phase 15: Production Readiness (Q1 2026)
 **Status**: Not Started
 
+#### First-Run Experience
+- **Directory initialization**: Create `~/.cockpit/` on first launch
+  - `~/.cockpit/data/` - Database and user data
+  - `~/.cockpit/logs/` - Application logs
+  - `~/.cockpit/cache/` - Temporary cache files
+  - `~/.cockpit/backups/` - Database backups
+  - `~/.cockpit/exports/` - Exported data
+- **Configuration wizard**: Guide user through initial setup
+  - API key input (NewsData, etc.)
+  - Generate secure master key
+  - Configure storage limits
+  - Set logging preferences
+- **Default settings**: Populate sensible defaults
+- **Migration path**: Import existing data from dev installation
+
+#### Distribution & Updates
 - Installation wizard
 - Auto-update mechanism
-- Error reporting/telemetry
+- Platform-specific installers (AppImage, .deb, .dmg, .exe)
+- Sandboxed permissions for system access
+
+#### Monitoring & Quality
+- Error reporting/telemetry (opt-in)
 - Performance monitoring
+- Crash reporting
 - Security audit
 - Documentation completion
+
+---
+
+### ⏳ Phase 16: Modular Component Architecture (Q1-Q2 2026)
+**Status**: Planning Phase
+**Goal**: True drop-in component system for maximum modularity
+
+#### Phase 1: File-Level Refactoring (December 2025) 🔴
+**Current**: Split large monolithic files into focused modules
+
+**Targets**:
+- `core/components/storage.rs` (1467 lines) → 5 modules (stats, backup, cleanup, logs, export)
+- `research/components/feed.rs` (~1200 lines) → 3 modules (sync, fetch, parser)
+- Apply pattern across all domains
+
+**Structure**:
+```
+domain/components/feature/
+├── mod.rs           # Public API + re-exports
+├── types.rs         # Structs, enums
+├── queries.rs       # Read operations
+└── mutations.rs     # Write operations
+```
+
+#### Phase 2: Component Trait Foundation (January 2026)
+**Goal**: Create plugin interface alongside existing code (coexist, don't replace)
+
+**New Infrastructure**:
+```
+core/component/
+├── mod.rs           # DomainComponent trait
+├── registry.rs      # Component registration system
+├── migration.rs     # Component-based DB migrations
+├── settings.rs      # Component settings schema
+├── command.rs       # Auto-command registration
+└── task.rs          # Auto-task scheduling
+```
+
+**Component Interface**:
+```rust
+pub trait DomainComponent: Send + Sync {
+    fn info(&self) -> ComponentInfo;
+    fn migrations(&self) -> Vec<Migration>;
+    fn settings_schema(&self) -> Option<SettingsSchema>;
+    fn commands(&self) -> Vec<Command>;
+    fn tasks(&self) -> Vec<ScheduledTask>;
+    async fn initialize(&self, state: &AppState) -> Result<()>;
+}
+```
+
+#### Phase 3: Domain Migration (February-March 2026)
+**Goal**: Migrate existing domains to new plugin system one-by-one
+
+**Migration Order**:
+1. **util** (smallest, easiest test case)
+2. **system** (scheduler already isolated)
+3. **writing** (simple domain, clear boundaries)
+4. **research** (most complex, do last)
+
+#### Phase 4: Plugin Developer Experience (Q2 2026)
+**Goal**: Make adding new components trivial
+
+**One-Line Registration**:
+```rust
+// main.rs
+let registry = ComponentRegistry::new()
+    .register(CoreComponent)
+    .register(WritingComponent)
+    .register(ResearchComponent)  // <-- Drop in new component
+    .register(SystemComponent);
+
+// Auto-wires:
+// ✅ Database migrations
+// ✅ Settings schema
+// ✅ Tauri commands
+// ✅ Scheduled tasks
+// ✅ Logging context
+```
+
+**Component Structure**:
+```
+my_component/
+├── Cargo.toml           # Standalone crate
+├── src/
+│   ├── lib.rs           # Implements DomainComponent
+│   ├── commands.rs      # Tauri command handlers
+│   ├── models/          # Database models
+│   └── migrations/      # SQL migration files
+└── settings.toml        # Settings schema definition
+```
+
+**Benefits**:
+- ✅ **True modularity**: Add/remove features without touching core
+- ✅ **Parallel development**: Teams work on separate components
+- ✅ **Testable**: Components isolated, easy to unit test
+- ✅ **Marketplace potential**: Community-contributed components
+- ✅ **Django-like migrations**: Auto-detection, auto-numbering (future)
+- ✅ **Hot reload**: Swap components without restart (future)
 
 ---
 
@@ -156,7 +275,9 @@ Wire up all System mode views to Tauri backend:
 - Mobile apps (iOS/Android via Tauri Mobile)
 
 ### 2027: Advanced Features
-- Plugin/extension system
+- **Plugin marketplace**: Community-contributed components via modular architecture
+- **Django-like migrations**: Auto-detect model changes, generate migration files
+- **Component hot-reload**: Swap plugins without restart
 - Command palette (⌘K)
 - Global search
 - Multi-window support

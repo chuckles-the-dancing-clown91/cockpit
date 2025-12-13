@@ -7,8 +7,10 @@ use crate::AppState;
 use super::components::settings::{get_app_settings_handler, update_setting_handler, update_settings_handler, AppSettingsDto, UpdateSettingInput};
 use super::components::storage::{
     get_storage_stats, backup_database, restore_database, list_backups, delete_backup,
-    export_data, import_data,
-    StorageStats, BackupInfo, ExportInfo, ImportSummary
+    export_data, import_data, cleanup_old_logs, cleanup_old_news,
+    get_logs, get_log_stats, export_logs, clear_logs,
+    StorageStats, BackupInfo, ExportInfo, ImportSummary, CleanupSummary,
+    LogEntry, LogStats
 };
 
 /// Get all application settings grouped by category
@@ -105,5 +107,70 @@ pub async fn import_database(
 ) -> Result<ImportSummary, String> {
     import_data(&state.db, &import_path)
         .await
+        .map_err(|e| e.to_string())
+}
+
+/// Clean up old log files
+#[tauri::command]
+pub fn cleanup_logs(
+    retention_days: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<CleanupSummary, String> {
+    cleanup_old_logs(&state.config.storage, retention_days)
+        .map_err(|e| e.to_string())
+}
+
+/// Clean up old dismissed news articles
+#[tauri::command]
+pub async fn cleanup_news(
+    retention_days: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<CleanupSummary, String> {
+    cleanup_old_news(&state.db, retention_days)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ============================================================================
+// Log Management Commands
+// ============================================================================
+
+/// Get logs with optional filtering
+#[tauri::command]
+pub fn get_application_logs(
+    level_filter: Option<String>,
+    limit: Option<usize>,
+    offset: Option<usize>,
+    state: State<'_, AppState>,
+) -> Result<Vec<LogEntry>, String> {
+    get_logs(&state.config.storage, level_filter, limit, offset)
+        .map_err(|e| e.to_string())
+}
+
+/// Get log statistics
+#[tauri::command]
+pub fn get_application_log_stats(
+    state: State<'_, AppState>,
+) -> Result<LogStats, String> {
+    get_log_stats(&state.config.storage)
+        .map_err(|e| e.to_string())
+}
+
+/// Export logs to a file
+#[tauri::command]
+pub fn export_application_logs(
+    level_filter: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    export_logs(&state.config.storage, level_filter)
+        .map_err(|e| e.to_string())
+}
+
+/// Clear all log files
+#[tauri::command]
+pub fn clear_application_logs(
+    state: State<'_, AppState>,
+) -> Result<CleanupSummary, String> {
+    clear_logs(&state.config.storage, None)
         .map_err(|e| e.to_string())
 }

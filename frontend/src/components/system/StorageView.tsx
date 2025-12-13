@@ -7,7 +7,7 @@ import { ScrollArea } from '../ui/ScrollArea';
 import { Separator } from '../ui/Separator';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useStorageStats, useListBackups, useCreateBackup, useRestoreBackup, useDeleteBackup, useExportData, useImportData } from '../../hooks/queries';
+import { useStorageStats, useListBackups, useCreateBackup, useRestoreBackup, useDeleteBackup, useExportData, useImportData, useCleanupLogs, useCleanupNews } from '../../hooks/queries';
 
 export default function StorageView() {
   const { data: stats, isLoading: statsLoading, error: statsError } = useStorageStats();
@@ -17,6 +17,8 @@ export default function StorageView() {
   const deleteBackup = useDeleteBackup();
   const exportData = useExportData();
   const importData = useImportData();
+  const cleanupLogs = useCleanupLogs();
+  const cleanupNews = useCleanupNews();
   
   const [exportDateRange, setExportDateRange] = useState({ start: '', end: '' });
   const [cleanupDays, setCleanupDays] = useState(90);
@@ -75,15 +77,42 @@ export default function StorageView() {
     }
   };
 
-  const handleCleanup = async () => {
-    if (!confirm(`Delete all data older than ${cleanupDays} days? This cannot be undone.`)) {
+  const handleCleanupLogs = async () => {
+    if (!confirm(`Delete log files older than ${cleanupDays} days? This cannot be undone.`)) {
       return;
     }
     setIsCleaningUp(true);
-    // TODO: Call backend to cleanup old data
-    console.log(`Cleaning up data older than ${cleanupDays} days`);
-    // invoke('cleanup_old_data', { days: cleanupDays })
-    setTimeout(() => setIsCleaningUp(false), 2000);
+    try {
+      const result = await cleanupLogs.mutateAsync(cleanupDays);
+      toast.success('Logs cleaned up', {
+        description: `Deleted ${result.filesDeleted} files, freed ${(result.spaceFreedBytes / (1024 * 1024)).toFixed(2)} MB`,
+      });
+    } catch (error) {
+      toast.error('Failed to cleanup logs', {
+        description: String(error),
+      });
+    } finally {
+      setIsCleaningUp(false);
+    }
+  };
+
+  const handleCleanupNews = async () => {
+    if (!confirm(`Delete dismissed news articles older than ${cleanupDays} days? This cannot be undone.`)) {
+      return;
+    }
+    setIsCleaningUp(true);
+    try {
+      const result = await cleanupNews.mutateAsync(cleanupDays);
+      toast.success('Dismissed articles cleaned up', {
+        description: `Deleted ${result.filesDeleted} articles`,
+      });
+    } catch (error) {
+      toast.error('Failed to cleanup news', {
+        description: String(error),
+      });
+    } finally {
+      setIsCleaningUp(false);
+    }
   };
 
   const handleCreateBackup = async () => {
@@ -438,21 +467,33 @@ export default function StorageView() {
                   <div className="flex-1">
                     <div className="font-semibold text-orange-500">Warning: Permanent Action</div>
                     <p className="text-sm text-muted-foreground mt-1">
-                      This will permanently delete articles, archived content, and task run history 
+                      This will permanently delete log files and dismissed news articles
                       older than {cleanupDays} days. This action cannot be undone.
                     </p>
                   </div>
                 </div>
               </div>
 
-              <Button 
-                onClick={handleCleanup}
-                disabled={isCleaningUp}
-                variant="outline"
-                className="w-full border-orange-500 text-orange-500 hover:bg-orange-500/10"
-              >
-                {isCleaningUp ? 'Cleaning up...' : '🗑️ Run Cleanup'}
-              </Button>
+              <div className="flex gap-3">
+                <Button 
+                  onClick={handleCleanupLogs}
+                  disabled={isCleaningUp}
+                  variant="outline"
+                  className="flex-1 border-orange-500 text-orange-500 hover:bg-orange-500/10"
+                >
+                  {isCleaningUp ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  📄 Clean Logs
+                </Button>
+                <Button 
+                  onClick={handleCleanupNews}
+                  disabled={isCleaningUp}
+                  variant="outline"
+                  className="flex-1 border-orange-500 text-orange-500 hover:bg-orange-500/10"
+                >
+                  {isCleaningUp ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  📰 Clean News
+                </Button>
+              </div>
             </div>
           </Card>
 

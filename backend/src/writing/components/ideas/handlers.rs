@@ -1,225 +1,22 @@
-//! Ideas management system for writing and content creation
+//! CRUD handlers for writing ideas
 //!
-//! This module handles CRUD operations for ideas/articles:
-//! - Creating ideas from scratch or from news articles
-//! - Managing idea metadata (status, priority, tags)
-//! - Editing article content and notes
-//! - Archiving completed ideas
+//! Provides functions for creating, reading, updating, and archiving ideas.
+//! All handlers accept AppState and return AppResult<T>.
 
+use super::types::*;
 use crate::core::components::errors::{AppError, AppResult};
 use crate::research::components::articles as news_articles;
 use crate::AppState;
 use chrono::Utc;
-use sea_orm::entity::prelude::*;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, Condition, EntityTrait, IntoActiveModel, QueryFilter,
-    QueryOrder, QuerySelect, Set, TransactionTrait, ConnectionTrait,
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, IntoActiveModel,
+    QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
 };
-use serde::{Deserialize, Serialize};
 use tauri::State;
-use tracing::{instrument, info};
-
-#[derive(Clone, Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
-#[sea_orm(rs_type = "String", db_type = "String(StringLen::N(32))")]
-pub enum IdeaStatus {
-    #[sea_orm(string_value = "in_progress")]
-    InProgress,
-    #[sea_orm(string_value = "stalled")]
-    Stalled,
-    #[sea_orm(string_value = "complete")]
-    Complete,
-}
-
-impl IdeaStatus {
-    pub fn as_str(&self) -> &str {
-        match self {
-            IdeaStatus::InProgress => "in_progress",
-            IdeaStatus::Stalled => "stalled",
-            IdeaStatus::Complete => "complete",
-        }
-    }
-
-    pub fn from_str(value: &str) -> AppResult<Self> {
-        match value {
-            "in_progress" => Ok(IdeaStatus::InProgress),
-            "stalled" => Ok(IdeaStatus::Stalled),
-            "complete" => Ok(IdeaStatus::Complete),
-            _ => Err(AppError::other(format!("Invalid idea status: {value}"))),
-        }
-    }
-}
-
-impl std::fmt::Display for IdeaStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "ideas")]
-pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: i64,
-    pub title: String,
-    pub summary: Option<String>,
-    pub status: IdeaStatus,
-    pub news_article_id: Option<i64>,
-    pub target: Option<String>,
-    pub tags: Option<String>,
-    pub notes_markdown: Option<String>,
-    pub article_title: Option<String>,
-    pub article_markdown: Option<String>,
-    pub date_added: DateTimeUtc,
-    pub date_updated: DateTimeUtc,
-    pub date_completed: Option<DateTimeUtc>,
-    pub date_removed: Option<DateTimeUtc>,
-    pub priority: i32,
-    pub is_pinned: i32,
-}
-
-#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {
-    #[sea_orm(
-        belongs_to = "news_articles::Entity",
-        from = "Column::NewsArticleId",
-        to = "news_articles::Column::Id",
-        on_delete = "SetNull"
-    )]
-    NewsArticle,
-}
-
-impl Related<news_articles::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::NewsArticle.def()
-    }
-}
-
-impl ActiveModelBehavior for ActiveModel {}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct IdeaDto {
-    pub id: i64,
-    pub title: String,
-    pub summary: Option<String>,
-    pub status: String,
-    pub news_article_id: Option<i64>,
-    pub target: Option<String>,
-    pub tags: Vec<String>,
-    pub notes_markdown: Option<String>,
-    pub article_title: Option<String>,
-    pub article_markdown: Option<String>,
-    pub date_added: Option<String>,
-    pub date_updated: Option<String>,
-    pub date_completed: Option<String>,
-    pub date_removed: Option<String>,
-    pub priority: i32,
-    pub is_pinned: bool,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateIdeaInput {
-    pub title: String,
-    pub summary: Option<String>,
-    pub status: Option<String>,
-    pub news_article_id: Option<i64>,
-    pub target: Option<String>,
-    pub tags: Option<Vec<String>>,
-    pub notes_markdown: Option<String>,
-    pub article_title: Option<String>,
-    pub article_markdown: Option<String>,
-    pub priority: Option<i32>,
-    pub is_pinned: Option<bool>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateIdeaForArticleInput {
-    pub article_id: i64,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateIdeaMetadataInput {
-    pub title: Option<String>,
-    pub summary: Option<String>,
-    pub status: Option<String>,
-    pub target: Option<String>,
-    pub tags: Option<Vec<String>>,
-    pub priority: Option<i32>,
-    pub is_pinned: Option<bool>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateIdeaNotesInput {
-    pub notes_markdown: Option<String>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateIdeaArticleInput {
-    pub article_title: Option<String>,
-    pub article_markdown: Option<String>,
-}
-
-pub fn parse_tags(raw: &Option<String>) -> Vec<String> {
-    raw.as_ref()
-        .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
-        .unwrap_or_default()
-}
-
-pub fn tags_to_json(tags: &[String]) -> Option<String> {
-    if tags.is_empty() {
-        None
-    } else {
-        Some(serde_json::to_string(tags).unwrap_or_else(|_| "[]".to_string()))
-    }
-}
-
-pub fn validate_status(status: &str) -> AppResult<IdeaStatus> {
-    IdeaStatus::from_str(status)
-}
-
-fn idea_to_dto(model: Model) -> IdeaDto {
-    IdeaDto {
-        id: model.id,
-        title: model.title,
-        summary: model.summary,
-        status: model.status.as_str().to_string(),
-        news_article_id: model.news_article_id,
-        target: model.target,
-        tags: parse_tags(&model.tags),
-        notes_markdown: model.notes_markdown,
-        article_title: model.article_title,
-        article_markdown: model.article_markdown,
-        date_added: Some(model.date_added.to_rfc3339()),
-        date_updated: Some(model.date_updated.to_rfc3339()),
-        date_completed: model.date_completed.map(|d| d.to_rfc3339()),
-        date_removed: model.date_removed.map(|d| d.to_rfc3339()),
-        priority: model.priority,
-        is_pinned: model.is_pinned != 0,
-    }
-}
-
-fn status_or_default(status: &Option<String>) -> AppResult<IdeaStatus> {
-    match status {
-        Some(status) => validate_status(status),
-        None => Ok(IdeaStatus::InProgress),
-    }
-}
-
-fn bool_to_int(value: Option<bool>) -> i32 {
-    if value.unwrap_or(false) {
-        1
-    } else {
-        0
-    }
-}
+use tracing::{info, instrument};
 
 /// List writing ideas with filtering, search, and pagination
-/// 
+///
 /// Supports filtering by status, text search, and archived status.
 /// Returns ideas sorted by last updated (newest first).
 #[instrument(skip(state), fields(limit = ?limit, offset = ?offset))]
@@ -283,6 +80,7 @@ pub async fn list_ideas_handler(
     Ok(results.into_iter().map(idea_to_dto).collect())
 }
 
+/// Get a single idea by ID with full content
 pub async fn get_idea_handler(id: i64, state: &State<'_, AppState>) -> AppResult<IdeaDto> {
     let model = Entity::find_by_id(id)
         .one(&state.db)
@@ -293,7 +91,7 @@ pub async fn get_idea_handler(id: i64, state: &State<'_, AppState>) -> AppResult
 }
 
 /// Create a new writing idea
-/// 
+///
 /// Creates idea with initial metadata and content.
 /// Uses default status if not provided.
 #[instrument(skip(state, input), fields(title = %input.title))]
@@ -339,7 +137,7 @@ where
 }
 
 /// Create a writing idea from a news article
-/// 
+///
 /// Converts a news article into an idea, linking them together.
 /// Uses a transaction to ensure atomicity.
 #[instrument(skip(state), fields(article_id = input.article_id))]
@@ -388,6 +186,7 @@ pub async fn create_idea_for_article_handler(
     Ok(idea)
 }
 
+/// Update idea metadata (title, status, tags, priority, etc.)
 pub async fn update_idea_metadata_handler(
     id: i64,
     input: UpdateIdeaMetadataInput,
@@ -430,6 +229,7 @@ pub async fn update_idea_metadata_handler(
     Ok(idea_to_dto(updated))
 }
 
+/// Update idea notes markdown content
 pub async fn update_idea_notes_handler(
     id: i64,
     input: UpdateIdeaNotesInput,
@@ -448,6 +248,7 @@ pub async fn update_idea_notes_handler(
     Ok(idea_to_dto(updated))
 }
 
+/// Update idea article content (title and markdown)
 pub async fn update_idea_article_handler(
     id: i64,
     input: UpdateIdeaArticleInput,
@@ -467,6 +268,7 @@ pub async fn update_idea_article_handler(
     Ok(idea_to_dto(updated))
 }
 
+/// Archive an idea (soft delete)
 pub async fn archive_idea_handler(id: i64, state: &State<'_, AppState>) -> AppResult<IdeaDto> {
     let mut model: ActiveModel = Entity::find_by_id(id)
         .one(&state.db)

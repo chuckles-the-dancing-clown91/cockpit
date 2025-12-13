@@ -166,6 +166,38 @@ cd ../backend
 cargo build
 ```
 
+4. **Configure environment variables**
+
+Create `backend/.env` with absolute paths:
+
+```bash
+# Database Configuration
+DATABASE_URL=sqlite:/absolute/path/to/cockpit/backend/storage/data/db.sql
+DB_MAX_CONNECTIONS=5
+DB_MIN_CONNECTIONS=1
+
+# Logging Configuration
+LOG_LEVEL=info
+LOG_JSON=true
+LOG_CONSOLE=true
+LOGS_DIR=/absolute/path/to/cockpit/backend/storage/logs
+LOG_MAX_SIZE_MB=10
+LOG_MAX_FILES=5
+
+# NewsData API
+NEWSDATA_API_KEY=your_api_key_here
+NEWSDATA_DAILY_LIMIT=180
+
+# Storage (use absolute paths)
+STORAGE_ROOT=/absolute/path/to/cockpit/backend/storage
+STORAGE_MAX_SIZE_GB=50
+
+# Crypto (generate a secure key)
+COCKPIT_MASTER_KEY=$(openssl rand -hex 32)
+```
+
+**Important**: Use absolute paths for `DATABASE_URL`, `LOGS_DIR`, and `STORAGE_ROOT` to prevent issues when running from different directories.
+
 ### Development
 
 **Run in development mode:**
