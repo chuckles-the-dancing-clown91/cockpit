@@ -3,7 +3,7 @@
 //! Provides functions for reading and updating application settings
 //! with encryption, validation, and audit logging.
 
-use super::entities::{self, ActiveModel, Column, Entity};
+use super::entities::{Column, Entity};
 use super::types::{AppSettingsDto, SettingValue, UpdateSettingInput};
 use super::validation::validate_setting_value;
 use crate::core::components::crypto;

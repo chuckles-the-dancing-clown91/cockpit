@@ -7,7 +7,7 @@ use tracing::instrument;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set};
 
 use crate::core::components::errors::{AppError, AppResult};
-use crate::research::components::articles::{self as news_articles, Entity as EntityNewsArticles};
+use super::entities::articles::{self as news_articles, Entity as EntityNewsArticles};
 
 use super::types::{NewsArticleDto, parse_vec};
 

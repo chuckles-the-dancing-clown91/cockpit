@@ -1,3 +1,5 @@
+//! Database entity for system tasks
+
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]

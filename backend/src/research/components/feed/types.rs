@@ -107,14 +107,7 @@ pub(crate) enum StringOrVec {
     Vec(Vec<String>),
 }
 
-impl StringOrVec {
-    pub fn to_vec(self) -> Vec<String> {
-        match self {
-            StringOrVec::String(s) => vec![s],
-            StringOrVec::Vec(v) => v,
-        }
-    }
-}
+// StringOrVec helper methods can be added here if needed
 
 /// NewsData API article structure
 #[derive(serde::Deserialize)]

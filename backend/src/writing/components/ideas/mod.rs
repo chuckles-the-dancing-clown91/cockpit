@@ -7,8 +7,7 @@
 pub mod types;
 pub mod handlers;
 
-// Re-export database entities for use elsewhere in the codebase
-pub use types::{ActiveModel, Column, Entity, IdeaStatus, Model, Relation};
+// Database entities available in types module
 
 // Re-export DTOs for API responses
 pub use types::{

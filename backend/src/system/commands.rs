@@ -3,13 +3,25 @@
 use tauri::State;
 use crate::AppState;
 use super::components::scheduler::{
-    list_system_tasks_handler, run_system_task_now_handler,
-    update_system_task_handler, SystemTaskDto, RunTaskNowResult, UpdateTaskInput,
+    get_task_history_handler, list_system_tasks_handler, run_system_task_now_handler,
+    update_system_task_handler, RunTaskNowResult, SystemTaskDto, TaskRunDto, UpdateTaskInput,
 };
 
 #[tauri::command]
 pub async fn list_system_tasks(state: State<'_, AppState>) -> Result<Vec<SystemTaskDto>, String> {
     list_system_tasks_handler(&state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_task_history(
+    task_id: Option<i64>,
+    limit: Option<u64>,
+    offset: Option<u64>,
+    state: State<'_, AppState>,
+) -> Result<Vec<TaskRunDto>, String> {
+    get_task_history_handler(task_id, limit, offset, &state)
         .await
         .map_err(|e| e.to_string())
 }

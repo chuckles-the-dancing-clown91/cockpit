@@ -8,8 +8,8 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, Query
 use crate::core::components::crypto;
 use crate::core::components::errors::AppResult;
 use crate::core::components::logging;
-use crate::research::components::settings::{self as news_settings, Entity as EntityNewsSettings};
-use crate::research::components::sources::{self as news_sources, Entity as EntityNewsSources};
+use super::entities::settings::{self as news_settings, Entity as EntityNewsSettings};
+use super::entities::sources::{self as news_sources, Entity as EntityNewsSources};
 use crate::system::components::scheduler::TaskRunResult;
 
 use super::types::{NewsSourceDto, NewsSourceApiResponse, StringOrVec, parse_vec, to_json_vec};

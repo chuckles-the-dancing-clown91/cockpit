@@ -105,24 +105,6 @@ pub fn get_storage_stats(config: &StorageConfig) -> Result<StorageStats, AppErro
     })
 }
 
-/// Check if storage exceeds configured limits
-pub fn check_storage_limits(config: &StorageConfig) -> Result<bool, AppError> {
-    if let Some(max_gb) = config.max_total_size_gb {
-        let stats = get_storage_stats(config)?;
-        let max_bytes = max_gb * 1_073_741_824; // GB to bytes
-        
-        if stats.total_bytes > max_bytes {
-            warn!(
-                "Storage limit exceeded: {:.2} GB / {} GB",
-                stats.total_gb(),
-                max_gb
-            );
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
 /// Log current storage statistics
 pub fn log_storage_stats(config: &StorageConfig) -> Result<(), AppError> {
     let stats = get_storage_stats(config)?;

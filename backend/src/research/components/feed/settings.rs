@@ -9,7 +9,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, Query
 
 use crate::core::components::crypto;
 use crate::core::components::errors::{AppError, AppResult};
-use crate::research::components::settings::{self as news_settings, Entity as EntityNewsSettings};
+use super::entities::settings::{self as news_settings, Entity as EntityNewsSettings};
 
 use super::types::{NewsSettingsDto, SaveNewsSettingsInput, env_news_api_key, parse_vec};
 

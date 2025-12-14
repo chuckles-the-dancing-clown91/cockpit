@@ -7,7 +7,7 @@ use super::executor::{cron_for_task, load_enabled_tasks, run_task_once};
 use std::time::Duration;
 use tauri::{async_runtime, AppHandle, Manager};
 use tokio_cron_scheduler::{Job, JobScheduler};
-use tracing::error;
+use tracing::{error, info, warn};
 
 /// Start the task scheduler and register all enabled tasks
 ///
@@ -23,15 +23,50 @@ pub async fn start_scheduler(app: AppHandle) -> Result<(), String> {
         if let Some(expr) = cron_for_task(&task) {
             let app_handle = app.clone();
             let state_clone = state.clone();
+            let expr_clone = expr.clone();
             let job = Job::new_async(expr.as_str(), move |_uuid, _l| {
                 let app_handle = app_handle.clone();
                 let state_clone = state_clone.clone();
                 let task = task.clone();
+                let cron_expr = expr_clone.clone();
                 Box::pin(async move {
-                    let result = run_task_once(&app_handle, &state_clone, task).await;
-                    if result.status == "error" {
-                        if let Some(err) = result.error_message {
-                            error!(target: "scheduler", "Scheduled task failed: {}", err);
+                    info!(
+                        target: "scheduler",
+                        "Scheduler triggering task: name='{}', type='{}', cron='{}'",
+                        task.name, task.task_type, cron_expr
+                    );
+                    let result = run_task_once(&app_handle, &state_clone, task.clone()).await;
+                    
+                    match result.status {
+                        "success" => {
+                            info!(
+                                target: "scheduler",
+                                "Scheduled task completed successfully: name='{}', type='{}'",
+                                task.name, task.task_type
+                            );
+                        }
+                        "error" => {
+                            error!(
+                                target: "scheduler",
+                                "Scheduled task failed: name='{}', type='{}', error='{}'",
+                                task.name, task.task_type, 
+                                result.error_message.as_deref().unwrap_or("unknown")
+                            );
+                        }
+                        "skipped" => {
+                            warn!(
+                                target: "scheduler",
+                                "Scheduled task skipped: name='{}', type='{}', reason='{}'",
+                                task.name, task.task_type,
+                                result.result_json.as_deref().unwrap_or("unknown")
+                            );
+                        }
+                        _ => {
+                            info!(
+                                target: "scheduler",
+                                "Scheduled task finished: name='{}', type='{}', status='{}'",
+                                task.name, task.task_type, result.status
+                            );
                         }
                     }
                 })

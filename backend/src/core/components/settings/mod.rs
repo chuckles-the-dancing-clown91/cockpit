@@ -11,11 +11,8 @@ pub mod handlers;
 pub mod types;
 pub mod validation;
 
-// Re-export database entities for use elsewhere
-pub use entities::{ActiveModel, Column, Entity as AppSettings, Model, Relation};
-
 // Re-export DTOs for API responses
-pub use types::{AppSettingsDto, SettingValue, UpdateSettingInput};
+pub use types::{AppSettingsDto, UpdateSettingInput};
 
 // Re-export handlers for Tauri commands
 pub use handlers::{get_app_settings_handler, update_setting_handler, update_settings_handler};

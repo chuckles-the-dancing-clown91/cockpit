@@ -16,9 +16,7 @@ mod types;
 mod validation;
 
 // Re-export all public types
-pub use types::{
-    AppConfig, CryptoConfig, DatabaseConfig, LoggingConfig, NewsDataConfig, StorageConfig,
-};
+pub use types::{AppConfig, LoggingConfig, StorageConfig};
 
 // Re-export utilities
 pub use validation::ensure_directories;

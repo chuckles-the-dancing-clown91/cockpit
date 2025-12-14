@@ -2,12 +2,14 @@
 //! 
 //! Handles NewsData.io integration for fetching and managing news articles.
 //! Organized by responsibility:
+//! - **entities**: Database entity models (articles, settings, sources)
 //! - **types**: Shared DTOs and API response structures
 //! - **settings**: News settings management (API keys, filters, quotas)
 //! - **articles**: Article CRUD operations (list, get, dismiss, star, read)
 //! - **sources**: News source management and syncing
 //! - **sync**: News article syncing from API with rate limiting
 
+pub mod entities;
 pub mod types;
 pub mod settings;
 pub mod articles;

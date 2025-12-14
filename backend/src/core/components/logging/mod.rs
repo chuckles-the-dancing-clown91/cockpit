@@ -39,7 +39,3 @@ mod utils;
 // Re-export public API
 pub use api::log_api_call;
 pub use init::init_logging;
-pub use utils::check_log_rotation;
-
-// Re-export LoggingConfig from sibling module for convenience
-pub use crate::core::components::config::LoggingConfig;

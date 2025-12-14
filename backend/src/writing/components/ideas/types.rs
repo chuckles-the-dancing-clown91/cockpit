@@ -4,7 +4,7 @@
 //! for the writing ideas feature.
 
 use crate::core::components::errors::{AppError, AppResult};
-use crate::research::components::articles as news_articles;
+use crate::research::components::feed::entities::articles as news_articles;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 

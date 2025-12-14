@@ -4,6 +4,107 @@ All completed work with completion dates and details.
 
 ---
 
+## 🎉 Sprint 3: System Mode Complete (Dec 12-13, 2025)
+
+**Duration**: 2 days  
+**Tasks Completed**: 7/10 (70%)  
+**Status**: Settings, Storage, and Logs fully integrated ✅
+
+### Sprint Summary
+Successfully completed backend and frontend integration for Settings, Storage, and Logs views. All three system views are fully functional with comprehensive error handling, validation, and user feedback.
+
+### Key Achievements
+- ✅ **Settings View**: Full CRUD with validation, real-time updates, toast notifications
+- ✅ **Storage View**: Database backups, restore, export/import, cleanup operations
+- ✅ **Logs View**: Multi-level filtering, export, stats dashboard, clear functionality
+- ✅ **Error Handling**: Comprehensive error types with user-friendly messages
+- ✅ **UI/UX**: Loading states, confirmation dialogs, progress indicators throughout
+
+### Tasks Completed
+
+#### Task #1: Settings View - Backend Commands ✅
+- Created `get_app_settings`, `update_setting`, `update_settings` commands
+- Validation for fetch intervals (5-1440 min), max articles (1-200), storage limits
+- Comprehensive error handling with AppError types
+- Tracing spans for debugging
+
+#### Task #2: Settings View - Frontend Integration ✅
+- Wired up useQuery and useMutation hooks
+- Real-time form validation matching backend rules
+- Success/error toast notifications with Sonner
+- Loading states and error boundaries
+- Settings persist across app restarts
+
+#### Task #3: Storage View - Backend Stats & Backup ✅
+- `get_storage_stats`: Database, logs, cache sizes with table breakdown
+- `backup_database`: SQLite VACUUM INTO with timestamp
+- `restore_database`: Validate, close connections, copy, reconnect
+- `list_backups`: Show available backups with metadata
+- Proper I/O error handling
+
+#### Task #4: Storage View - Export/Import Data ✅
+- `export_data`: Export ideas, articles, settings to timestamped JSON
+- `import_data`: Parse, validate, transaction-based atomic import
+- Native file picker with tauri-plugin-dialog
+- `delete_backup`: Path validation and confirmation
+- Import summary with records added/skipped/errors
+
+#### Task #5: Storage View - Cleanup & Frontend ✅
+- `cleanup_old_logs`: Retention-based log cleanup with summary
+- `cleanup_old_news`: Delete dismissed articles + VACUUM
+- Separate cleanup buttons with confirmation dialogs
+- Toast notifications with cleanup results
+- Loading spinners during operations
+
+#### Task #6: Logs View - Backend Commands ✅
+- `get_logs`: Multi-level filtering (INFO/WARN/ERROR), pagination
+- `export_logs`: Filter + export to timestamped text file
+- `clear_logs`: Delete all log files with summary
+- `get_log_stats`: Count by level (24h, 7d, 30d breakdowns)
+- Parses both JSON and plain text log formats
+
+#### Task #7: Logs View - Frontend Integration ✅
+- Replaced mock data with real queries
+- Level dropdown filtering and search
+- Export and clear buttons with confirmations
+- Stats dashboard cards (Total, Last 24h, Errors, Warnings)
+- Loading states and error handling throughout
+
+### Remaining Tasks
+- 🔴 Task #8: Tasks View - Backend Commands
+- 🔴 Task #9: Tasks View - Frontend Integration
+- 🔴 Task #10: System Mode - Integration Testing
+
+### Next Steps
+Focus shifts to modular refactoring (storage.rs split) before completing Tasks view.
+
+---
+
+## 🎉 Sprint 2: Backend Refactoring Complete (Dec 12, 2025)
+
+**Duration**: 1 day  
+**Status**: Domain-driven architecture implemented ✅
+
+### Sprint Summary
+Successfully refactored backend from monolithic structure to clean domain-driven design. All business logic separated from Tauri commands, cross-module imports updated, builds verified.
+
+### Key Achievements
+- ✅ **File reorganization**: Moved 17 files to domain/components/
+- ✅ **Command extraction**: 20+ commands extracted to domain modules
+- ✅ **main.rs slimmed**: 533 lines → 275 lines (48% reduction)
+- ✅ **Module structure**: Each domain has components/ and commands.rs
+- ✅ **Import updates**: All cross-module references fixed
+- ✅ **Build verification**: Both debug and release builds successful
+
+### Benefits Achieved
+- Clear domain separation (core, writing, research, system)
+- Easy feature location and navigation
+- Parallel development friendly
+- Command interface separate from business logic
+- Foundation for future plugin system
+
+---
+
 ## 🎉 Sprint 1: Backend Modernization & Frontend Optimization (Dec 9-12, 2025)
 
 **Duration**: 3 days  

@@ -32,7 +32,7 @@ use research::commands::{
     dismiss_news_article, toggle_star_news_article, mark_news_article_read,
     sync_news_now, sync_news_sources_now, list_news_sources,
 };
-use system::commands::{list_system_tasks, run_system_task_now, update_system_task};
+use system::commands::{get_task_history, list_system_tasks, run_system_task_now, update_system_task};
 use util::commands::{
     get_system_user, log_frontend_error, get_mixed_feed, get_upcoming_events,
     list_scheduled_jobs, sync_calendar,
@@ -117,6 +117,7 @@ fn main() {
             list_scheduled_jobs,
             sync_calendar,
             list_system_tasks,
+            get_task_history,
             run_system_task_now,
             update_system_task,
             get_app_settings,

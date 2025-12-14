@@ -34,7 +34,6 @@ mod types;
 mod utils;
 
 // Re-export all public items
-pub use codes::ErrorCode;
 pub use types::{AppError, AppResult};
 
 // Re-export methods are already implemented on AppError via the modules

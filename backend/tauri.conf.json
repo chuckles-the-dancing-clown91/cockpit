@@ -4,15 +4,15 @@
   "version": "0.1.0",
   "identifier": "com.architect.cockpit",
   "build": {
-    "beforeDevCommand": "npm run dev --prefix ./frontend -- --host --port 5173",
-    "beforeBuildCommand": "npm run build --prefix ./frontend",
+    "beforeDevCommand": "bash -c 'cd /home/daddy/Documents/Commonwealth/cockpit/frontend && npm run dev -- --host --port 5173'",
+    "beforeBuildCommand": "bash -c 'cd /home/daddy/Documents/Commonwealth/cockpit/frontend && npm run build'",
     "devUrl": "http://localhost:5173",
-    "frontendDist": "../frontend/dist"
+    "frontendDist": "/home/daddy/Documents/Commonwealth/cockpit/frontend/dist"
   },
   "app": {
     "windows": [
       {
-        "title": "Architect Cockpit",
+        "title": "Your Architect Cockpit",
         "width": 1700,
         "height": 950,
         "minWidth": 1700,

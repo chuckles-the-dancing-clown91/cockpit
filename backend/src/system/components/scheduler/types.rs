@@ -63,7 +63,7 @@ pub struct UpdateTaskInput {
 }
 
 /// Convert database model to DTO
-pub(crate) fn model_to_dto(m: crate::system::components::tasks::Model) -> SystemTaskDto {
+pub(crate) fn model_to_dto(m: super::entities::Model) -> SystemTaskDto {
     SystemTaskDto {
         id: m.id,
         name: m.name,
