@@ -9,6 +9,14 @@ use super::components::feed::{
     mark_news_article_read_handler, sync_news_now_handler,
     sync_news_sources_now_handler, list_news_sources_handler,
     NewsArticleDto, NewsSettingsDto, SaveNewsSettingsInput, NewsSourceDto,
+    // Feed source management
+    list_feed_sources_handler, get_feed_source_handler,
+    create_feed_source_handler, update_feed_source_handler,
+    delete_feed_source_handler, toggle_feed_source_handler,
+    test_feed_source_connection_handler,
+    sync_feed_source_now_handler, sync_all_feed_sources_handler,
+    FeedSourceDto, CreateFeedSourceInput, UpdateFeedSourceInput,
+    SyncSourceResult, SyncAllResult,
 };
 use crate::system;
 
@@ -117,6 +125,96 @@ pub async fn list_news_sources(
     state: State<'_, AppState>,
 ) -> Result<Vec<NewsSourceDto>, String> {
     list_news_sources_handler(country, language, search, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ===== Feed Source Management Commands =====
+
+#[tauri::command]
+pub async fn list_feed_sources(state: State<'_, AppState>) -> Result<Vec<FeedSourceDto>, String> {
+    list_feed_sources_handler(&state.db)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_feed_source(
+    source_id: i64,
+    state: State<'_, AppState>,
+) -> Result<FeedSourceDto, String> {
+    get_feed_source_handler(&state.db, source_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn create_feed_source(
+    input: CreateFeedSourceInput,
+    state: State<'_, AppState>,
+) -> Result<FeedSourceDto, String> {
+    create_feed_source_handler(&state.db, input)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_feed_source(
+    source_id: i64,
+    input: UpdateFeedSourceInput,
+    state: State<'_, AppState>,
+) -> Result<FeedSourceDto, String> {
+    update_feed_source_handler(&state.db, source_id, input)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_feed_source(
+    source_id: i64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    delete_feed_source_handler(&state.db, source_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn toggle_feed_source(
+    source_id: i64,
+    enabled: bool,
+    state: State<'_, AppState>,
+) -> Result<FeedSourceDto, String> {
+    toggle_feed_source_handler(&state.db, source_id, enabled)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn test_feed_source_connection(
+    source_id: i64,
+    state: State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    test_feed_source_connection_handler(&state.db, &state.http_client, source_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn sync_feed_source_now(
+    source_id: i64,
+    state: State<'_, AppState>,
+) -> Result<SyncSourceResult, String> {
+    sync_feed_source_now_handler(&state.db, &state.http_client, source_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn sync_all_feed_sources(
+    state: State<'_, AppState>,
+) -> Result<SyncAllResult, String> {
+    sync_all_feed_sources_handler(&state.db, &state.http_client)
         .await
         .map_err(|e| e.to_string())
 }

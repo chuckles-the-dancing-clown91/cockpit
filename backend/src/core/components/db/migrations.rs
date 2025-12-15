@@ -41,6 +41,12 @@ pub fn all_migrations() -> Vec<Migration> {
             up: include_str!("../../../../migrations/003_performance_indexes_up.sql"),
             down: include_str!("../../../../migrations/003_performance_indexes_down.sql"),
         },
+        Migration {
+            version: 4,
+            name: "feed_sources",
+            up: include_str!("../../../../migrations/004_feed_sources_up.sql"),
+            down: include_str!("../../../../migrations/004_feed_sources_down.sql"),
+        },
     ]
 }
 

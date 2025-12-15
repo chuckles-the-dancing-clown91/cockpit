@@ -52,121 +52,107 @@ Transform Research mode into a powerful, extensible feed aggregation platform wh
 
 ### Phase 1: Database Schema & Backend Foundation
 
-#### Task #1: Feed Sources Table & Migration 🔴
+#### Task #1: Feed Sources Table & Migration ✅
 **Priority**: HIGH - New table for feed plugins  
-**Estimated Effort**: 1 hour
+**Estimated Effort**: 1 hour  
+**Status**: COMPLETE
 
 **Action**: Create new `feed_sources` table (distinct from existing `news_sources`)
 
-- [ ] **Create migration 004_feed_sources_up.sql**:
-  - [ ] Create `feed_sources` table with fields:
-    - `id` - Primary key
-    - `name` - Display name (e.g., "NewsData.io Tech News")
-    - `source_type` - Enum: NewsData, Reddit, RSS, Twitter, Custom
-    - `enabled` - Boolean (0/1)
-    - `api_key_encrypted` - BLOB (encrypted API key)
-    - `config` - TEXT (JSON config: fetch_interval, categories, filters)
-    - `task_id` - Foreign key to system_tasks (nullable)
-    - `last_sync_at` - DATETIME
-    - `article_count` - INTEGER (cached count)
-    - `error_count` - INTEGER
-    - `created_at`, `updated_at` - DATETIME
-  - [ ] Create indexes on source_type, enabled, task_id
+- [x] **Create migration 004_feed_sources_up.sql**:
+  - [x] Create `feed_sources` table with all fields
+  - [x] Create indexes on source_type, enabled, task_id
+  - [x] Add `feed_source_id` column to `news_articles`
+  - [x] Create 004_feed_sources_down.sql rollback migration
+  - [x] Register migration in migrations.rs
+  - [x] Create FeedSource entity model
+  - [x] Create SourceType, SourceConfig types
+  - [x] Create FeedSourceDto and input types
+  - [x] Backend compiles successfully
 
-- [ ] **Update `news_articles` table**:
-  - [ ] Add `feed_source_id` column (foreign key to feed_sources)
-  - [ ] Keep existing `provider` and `source_name` for backward compatibility
-
-- [ ] **Note**: Existing `news_sources` table tracks individual news outlets (CNN, BBC, etc.) - keep as-is
-
-#### Task #2: Source Types & Plugin Trait 🔴
+#### Task #2: Source Types & Plugin Trait ✅
 **Priority**: HIGH - Foundation for plugin system  
-**Estimated Effort**: 2-3 hours
+**Estimated Effort**: 2-3 hours  
+**Status**: COMPLETE
 
 Create the plugin architecture:
 
-- [ ] **backend/src/research/components/feed/plugin.rs**:
-  - [ ] Define `FeedSource` trait with methods:
-    - `fetch_articles()` - Fetch articles from source
-    - `test_connection()` - Verify API key and connectivity
-    - `get_metadata()` - Return source name, type, description
-    - `parse_article()` - Convert source format to common Article schema
-  - [ ] Define `SourceType` enum: NewsData, Reddit, RSS, Twitter, Custom
-  - [ ] Define `SourceConfig` struct for per-source settings
+- [x] **backend/src/research/components/feed/plugin.rs**:
+  - [x] Define `FeedSource` trait with async methods:
+    - `fetch_articles()` - Fetch articles with config & last_sync_at
+    - `test_connection()` - Verify API key and return quota info
+    - `get_metadata()` - Return source metadata for UI
+    - `parse_config()` - Validate/normalize configuration
+    - `default_config()` - Provide default config
+    - `estimate_api_calls()` - For rate limit checking
+  - [x] Define `FeedArticle` struct (common article format)
+  - [x] Define `FetchResult` (articles + api_calls_used + warnings)
+  - [x] Define `SourceMetadata` (for UI display)
+  - [x] Define `ConnectionTestResult` (connection status)
+  - [x] Create `PluginRegistry` for managing plugins
+  - [x] Add async-trait dependency
+  - [x] Backend compiles successfully
 
 - [ ] **backend/src/research/components/feed/sources/mod.rs**:
   - [ ] Create sources directory for plugin implementations
-  - [ ] Re-export all source plugins
+  - [ ] Implement NewsData plugin next
 
-#### Task #3: NewsData.io Plugin Implementation 🔴
+#### Task #3: NewsData.io Plugin Implementation ✅
 **Priority**: HIGH - Migrate existing integration  
-**Estimated Effort**: 2 hours
+**Estimated Effort**: 2 hours  
+**Status**: COMPLETE
 
 Extract NewsData.io to plugin:
-3 hours
 
-Backend commands for source management:
+- [x] **backend/src/research/components/feed/plugins/newsdata.rs**:
+  - [x] Implement `FeedSource` trait for NewsDataPlugin
+  - [x] Migrate existing NewsData API logic from sync.rs
+  - [x] Implement all trait methods (fetch_articles, test_connection, etc.)
+  - [x] Support all NewsData features (latest + archive endpoints)
+  - [x] Implement pagination with max_pages control
+  - [x] Add retry logic with exponential backoff
+  - [x] Handle rate limiting (429 status code)
+  - [x] Validate config (max_pages 1-10, date format)
+  - [x] Convert NewsData response to FeedArticle format
+  - [x] Return warnings when pagination limit reached
+  - [x] Backend compiles successfully
 
-- [ ] **backend/src/research/commands.rs**:
-  - [ ] `list_feed_sources` - Get all sources with metadata (includes task info)
-  - [ ] `get_feed_source` - Get single source by ID
-  - [ ] `create_feed_source` - Add new source + create system_task
-    - Creates feed source record
-    - Creates corresponding system_task with cron schedule
-    - LiAdd `sync_single_source(source_id)` function
-    - Query feed source by ID
-    - Instantiate appropriate plugin
-    - Call plugin.fetch_articles()
-    - Save articles with feed_source_id
-    - Update source last_sync_at and article_count
-    - Log success/errors
-  - [ ] Add `sync_all_sources()` function
-    - Query all enabled sources
-    - Iterate and call sync_single_source()
-    - Return summary (sources synced, articles added, errors) config, API key, enabled status
-    - Updates feed source
-    - Updates corresponding system_task schedule if changed
-  - [ ] `delete_feed_source` - Remove source + cleanup
-    - Soft deletes associated articles (set feed_source_id = NULL)
-    - Deletes corresponding system_task
-    - Deletes feed source record
-  - [ ] `test_feed_source_connection` - Test API key validity
-  - [ ] `toggle_feed_source` - Enable/disable source + task
-    - Updates feed source enabled status
-    - Updates system_task enabled status
-  - [ ] `sync_feed_source_now` - Manual trigger for single source
-  - [ ] `sync_all_feed_sources` - Trigger all enabled sources ⭐es()`
-  - [ ] Handle per-source errors gracefully
-
-#### Task #4: Source Management Commands 🔴
+#### Task #4: Source Management Commands ✅
 **Priority**: HIGH - CRUD for feed sources  
-**Estimated Effort**: 2 hours
+**Estimated Effort**: 2 hours  
+**Status**: COMPLETE
 
 Backend commands for source management:
 
-- [ ] **Header with actions:
-    - **"Sync All" button** ⭐ - Triggers all enabled sources
-    - "Add Source" button → opens modal/drawer
-    - Filter by source type dropdown
-    - Search by source name
-  - [ ] Sources list with cards showing:
-    - Source name, type badge (NewsData, Reddit, etc.)
-    - Enabled toggle switch
-    - Last sync time, article count
-    - Sync schedule (cron expression in human readable)
-    - "Sync Now" button per source ⭐
-    - Edit and delete buttons
-  - [ ] Loading states during sync operations
-  - [ ] Toast notifications for sync results- Enable/disable source
-  - [ ] Register all commands in main.rs
+- [x] **backend/src/research/components/feed/feed_sources.rs**:
+  - [x] `list_feed_sources_handler` - Get all sources with metadata
+  - [x] `get_feed_source_handler` - Get single source by ID
+  - [x] `create_feed_source_handler` - Create source + system_task atomically
+  - [x] `update_feed_source_handler` - Update source + task
+  - [x] `delete_feed_source_handler` - Delete source + cleanup task
+  - [x] `toggle_feed_source_handler` - Enable/disable source + task
+  - [x] `test_feed_source_connection_handler` - Validate API key
+  - [x] `sync_feed_source_now_handler` - Manual trigger for single source
+  - [x] `sync_all_feed_sources_handler` - "Boom magic" sync all button
+
+- [x] **backend/src/research/commands.rs**:
+  - [x] Create Tauri command wrappers for all 9 handlers
+  - [x] Add proper error handling (map to String)
+  - [x] Export from research module
+
+- [x] **backend/src/main.rs**:
+  - [x] Import all 9 feed source commands
+  - [x] Register all commands in invoke_handler
+  - [x] Backend compiles successfully
 
 ---
 
 ### Phase 2: Frontend - Feed Sources View
 
-#### Task #5: Feed Sources Management Page 🔴
+#### Task #5: Feed Sources Management Page ✅
 **Priority**: HIGH - Primary configuration interface  
-**Estimated Effort**: 3-4 hours
+**Estimated Effort**: 3-4 hours  
+**Status**: COMPLETE
 
 Create dedicated sources management:
 syncing, error, disabled)
@@ -217,9 +203,10 @@ syncing, error, disabled)
   - [ ] `useTestSourceConnection()` mutation
   - [ ] `useToggleNewsSource()` mutation
 
-#### Task #6: Update Navigation 🔴
+#### Task #6: Update Navigation ✅
 **Priority**: MEDIUM - User discoverability  
-**Estimated Effort**: 30 minutes
+**Estimated Effort**: 30 minutes  
+**Status**: COMPLETE
 
 Add Feed Sources to Research navigation:
 

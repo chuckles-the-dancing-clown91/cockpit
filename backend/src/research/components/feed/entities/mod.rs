@@ -4,6 +4,7 @@
 //! These represent the core database tables for the news feed system.
 
 pub mod articles;
+pub mod feed_sources;
 pub mod settings;
 pub mod sources;
 

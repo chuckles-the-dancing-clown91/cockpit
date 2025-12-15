@@ -10,6 +10,7 @@ import {
   Database,
   FileText,
   Clock,
+  Plug,
 } from 'lucide-react';
 
 interface NavItem {
@@ -26,6 +27,7 @@ const writingNavItems: NavItem[] = [
 
 const researchNavItems: NavItem[] = [
   { id: 'news', label: 'News', icon: Newspaper },
+  { id: 'feed-sources', label: 'Feed Sources', icon: Plug },
   { id: 'reddit', label: 'Reddit', icon: Share2 },
   { id: 'sources', label: 'Sources', icon: Rss },
 ];

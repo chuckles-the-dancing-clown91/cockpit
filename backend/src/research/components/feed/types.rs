@@ -3,6 +3,74 @@
 //! Contains DTOs, API response structures, and utility functions
 //! used across settings, articles, sources, and sync modules.
 
+use super::entities::feed_sources::{SourceConfig, SourceType};
+
+/// Feed source data transfer object
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FeedSourceDto {
+    pub id: i64,
+    pub name: String,
+    pub source_type: String,
+    pub enabled: bool,
+    pub has_api_key: bool, // Don't expose actual key
+    pub config: Option<SourceConfig>,
+    pub task_id: Option<i64>,
+    pub schedule: Option<String>, // Human-readable cron
+    pub last_sync_at: Option<String>,
+    pub last_error: Option<String>,
+    pub article_count: i32,
+    pub error_count: i32,
+    pub api_calls_today: i32,
+    pub api_quota_daily: Option<i32>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Create feed source input
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateFeedSourceInput {
+    pub name: String,
+    pub source_type: String,
+    pub api_key: Option<String>, // Plain text, will be encrypted
+    pub config: Option<SourceConfig>,
+    pub schedule: Option<String>, // Cron expression
+}
+
+/// Update feed source input
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateFeedSourceInput {
+    pub name: Option<String>,
+    pub enabled: Option<bool>,
+    pub api_key: Option<String>, // Plain text, will be encrypted
+    pub config: Option<SourceConfig>,
+    pub schedule: Option<String>, // Cron expression
+}
+
+/// Sync result for a single feed source
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncSourceResult {
+    pub source_id: i64,
+    pub source_name: String,
+    pub success: bool,
+    pub articles_added: i32,
+    pub error: Option<String>,
+}
+
+/// Sync all sources result
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncAllResult {
+    pub total_sources: i32,
+    pub successful: i32,
+    pub failed: i32,
+    pub total_articles: i32,
+    pub results: Vec<SyncSourceResult>,
+}
+
 /// News article data transfer object
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]

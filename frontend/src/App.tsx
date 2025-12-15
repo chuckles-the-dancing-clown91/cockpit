@@ -10,6 +10,7 @@ const WritingView = lazy(() => import('./views/WritingView'));
 const IdeasLibraryView = lazy(() => import('./components/writing/IdeasLibraryView'));
 const ArchiveView = lazy(() => import('./components/writing/ArchiveView'));
 const NewsFeedView = lazy(() => import('./components/research/NewsFeedView'));
+const FeedSourcesView = lazy(() => import('./views/FeedSourcesView'));
 const RedditView = lazy(() => import('./components/research/RedditView'));
 const SourcesView = lazy(() => import('./components/research/SourcesView'));
 const SettingsView = lazy(() => import('./components/system/SettingsView'));
@@ -41,6 +42,7 @@ function AppContent() {
     // Research mode views
     if (mode === 'research') {
       if (view === 'news') return <NewsFeedView />;
+      if (view === 'feed-sources') return <FeedSourcesView />;
       if (view === 'reddit') return <RedditView />;
       if (view === 'sources') return <SourcesView />;
     }

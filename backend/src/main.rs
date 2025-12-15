@@ -32,6 +32,10 @@ use research::commands::{
     get_news_settings, save_news_settings, list_news_articles, get_news_article,
     dismiss_news_article, toggle_star_news_article, mark_news_article_read,
     sync_news_now, sync_news_sources_now, list_news_sources,
+    // Feed source management
+    list_feed_sources, get_feed_source, create_feed_source, update_feed_source,
+    delete_feed_source, toggle_feed_source, test_feed_source_connection,
+    sync_feed_source_now, sync_all_feed_sources,
 };
 use system::commands::{get_task_history, list_system_tasks, run_system_task_now, update_system_task};
 use util::commands::{
@@ -181,6 +185,16 @@ fn main() {
             sync_news_now,
             sync_news_sources_now,
             list_news_sources,
+            // Feed source management
+            list_feed_sources,
+            get_feed_source,
+            create_feed_source,
+            update_feed_source,
+            delete_feed_source,
+            toggle_feed_source,
+            test_feed_source_connection,
+            sync_feed_source_now,
+            sync_all_feed_sources,
             list_ideas,
             get_idea,
             create_idea,

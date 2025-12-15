@@ -5,7 +5,7 @@ export type AppMode = 'writing' | 'research' | 'system';
 
 // Define views for each mode
 export type WritingView = 'editor' | 'ideas' | 'archive';
-export type ResearchView = 'news' | 'reddit' | 'sources';
+export type ResearchView = 'news' | 'feed-sources' | 'reddit' | 'sources';
 export type SystemView = 'settings' | 'storage' | 'logs' | 'tasks';
 
 export type ViewType = WritingView | ResearchView | SystemView;
