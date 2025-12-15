@@ -1,0 +1,17 @@
+[Desktop Entry]
+Name={{{name}}}
+GenericName=Writing and Research Tool
+Comment={{{comment}}}
+Exec={{{exec}}}
+Icon={{{icon}}}
+Terminal=false
+Type=Application
+Categories={{{categories}}}
+Keywords=writing;research;news;ideas;productivity;notes;editor;
+StartupWMClass=cockpit
+StartupNotify=true
+Actions=NewWindow;
+
+[Desktop Action NewWindow]
+Name=New Window
+Exec={{{exec}}}

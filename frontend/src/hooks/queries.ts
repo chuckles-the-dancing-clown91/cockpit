@@ -255,6 +255,30 @@ async function invokeWithFallback<T>(
   return invokeWithRetry(command, args, { fallback });
 }
 
+// ============================================================================
+// Setup Wizard Queries
+// ============================================================================
+
+export type SetupStatus = {
+  is_complete: boolean;
+  has_master_key: boolean;
+  has_database: boolean;
+  cockpit_home: string;
+};
+
+export function useSetupStatus() {
+  return useQuery({
+    queryKey: ['setupStatus'],
+    queryFn: () => invoke<SetupStatus>('check_setup_status_command'),
+    staleTime: 1000 * 60, // 1 minute - setup status doesn't change frequently
+    retry: 1, // Only retry once for setup checks
+  });
+}
+
+// ============================================================================
+// User & System Queries
+// ============================================================================
+
 export function useSystemUser() {
   return useQuery({
     queryKey: ['systemUser'],

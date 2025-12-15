@@ -1,0 +1,248 @@
+# Distribution Checklist
+
+Quick checklist for preparing and distributing Cockpit releases.
+
+## Pre-Release Checklist
+
+### Code Quality
+- [ ] All tests passing: `cargo test --all`
+- [ ] No compiler warnings: `cargo clippy -- -D warnings`
+- [ ] Frontend builds cleanly: `cd frontend && npm run build`
+- [ ] Backend builds cleanly: `cd backend && cargo build --release`
+- [ ] Full Tauri build succeeds: `cd backend && cargo tauri build`
+
+### Documentation
+- [ ] README.md updated with latest features
+- [ ] INSTALL.md has correct version numbers
+- [ ] TODO.md current sprint updated
+- [ ] CHANGELOG.md created/updated
+
+### Security
+- [ ] API keys properly encrypted (test in Settings view)
+- [ ] Master key validation works (test startup without key)
+- [ ] File permissions correct (`.env` is 600)
+- [ ] CSP properly configured (no console warnings)
+- [ ] No secrets in git history
+
+### Functionality
+- [ ] Writing Mode: Editor, Ideas, Archive all work
+- [ ] Research Mode: News sync, article management work
+- [ ] System Mode: Settings, Storage, Logs, Tasks all work
+- [ ] All themes switch properly (Dark, Cyberpunk, Light)
+- [ ] Database backups/restores work
+- [ ] Task scheduler runs (check logs after 5 minutes)
+
+## Build Process
+
+### 1. Update Version Numbers
+
+```bash
+# backend/Cargo.toml
+version = "0.2.0"
+
+# backend/tauri.conf.json
+"version": "0.2.0"
+
+# frontend/package.json
+"version": "0.2.0"
+
+# INSTALL.md
+Update all version references
+```
+
+### 2. Build Release
+
+```bash
+# Full production build
+cd backend
+cargo tauri build
+
+# Output locations:
+# - Linux: build/target/release/bundle/deb/cockpit_X.Y.Z_amd64.deb
+# - Linux: build/target/release/bundle/rpm/cockpit-X.Y.Z-1.x86_64.rpm
+# - Linux: build/target/release/bundle/appimage/cockpit_X.Y.Z_amd64.AppImage
+```
+
+### 3. Test Installation
+
+```bash
+# Create test VM or container
+# Install from package
+sudo dpkg -i cockpit_0.2.0_amd64.deb  # Debian/Ubuntu
+sudo rpm -i cockpit-0.2.0-1.x86_64.rpm  # Fedora/RHEL
+
+# Or use install.sh
+./install.sh
+
+# Test first run
+cockpit
+
+# Check directories created
+ls -la ~/.cockpit/
+
+# Check logs for errors
+tail -f ~/.cockpit/logs/app.log
+```
+
+### 4. Create Release Package
+
+```bash
+# Create release directory
+mkdir -p release/cockpit-v0.2.0-linux
+
+# Copy files
+cp build/target/release/cockpit release/cockpit-v0.2.0-linux/
+cp install.sh release/cockpit-v0.2.0-linux/
+cp uninstall.sh release/cockpit-v0.2.0-linux/
+cp INSTALL.md release/cockpit-v0.2.0-linux/
+cp LICENSE release/cockpit-v0.2.0-linux/
+cp -r backend/icons release/cockpit-v0.2.0-linux/
+
+# Create tarball
+cd release
+tar -czf cockpit-v0.2.0-linux.tar.gz cockpit-v0.2.0-linux/
+
+# Create checksums
+sha256sum cockpit-v0.2.0-linux.tar.gz > SHA256SUMS
+sha256sum *.deb >> SHA256SUMS
+sha256sum *.rpm >> SHA256SUMS
+```
+
+## Distribution Files
+
+### Required Files in Release Package
+
+```
+cockpit-v0.2.0-linux/
+├── cockpit              # Binary
+├── install.sh           # Installation script
+├── uninstall.sh         # Removal script
+├── INSTALL.md           # User guide
+├── LICENSE              # License file
+└── icons/               # Default icons
+    ├── frac-32x32.png
+    └── frac-128x128.png
+```
+
+### Package Managers
+
+**Debian/Ubuntu (.deb)**:
+- Location: `build/target/release/bundle/deb/`
+- Install: `sudo dpkg -i cockpit_0.2.0_amd64.deb`
+- Remove: `sudo apt remove cockpit`
+
+**Fedora/RHEL (.rpm)**:
+- Location: `build/target/release/bundle/rpm/`
+- Install: `sudo rpm -i cockpit-0.2.0-1.x86_64.rpm`
+- Remove: `sudo rpm -e cockpit`
+
+**AppImage**:
+- Location: `build/target/release/bundle/appimage/`
+- Run: `./cockpit_0.2.0_amd64.AppImage`
+- Note: Requires square icon (not yet configured)
+
+## Post-Release
+
+### GitHub Release
+
+1. Create git tag:
+   ```bash
+   git tag -a v0.2.0 -m "Release version 0.2.0"
+   git push origin v0.2.0
+   ```
+
+2. Create GitHub release with:
+   - Release notes (from CHANGELOG.md)
+   - Tarball: `cockpit-v0.2.0-linux.tar.gz`
+   - Packages: `.deb`, `.rpm`
+   - Checksums: `SHA256SUMS`
+
+### Documentation
+
+- [ ] Update project website (if exists)
+- [ ] Post release announcement
+- [ ] Update installation instructions
+- [ ] Archive old version documentation
+
+### Monitoring
+
+- [ ] Monitor for installation issues
+- [ ] Check error reports in issues
+- [ ] Review crash logs if submitted
+- [ ] Plan hotfix releases if needed
+
+## Troubleshooting Distribution Issues
+
+### Build Failures
+
+**Problem**: `cargo tauri build` fails
+**Solution**: 
+- Check frontend builds: `cd frontend && npm run build`
+- Check backend compiles: `cd backend && cargo build --release`
+- Review error logs in terminal output
+
+**Problem**: Icon not found errors
+**Solution**:
+- Verify icon paths in `backend/tauri.conf.json`
+- Ensure icons exist in `backend/icons/`
+
+### Installation Issues
+
+**Problem**: Binary won't run after install
+**Solution**:
+- Check executable permissions: `chmod +x /usr/local/bin/cockpit`
+- Verify dependencies installed (glibc, openssl, etc.)
+
+**Problem**: Database errors on first run
+**Solution**:
+- Ensure `~/.cockpit/` directories created
+- Check `.env` file exists with correct DATABASE_URL
+- Verify master key is set (64 hex characters)
+
+**Problem**: Desktop entry doesn't appear
+**Solution**:
+- Update desktop database: `update-desktop-database ~/.local/share/applications`
+- Check file exists: `ls ~/.local/share/applications/cockpit.desktop`
+- Log out and back in
+
+## Platform-Specific Notes
+
+### Linux
+- Works on most distributions with glibc 2.31+
+- Requires X11 or Wayland display server
+- Dependencies: `libwebkit2gtk-4.1`, `libgtk-3-0`
+
+### macOS (Future)
+- Requires code signing for distribution
+- DMG or PKG package format
+- App must be notarized for Gatekeeper
+
+### Windows (Future)
+- MSI or NSIS installer
+- Code signing recommended
+- May require Visual C++ redistributables
+
+## Checklist Summary
+
+Before releasing:
+- ✅ Code quality verified
+- ✅ Documentation updated
+- ✅ Security audited
+- ✅ Functionality tested
+- ✅ Version numbers updated
+- ✅ Builds created successfully
+- ✅ Installation tested on clean system
+- ✅ Release package created
+- ✅ Checksums generated
+- ✅ GitHub release prepared
+
+After releasing:
+- ✅ Git tag created and pushed
+- ✅ GitHub release published
+- ✅ Documentation updated
+- ✅ Monitoring active
+- ✅ Support channels ready
+
+---
+
+**Last Updated**: December 2025

@@ -187,36 +187,52 @@ pub async fn create_idea_for_article_handler(
 }
 
 /// Update idea metadata (title, status, tags, priority, etc.)
+#[tracing::instrument(skip(state, input), fields(
+    idea_id = %id,
+    has_title = %input.title.is_some(),
+    has_status = %input.status.is_some(),
+    has_tags = %input.tags.is_some(),
+    has_priority = %input.priority.is_some()
+))]
 pub async fn update_idea_metadata_handler(
     id: i64,
     input: UpdateIdeaMetadataInput,
     state: &State<'_, AppState>,
 ) -> AppResult<IdeaDto> {
+    tracing::info!("Updating idea metadata");
+    
     let mut model: ActiveModel = Entity::find_by_id(id)
         .one(&state.db)
         .await?
-        .ok_or_else(|| AppError::other(format!("Idea not found: {id}")))?
+        .ok_or_else(|| {
+            tracing::error!("Idea not found for metadata update");
+            AppError::other(format!("Idea not found: {id}"))
+        })?
         .into();
 
-    if let Some(title) = input.title {
-        model.title = Set(title);
+    if let Some(ref title) = input.title {
+        tracing::info!(new_title = %title, "Updating idea title");
+        model.title = Set(title.clone());
     }
     if let Some(summary) = input.summary {
         model.summary = Set(Some(summary));
     }
-    if let Some(status) = input.status {
-        let status = validate_status(&status)?;
+    if let Some(ref status) = input.status {
+        let status = validate_status(status)?;
         let is_complete = matches!(status, IdeaStatus::Complete);
+        tracing::info!(new_status = ?status, is_complete = %is_complete, "Updating idea status");
         model.status = Set(status);
         model.date_completed = Set(if is_complete { Some(Utc::now()) } else { None });
     }
     if let Some(target) = input.target {
         model.target = Set(Some(target));
     }
-    if let Some(tags) = input.tags {
-        model.tags = Set(tags_to_json(&tags));
+    if let Some(ref tags) = input.tags {
+        tracing::info!(tags = ?tags, "Updating idea tags");
+        model.tags = Set(tags_to_json(tags));
     }
     if let Some(priority) = input.priority {
+        tracing::info!(new_priority = %priority, "Updating idea priority");
         model.priority = Set(priority);
     }
     if let Some(is_pinned) = input.is_pinned {
@@ -226,54 +242,84 @@ pub async fn update_idea_metadata_handler(
     model.date_updated = Set(Utc::now());
 
     let updated = model.update(&state.db).await?;
+    tracing::info!("Idea metadata updated successfully");
     Ok(idea_to_dto(updated))
 }
 
 /// Update idea notes markdown content
+#[tracing::instrument(skip(state, input), fields(
+    idea_id = %id,
+    notes_size = %input.notes_markdown.as_ref().map_or(0, |s| s.len())
+))]
 pub async fn update_idea_notes_handler(
     id: i64,
     input: UpdateIdeaNotesInput,
     state: &State<'_, AppState>,
 ) -> AppResult<IdeaDto> {
+    let notes_len = input.notes_markdown.as_ref().map_or(0, |s| s.len());
+    tracing::info!(notes_size = %notes_len, "Updating idea notes");
+    
     let mut model: ActiveModel = Entity::find_by_id(id)
         .one(&state.db)
         .await?
-        .ok_or_else(|| AppError::other(format!("Idea not found: {id}")))?
+        .ok_or_else(|| {
+            tracing::error!("Idea not found for notes update");
+            AppError::other(format!("Idea not found: {id}"))
+        })?
         .into();
 
     model.notes_markdown = Set(input.notes_markdown);
     model.date_updated = Set(Utc::now());
 
     let updated = model.update(&state.db).await?;
+    tracing::info!(notes_size = %notes_len, "Idea notes updated successfully");
     Ok(idea_to_dto(updated))
 }
 
 /// Update idea article content (title and markdown)
+#[tracing::instrument(skip(state, input), fields(
+    idea_id = %id,
+    article_title_size = %input.article_title.as_ref().map_or(0, |t| t.len()),
+    article_content_size = %input.article_markdown.as_ref().map_or(0, |m| m.len())
+))]
 pub async fn update_idea_article_handler(
     id: i64,
     input: UpdateIdeaArticleInput,
     state: &State<'_, AppState>,
 ) -> AppResult<IdeaDto> {
+    tracing::info!("Updating idea article content");
+    
     let mut model: ActiveModel = Entity::find_by_id(id)
         .one(&state.db)
         .await?
-        .ok_or_else(|| AppError::other(format!("Idea not found: {id}")))?
+        .ok_or_else(|| {
+            tracing::error!("Idea not found for article update");
+            AppError::other(format!("Idea not found: {id}"))
+        })?
         .into();
 
     model.article_title = Set(input.article_title);
     model.article_markdown = Set(input.article_markdown);
-    model.date_updated = Set(Utc::now());
+    let updated_at = Utc::now();
+    model.date_updated = Set(updated_at);
 
     let updated = model.update(&state.db).await?;
+    tracing::info!(%updated_at, "Idea article content updated successfully");
     Ok(idea_to_dto(updated))
 }
 
 /// Archive an idea (soft delete)
+#[tracing::instrument(skip(state), fields(idea_id = %id))]
 pub async fn archive_idea_handler(id: i64, state: &State<'_, AppState>) -> AppResult<IdeaDto> {
+    tracing::info!("Archiving idea");
+    
     let mut model: ActiveModel = Entity::find_by_id(id)
         .one(&state.db)
         .await?
-        .ok_or_else(|| AppError::other(format!("Idea not found: {id}")))?
+        .ok_or_else(|| {
+            tracing::error!("Idea not found for archival");
+            AppError::other(format!("Idea not found: {id}"))
+        })?
         .into();
 
     let now = Utc::now();
@@ -281,5 +327,6 @@ pub async fn archive_idea_handler(id: i64, state: &State<'_, AppState>) -> AppRe
     model.date_updated = Set(now);
 
     let updated = model.update(&state.db).await?;
+    tracing::info!(archived_at = %now, is_archived = true, "Idea archived successfully");
     Ok(idea_to_dto(updated))
 }

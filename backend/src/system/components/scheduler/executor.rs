@@ -4,7 +4,7 @@
 //! and preventing concurrent runs of the same task.
 
 use super::entities::{Column, Entity};
-use super::task_runs::{ActiveModel as TaskRunActiveModel, Entity as TaskRunEntity};
+use super::task_runs::ActiveModel as TaskRunActiveModel;
 use super::types::{SystemTask, TaskRunResult};
 use crate::core::components::errors::AppResult;
 use crate::research::components::feed as news;

@@ -1,15 +1,17 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default permissions for the main window",
+  "description": "Default permissions for Cockpit main window - principle of least privilege applied",
   "windows": ["*"],
   "permissions": [
     "core:default",
     "core:window:default",
     "core:window:allow-set-title",
     "core:window:allow-close",
+    "core:event:default",
     "dialog:default",
     "dialog:allow-open",
     "dialog:allow-save"
-  ]
+  ],
+  "platforms": ["linux", "macOS", "windows"]
 }

@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tauri::{async_runtime, Manager};
 use tokio::sync::Mutex;
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 use reqwest::Client;
 
 // Import Tauri command handlers from domain command modules
@@ -22,6 +22,7 @@ use core::commands::{
     get_storage_statistics, create_database_backup, restore_database_from_backup, list_database_backups,
     delete_database_backup, export_database, import_database, cleanup_logs, cleanup_news,
     get_application_logs, get_application_log_stats, export_application_logs, clear_application_logs,
+    check_setup_status_command, generate_master_key_command, save_setup_config_command,
 };
 use writing::commands::{
     list_ideas, get_idea, create_idea, create_idea_for_article,
@@ -52,6 +53,26 @@ pub struct AppState {
 // ========== Main Application Setup ==========
 
 fn main() {
+    // Perform first-run setup (creates ~/.cockpit, generates master key, etc.)
+    let is_first_run = match core::components::setup::ensure_first_run_setup() {
+        Ok(first_run) => first_run,
+        Err(e) => {
+            eprintln!("❌ Failed to initialize Cockpit: {}", e);
+            eprintln!("Please check permissions and try again.");
+            std::process::exit(1);
+        }
+    };
+    
+    // Load .env file from ~/.cockpit first (for production) or current directory (for development)
+    if let Some(home) = dirs::home_dir() {
+        let prod_env = home.join(".cockpit/.env");
+        if prod_env.exists() {
+            let _ = dotenvy::from_path(&prod_env);
+        }
+    }
+    // Fallback to current directory .env for development
+    let _ = dotenvy::dotenv();
+    
     // Load and validate configuration
     let config = match core::config::AppConfig::from_env() {
         Ok(cfg) => cfg,
@@ -82,6 +103,17 @@ fn main() {
                 async_runtime::block_on(async { core::db::init_db_from_env().await }).map_err(|e| {
                     tauri::Error::Setup((Box::new(e) as Box<dyn std::error::Error>).into())
                 })?;
+            
+            // Initialize default settings on first run
+            if is_first_run {
+                info!(target: "setup", "First run detected, initializing default settings...");
+                async_runtime::block_on(async {
+                    if let Err(e) = core::components::setup::initialize_default_settings(&db).await {
+                        warn!(target: "setup", "Failed to initialize default settings: {}", e);
+                        // Don't fail startup - settings can be created manually
+                    }
+                });
+            }
             
             // Configure shared HTTP client with connection pooling and timeouts
             let http_client = Client::builder()
@@ -120,6 +152,9 @@ fn main() {
             get_task_history,
             run_system_task_now,
             update_system_task,
+            check_setup_status_command,
+            generate_master_key_command,
+            save_setup_config_command,
             get_app_settings,
             update_setting,
             update_settings,

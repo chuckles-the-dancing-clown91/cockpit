@@ -111,6 +111,94 @@ Wire up all System mode views to Tauri backend:
 
 ---
 
+### ⏳ Phase 13b: Backend Code Quality Improvements (Q1 2026)
+**Status**: Planning - Identified from December 2025 Backend Audit  
+**Source**: See [CODE_REVIEW.md](../CODE_REVIEW.md) for detailed analysis  
+**Priority**: MEDIUM 📝  
+**Estimated Effort**: 10-12 hours
+
+#### Code Refactoring
+- **Extract Magic Numbers to Constants** (1 hour)
+  - Create constants module for cleanup thresholds (30 days, 10MB limits)
+  - Extract retry delays and attempts to configuration
+  - Make connection pool sizes configurable via .env
+  - Add constants for log rotation limits
+
+- **Refactor Duplicate Retry Logic** (2 hours)
+  - Extract retry logic to shared `core/util/retry.rs` module
+  - Update `research/components/feed/sync.rs` to use shared module
+  - Update `research/components/feed/sources.rs` to use shared module
+  - Add configurable backoff strategy (linear vs exponential)
+  - Add retry metrics and logging
+
+- **Improve Export/Import Serialization** (2 hours)
+  - Replace manual JSON construction with serde serialization
+  - Add export/import format versioning (v1, v2, etc.)
+  - Support incremental imports (merge vs replace)
+  - Add export metadata (timestamp, version, record counts)
+  - Validate import data before applying
+
+#### Database Portability (Q1-Q2 2026)
+**Status**: Planning - MAJOR EFFORT REQUIRED  
+**Priority**: HIGH ⚠️ (for future-proofing)  
+**Estimated Effort**: 20-30 hours  
+**Current Score**: 3/10 - Heavily SQLite-specific
+
+**Why This Matters**:
+- SQLite has concurrency limitations for high-traffic scenarios
+- Many production deployments require PostgreSQL
+- Cannot scale to multi-instance deployments without shared database
+- Current code uses SQLite-specific features (PRAGMA, AUTOINCREMENT, sqlite_master, VACUUM INTO)
+
+**Step 1: Database Abstraction Layer** (8 hours)
+- Create `core/components/db/abstraction.rs` with DatabaseOps trait
+- Implement SqliteOps with current PRAGMA optimizations
+- Implement PostgresOps with PostgreSQL-specific settings
+- Add DatabaseType enum (Sqlite, Postgres)
+- Update connection initialization to use abstraction
+
+**Step 2: Convert Migrations to SeaORM** (6 hours)
+- Replace `migrations/*.sql` with Rust-based SeaORM migrations
+- Use `MigrationTrait` for database-agnostic migrations
+- Replace AUTOINCREMENT with `.auto_increment()` (works on both)
+- Test migrations on both SQLite and PostgreSQL
+- Add migration rollback tests
+
+**Step 3: Update Storage Module** (4 hours)
+- Replace PRAGMA statements with abstraction layer calls
+- Update backup/restore to use database-specific methods:
+  - SQLite: Keep VACUUM INTO
+  - PostgreSQL: Use pg_dump via Command
+- Replace sqlite_master queries with information_schema (standard SQL)
+- Add database type detection
+
+**Step 4: Configuration & Connection** (2 hours)
+- Add `DATABASE_TYPE=sqlite` or `=postgres` to .env
+- Add `DATABASE_URL` support for PostgreSQL connection strings
+- Update connection pool settings for PostgreSQL
+- Add PostgreSQL-specific .env variables (host, port, user, password)
+
+**Step 5: Testing** (8 hours)
+- Create test database for PostgreSQL
+- Run all migrations on PostgreSQL
+- Test all CRUD operations on both databases
+- Test backup/restore on both databases
+- Performance benchmarking (SQLite vs PostgreSQL)
+- Test concurrent operations (PostgreSQL advantage)
+
+**Step 6: Documentation** (2 hours)
+- Update README.md with PostgreSQL setup instructions
+- Document migration process from SQLite to PostgreSQL
+- Create troubleshooting guide for database issues
+- Add performance comparison guide
+
+**PostgreSQL Migration Benefits**:
+- ✅ Better concurrency (MVCC, no write locks)
+- ✅ Full ACID compliance with complex transactions
+- ✅ Better for high-traffic scenarios (100+ concurrent users)
+- ✅ Industry-standard for production deployments
+- ✅ Advanced features (full-text search, JSON operators, extensions)
+
 ### ⏳ Phase 14: Testing Infrastructure (Q1 2026)
 **Status**: Not Started
 
@@ -125,6 +213,36 @@ Wire up all System mode views to Tauri backend:
 ### ⏳ Phase 15: Production Readiness (Q1 2026)
 **Status**: Not Started
 
+#### Security Enhancements (LOW 📝)
+**Source**: December 2025 Backend Audit
+
+- **Key Rotation Documentation** (1 hour)
+  - Document master key rotation process step-by-step
+  - Create migration script for re-encrypting all secrets
+  - Add key version tracking to database
+  - Test key rotation on backup database
+
+- **OS Keychain Integration** (4 hours)
+  - Add `keyring` crate dependency
+  - Implement keychain storage for master key:
+    - macOS: Keychain Access
+    - Windows: Credential Manager
+    - Linux: Secret Service API (GNOME Keyring, KWallet)
+  - Add fallback to .env for development
+  - Update first-run wizard to store key in OS keychain
+
+- **Transaction Logging Enhancement** (2 hours)
+  - Add detailed transaction tracking to all database operations
+  - Log transaction duration and identify slow transactions
+  - Track failed transaction patterns for debugging
+  - Add transaction metrics to storage stats
+
+- **Shared Modules for Common Patterns** (4 hours)
+  - Extract pagination utilities to `core/util/pagination.rs`
+  - Extract common query patterns (find_by_id, list_all, etc.)
+  - Create standard response builders for Tauri commands
+  - Reduce code duplication across domains
+
 #### First-Run Experience
 - **Directory initialization**: Create `~/.cockpit/` on first launch
   - `~/.cockpit/data/` - Database and user data
@@ -134,7 +252,7 @@ Wire up all System mode views to Tauri backend:
   - `~/.cockpit/exports/` - Exported data
 - **Configuration wizard**: Guide user through initial setup
   - API key input (NewsData, etc.)
-  - Generate secure master key
+  - Generate secure master key (store in OS keychain)
   - Configure storage limits
   - Set logging preferences
 - **Default settings**: Populate sensible defaults
@@ -150,7 +268,7 @@ Wire up all System mode views to Tauri backend:
 - Error reporting/telemetry (opt-in)
 - Performance monitoring
 - Crash reporting
-- Security audit
+- Security audit (external)
 - Documentation completion
 
 ---

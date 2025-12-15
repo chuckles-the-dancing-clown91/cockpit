@@ -132,48 +132,72 @@ pub async fn get_news_article_handler(
 }
 
 /// Dismiss a news article
+#[tracing::instrument(skip(state), fields(article_id = %id))]
 pub async fn dismiss_news_article_handler(id: i64, state: &crate::AppState) -> AppResult<()> {
+    tracing::info!("Dismissing news article");
+    
     let model = EntityNewsArticles::find_by_id(id).one(&state.db).await?;
     let Some(m) = model else {
-        return Err(AppError::other("Not found"));
+        tracing::error!("Article not found for dismissal");
+        return Err(AppError::other("Article not found"));
     };
+    
     let mut active = m.into_active_model();
     active.dismissed_at = Set(Some(chrono::Utc::now()));
     active.is_dismissed = Set(1);
     active.updated_at = Set(chrono::Utc::now());
     active.update(&state.db).await?;
+    
+    tracing::info!("Article dismissed successfully");
     Ok(())
 }
 
 /// Toggle star status of a news article
+#[tracing::instrument(skip(state), fields(article_id = %id, starred = %starred))]
 pub async fn toggle_star_news_article_handler(
     id: i64,
     starred: bool,
     state: &crate::AppState,
 ) -> AppResult<()> {
+    tracing::info!("Toggling star status for article");
+    
     let model = EntityNewsArticles::find_by_id(id).one(&state.db).await?;
     let Some(m) = model else {
-        return Err(AppError::other("Not found"));
+        tracing::error!("Article not found for starring");
+        return Err(AppError::other("Article not found"));
     };
+    
     let mut active = m.into_active_model();
     active.is_starred = Set(if starred { 1 } else { 0 });
     active.updated_at = Set(chrono::Utc::now());
     active.update(&state.db).await?;
+    
+    tracing::info!(new_star_status = %starred, "Article star status updated successfully");
     Ok(())
 }
 
 /// Mark news article as read
+#[tracing::instrument(skip(state), fields(article_id = %id))]
 pub async fn mark_news_article_read_handler(id: i64, state: &crate::AppState) -> AppResult<()> {
+    tracing::info!("Marking article as read");
+    
     let model = EntityNewsArticles::find_by_id(id).one(&state.db).await?;
     let Some(m) = model else {
-        return Err(AppError::other("Not found"));
+        tracing::error!("Article not found for marking as read");
+        return Err(AppError::other("Article not found"));
     };
+    
     if m.is_read == 1 {
+        tracing::info!("Article already marked as read, skipping update");
         return Ok(());
     }
+    
+    let read_at = chrono::Utc::now();
     let mut active = m.into_active_model();
     active.is_read = Set(1);
-    active.updated_at = Set(chrono::Utc::now());
+    active.updated_at = Set(read_at);
     active.update(&state.db).await?;
+    
+    tracing::info!(%read_at, "Article marked as read successfully");
     Ok(())
 }

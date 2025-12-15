@@ -1,6 +1,6 @@
 //! Core Tauri commands
 //! 
-//! App settings management and storage commands
+//! App settings management, storage commands, and setup wizard
 
 use tauri::State;
 use crate::AppState;
@@ -11,6 +11,10 @@ use super::components::storage::{
     get_logs, get_log_stats, export_logs, clear_logs,
     StorageStats, BackupInfo, ExportInfo, ImportSummary, CleanupSummary,
     LogEntry, LogStats
+};
+use super::components::setup_wizard::{
+    check_setup_status, generate_master_key, save_setup_config,
+    SetupStatus, SetupConfig
 };
 
 /// Get all application settings grouped by category
@@ -172,5 +176,29 @@ pub fn clear_application_logs(
     state: State<'_, AppState>,
 ) -> Result<CleanupSummary, String> {
     clear_logs(&state.config.storage, None)
+        .map_err(|e| e.to_string())
+}
+
+// ============================================================================
+// Setup Wizard Commands
+// ============================================================================
+
+/// Check if initial setup is complete
+#[tauri::command]
+pub fn check_setup_status_command() -> Result<SetupStatus, String> {
+    check_setup_status()
+        .map_err(|e| e.to_string())
+}
+
+/// Generate a new secure master key
+#[tauri::command]
+pub fn generate_master_key_command() -> String {
+    generate_master_key()
+}
+
+/// Save setup configuration (completes first-run setup)
+#[tauri::command]
+pub fn save_setup_config_command(config: SetupConfig) -> Result<(), String> {
+    save_setup_config(config)
         .map_err(|e| e.to_string())
 }

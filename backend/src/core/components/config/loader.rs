@@ -11,7 +11,25 @@ use std::time::Duration;
 impl AppConfig {
     /// Load configuration from environment with validation
     pub fn from_env() -> Result<Self, AppError> {
-        // Load .env file if present
+        // Load .env file from appropriate location
+        // In production: ~/.cockpit/.env
+        // In development: .env in current directory
+        if let Some(home) = dirs::home_dir() {
+            let prod_env = home.join(".cockpit/.env");
+            if prod_env.exists() {
+                match dotenvy::from_path(&prod_env) {
+                    Ok(_) => {
+                        tracing::info!("Loaded configuration from ~/.cockpit/.env");
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to load ~/.cockpit/.env: {}", e);
+                    }
+                }
+            } else {
+                tracing::debug!("Production .env not found at {:?}, checking current directory", prod_env);
+            }
+        }
+        // Fallback to current directory .env for development
         let _ = dotenvy::dotenv();
 
         let database = DatabaseConfig::from_env()?;

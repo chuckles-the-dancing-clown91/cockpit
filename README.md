@@ -13,6 +13,7 @@ Built with **Tauri 2.5** (Rust backend) + **React 19** (TypeScript frontend), Co
 ## 📖 Table of Contents
 
 - [Overview](#overview)
+- [Installation](#installation)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
@@ -31,6 +32,59 @@ Cockpit is organized into three specialized modes:
 - **📝 Writing Mode**: Markdown editor with LaTeX support, idea management, and archive
 - **📰 Research Mode**: News aggregation, article management, and source configuration
 - **⚙️ System Mode**: Settings, database management, logs, and task scheduler
+
+## 🚀 Installation
+
+### End Users (Recommended)
+
+**Method 1: Tarball (Any Linux)**
+```bash
+# Download and extract
+tar -xzf cockpit-0.1.0-linux-amd64.tar.gz
+cd cockpit-0.1.0-linux-amd64
+
+# Run automated installer
+./install
+
+# Launch Cockpit
+cockpit
+```
+
+**Method 2: Debian Package (Ubuntu/Debian)**
+```bash
+# Install package
+sudo dpkg -i cockpit_0.1.0_amd64.deb
+
+# Install dependencies if needed
+sudo apt-get install -f
+
+# Launch Cockpit
+cockpit
+```
+
+**What happens automatically:**
+- ✅ Binary installed to `/usr/local/bin/cockpit`
+- ✅ Secure 256-bit master key generated
+- ✅ `~/.cockpit/` directory structure created
+- ✅ Desktop integration (launcher, icons)
+- ✅ Database initialized on first run with default settings
+- ✅ **Zero configuration required**
+
+**Uninstall**:
+```bash
+# If installed from tarball
+cd cockpit-0.1.0-linux-amd64/scripts
+./uninstall.sh
+
+# If installed from .deb
+sudo apt remove cockpit
+```
+
+See [INSTALL.md](INSTALL.md) for detailed installation instructions.
+
+### Developers
+
+See [Getting Started](#getting-started) below for development setup.
 
 ## Features
 
@@ -461,27 +515,43 @@ cd backend
 cargo tauri build
 ```
 
+**How It Works (Portable Build System):**
+- Uses portable build scripts: `backend/build-frontend.sh` and `backend/dev-frontend.sh`
+- Scripts auto-detect project root using `$PWD` and `BASH_SOURCE`
+- Works from **any directory** on **any machine** (no absolute paths)
+- Frontend builds first, then Rust backend compiles, then bundles are created
+
+**Build Process:**
+1. `cargo tauri build` invoked from `backend/` directory
+2. Tauri calls `bash $PWD/backend/build-frontend.sh`
+3. Script detects project root: `$(cd "$SCRIPT_DIR/.." && pwd)`
+4. Builds frontend: `cd $PROJECT_ROOT/frontend && npm run build`
+5. Tauri compiles Rust backend in release mode
+6. Bundles created for target platforms
+
+**Why This Approach:**
+- ✅ **Portable**: Works on any developer's machine without absolute paths
+- ✅ **Reliable**: Handles Tauri's working directory changes automatically
+- ✅ **Transferable**: Git clone + build works immediately on any system
+- ✅ **Documented**: Build scripts are commented and easy to understand
+
 **Build Output:**
 ```
-backend/target/release/
-├── backend                      # Standalone binary (macOS/Linux)
-├── backend.exe                  # Standalone binary (Windows)
-├── cockpit                      # Tauri bundled app
+build/target/release/            # Centralized build artifacts (root level)
+├── cockpit                      # Tauri bundled app (CORRECT BINARY)
 └── bundle/                      # Platform-specific installers
-    ├── appimage/               # Linux AppImage
-    │   └── cockpit_0.2.0_amd64.AppImage
-    ├── deb/                    # Debian package
-    │   └── cockpit_0.2.0_amd64.deb
-    ├── dmg/                    # macOS disk image
-    │   └── cockpit_0.2.0_x64.dmg
-    └── msi/                    # Windows installer
-        └── cockpit_0.2.0_x64.msi
+    ├── appimage/               # Linux AppImage (requires square icon)
+    ├── deb/                    # Debian package ✅
+    │   └── Cockpit_0.1.0_amd64.deb
+    └── rpm/                    # RPM package ✅
+        └── Cockpit-0.1.0-1.x86_64.rpm
 ```
 
 **Build Times (Reference):**
-- Debug build: ~30s (incremental)
-- Release build: ~1m 50s (optimized)
-- Frontend build: ~5s
+- Frontend build: ~4s (Vite production)
+- Rust compilation: ~1m 30s (release mode, optimized)
+- Bundle creation: ~10s (deb + rpm)
+- **Total**: ~1m 45s
 
 **Frontend Only Build:**
 ```bash
@@ -490,19 +560,19 @@ npm run build
 ```
 - Output: `frontend/dist/`
 - Used by Tauri for production bundles
+- Vite optimizes and code-splits automatically
 
 ### Running Production Binary
 
 **Tauri App (Correct Way):**
 ```bash
-cd backend
-./target/release/cockpit        # Full Tauri app with UI
+./build/target/release/cockpit        # Full Tauri app with UI
 ```
 
-**⚠️ Important**: Do NOT run `./target/release/backend` - this is the backend library only, not the full app!
+**⚠️ Important**: Do NOT run `./build/target/release/backend` - this is the backend library only, not the full app!
 
 **Platform Installers:**
-- **Linux**: `./backend/target/release/bundle/appimage/cockpit_0.2.0_amd64.AppImage`
+- **Linux**: `./build/target/release/bundle/appimage/cockpit_0.2.0_amd64.AppImage`
 - **macOS**: Open `cockpit.app` from `bundle/dmg/`
 - **Windows**: Install from `.msi` or run `.exe`
 
@@ -1077,6 +1147,7 @@ Built with amazing open-source projects:
 - 🔄 **Integration Testing**: System-wide testing of all features
 
 ### Completed Recently ✨
+- ✨ **Production Readiness** (Dec 14): Missing logging added (8 functions), Tauri security fixed (CSP, permissions), portable build system
 - ✨ **Tasks View Complete** (Dec 14): Scheduler management, execution history tracking, comprehensive logging
 - ✨ **System Mode 100% Complete** (Dec 14): All four views fully functional
 - ✨ **Modular Refactoring Phase 1a** (Dec 13): Research domain entities organized
@@ -1089,6 +1160,87 @@ Built with amazing open-source projects:
 ### Roadmap
 
 See [TODO.md](TODO.md) for current tasks and [ROADMAP.md](./docs/ROADMAP.md) for long-term planning.
+
+## 🔧 Troubleshooting
+
+### Build Issues
+
+**Problem**: `cargo tauri build` fails with "No such file or directory" for frontend
+**Solution**: The portable build scripts (`backend/build-frontend.sh`) handle this automatically. Ensure you run from `backend/` directory:
+```bash
+cd backend
+cargo tauri build
+```
+
+**Problem**: AppImage build fails with "couldn't find a square icon"
+**Status**: Known issue, .deb and .rpm packages build successfully
+**Workaround**: Add a square icon or use `--bundles deb,rpm` to skip AppImage
+
+**Problem**: Build scripts not executable
+**Solution**:
+```bash
+cd backend
+chmod +x build-frontend.sh dev-frontend.sh
+```
+
+### Runtime Issues
+
+**Problem**: App won't start or exits immediately
+**Check**:
+1. `COCKPIT_MASTER_KEY` in `.env` is exactly 64 hex characters
+2. Database path in `.env` is correct: `DATABASE_URL=sqlite:./storage/data/db.sql`
+3. Run with logging: `RUST_LOG=debug ./build/target/release/cockpit`
+
+**Problem**: "Failed to open icon" error during build
+**Solution**: Icon paths in `tauri.conf.json` updated to use existing files (frac-32x32.png, frac-128x128.png)
+
+**Problem**: Frontend dev server won't start with `cargo tauri dev`
+**Solution**: Ensure frontend dependencies installed:
+```bash
+cd frontend && npm install
+cd ../backend && cargo tauri dev
+```
+
+### Path Resolution
+
+The project uses **portable build scripts** that work anywhere:
+
+**How it works**:
+- Scripts detect project root from their own location using `BASH_SOURCE`
+- Tauri calls scripts using `$PWD/backend/script.sh` (always correct)
+- Works from any directory, on any machine, no configuration needed
+
+**Build from different locations**:
+```bash
+# From backend directory (recommended)
+cd backend && cargo tauri build
+
+# From project root (also works)
+cd cockpit && cargo tauri build --config backend/tauri.conf.json
+
+# From anywhere (not recommended, but possible)
+cd /any/directory && cargo tauri build --config /path/to/cockpit/backend/tauri.conf.json
+```
+
+### Database Issues
+
+**Problem**: "Database is locked" error
+**Solution**: Close any other running instances of the app
+
+**Problem**: Migrations fail on startup
+**Solution**:
+1. Backup database: Copy `backend/storage/data/db.sql`
+2. Delete corrupted database
+3. Restart app (creates fresh database with migrations)
+4. Restore from backup via Storage View → Restore
+
+### Security
+
+See [backend/PERMISSIONS.md](backend/PERMISSIONS.md) for detailed security documentation including:
+- What permissions are granted and why
+- What's explicitly NOT granted (filesystem, network, shell)
+- CSP (Content Security Policy) configuration
+- Security boundaries between frontend and backend
 
 ## 📚 Documentation
 

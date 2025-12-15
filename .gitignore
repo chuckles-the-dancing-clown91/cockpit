@@ -43,3 +43,6 @@ coverage
 # Runtime storage (SQLite DBs, logs)
 backend/storage/
 
+
+# Build artifacts
+build/
