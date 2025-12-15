@@ -6,24 +6,8 @@
 [![Rust](https://img.shields.io/badge/Rust-1.75+-orange)](https://www.rust-lang.org/)
 [![React](https://img.shields.io/badge/React-19-blue)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 Built with **Tauri 2.5** (Rust backend) + **React 19** (TypeScript frontend), Cockpit provides a unified workspace for writing, research, and system management.
-
-## 📖 Table of Contents
-
-- [Overview](#overview)
-- [Installation](#installation)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-- [Build & Run](#build--run)
-- [Configuration](#configuration)
-- [Development Guide](#development-guide)
-- [Architecture](#architecture)
-- [Troubleshooting](#troubleshooting)
-- [Project Status](#project-status)
 
 ## 🎯 Overview
 
@@ -33,1230 +17,329 @@ Cockpit is organized into three specialized modes:
 - **📰 Research Mode**: News aggregation, article management, and source configuration
 - **⚙️ System Mode**: Settings, database management, logs, and task scheduler
 
-## 🚀 Installation
+## 🚀 Quick Start
 
-### End Users (Recommended)
+### For Users
 
-**Method 1: Tarball (Any Linux)**
+**Debian/Ubuntu:**
 ```bash
-# Download and extract
-tar -xzf cockpit-0.1.0-linux-amd64.tar.gz
-cd cockpit-0.1.0-linux-amd64
-
-# Run automated installer
-./install
-
-# Launch Cockpit
+sudo dpkg -i Cockpit_0.1.0_amd64.deb
 cockpit
 ```
 
-**Method 2: Debian Package (Ubuntu/Debian)**
+**Fedora/RHEL:**
 ```bash
-# Install package
-sudo dpkg -i cockpit_0.1.0_amd64.deb
-
-# Install dependencies if needed
-sudo apt-get install -f
-
-# Launch Cockpit
+sudo rpm -i Cockpit-0.1.0-1.x86_64.rpm
 cockpit
 ```
 
-**What happens automatically:**
-- ✅ Binary installed to `/usr/local/bin/cockpit`
-- ✅ Secure 256-bit master key generated
-- ✅ `~/.cockpit/` directory structure created
-- ✅ Desktop integration (launcher, icons)
-- ✅ Database initialized on first run with default settings
-- ✅ **Zero configuration required**
+See [INSTALLATION.md](docs/INSTALLATION.md) for detailed instructions.
 
-**Uninstall**:
+### For Developers
+
 ```bash
-# If installed from tarball
-cd cockpit-0.1.0-linux-amd64/scripts
-./uninstall.sh
+# Clone and setup
+git clone <repo-url>
+cd cockpit
 
-# If installed from .deb
-sudo apt remove cockpit
+# Install frontend dependencies
+cd frontend && npm install
+
+# Create backend/.env (see Configuration section below)
+cd ../backend
+cp .env.example .env
+# Edit .env with your settings
+
+# Run development server
+cargo tauri dev
 ```
 
-See [INSTALL.md](INSTALL.md) for detailed installation instructions.
-
-### Developers
-
-See [Getting Started](#getting-started) below for development setup.
-
-## Features
+## ✨ Features
 
 ### Writing Mode
 - **Advanced Markdown Editor**: 13 toolbar actions, live preview, LaTeX/math support
-- **Ideas Library**: Capture and organize ideas with priority levels and status tracking
+- **Ideas Library**: Capture and organize ideas with priority levels
 - **Archive**: View and restore previously saved content
 - **Writing Stats**: Real-time word count, reading time, paragraph tracking
 
 ### Research Mode
-- **News Feed**: Automated article fetching from configured sources
+- **News Feed**: Automated article fetching from NewsData.io
 - **Reddit Integration**: Monitor subreddits, manage mod queue
-- **Source Management**: Enable/disable news sources, configure fetch intervals
+- **Source Management**: Enable/disable sources, configure fetch intervals
 
 ### System Mode
 - **Settings**: App preferences, API keys (encrypted), logging configuration
 - **Storage**: Database stats, backups, export/import, automated cleanup
-- **Logs**: Multi-filter log viewer (level, module, date, search), export functionality
-- **Tasks**: Complete scheduler management with:
-  - Real-time task list with status, last run time, error counts
-  - Execution history tracking (all runs recorded to database)
-  - Manual task triggering (Run Now button)
-  - Enable/disable scheduled tasks
-  - Comprehensive logging (scheduler triggers, completions, errors)
-  - Duration tracking and status badges
+- **Logs**: Multi-filter log viewer (level, module, date), export functionality
+- **Task Scheduler**: Cron-based job system with execution history
 
-### Cross-Cutting Features
-- **3 Themes**: Dark, Cyberpunk, Light with instant switching
-- **Mobile Responsive**: Drawer navigation, touch-friendly UI
-- **Keyboard Shortcuts**: ⌘/Ctrl+1/2/3 for mode switching
-- **Accessibility**: Full ARIA labels, screen reader support, keyboard navigation
-- **Smooth Animations**: Fade transitions, scale effects, slide-out drawers
+## 🛠️ Tech Stack
 
-## Tech Stack
+### Backend (Rust)
+- **Tauri 2.5.3** - Desktop application framework
+- **SeaORM 1.1** - Async ORM for SQLite
+- **Tokio** - Async runtime
+- **Tokio-Cron-Scheduler** - Job scheduling
+- **Argon2** - Password hashing
+- **AES-GCM** - Encryption for sensitive data
 
-### Backend
-- **Tauri 2.5.3**: Native desktop framework
-- **Rust 1.75+**: Core application logic
-- **SeaORM 1.1.19**: Database ORM with migrations
-- **SQLite**: Local data storage
-- **tokio-cron-scheduler 0.15.1**: Automated task execution
-- **tracing**: Structured logging with JSON format
-- **argon2**: Password hashing (future auth)
-- **aes-gcm**: API key encryption
-
-### Frontend
-- **React 19**: UI framework with concurrent features
-- **TypeScript 5**: Type-safe development
-- **Vite 7.2.7**: Fast build tooling with HMR
-- **TanStack Query v5**: Server state management & caching
-- **Tailwind CSS 3**: Utility-first styling
-- **Radix UI**: Accessible component primitives
-- **Sonner 2.0**: Toast notifications
-- **MDEditor**: Custom markdown editor with LaTeX support
+### Frontend (React/TypeScript)
+- **React 19** - UI framework
+- **TypeScript 5** - Type safety
+- **TanStack Query** - Data fetching and caching
+- **Radix UI** - Accessible component primitives
+- **Tailwind CSS** - Utility-first styling
+- **Vite** - Build tool and dev server
 
 ## 📁 Project Structure
 
-### Complete File Hierarchy
-
 ```
 cockpit/
-├── backend/                      # Tauri + Rust backend
+├── backend/              # Rust backend (Tauri)
 │   ├── src/
-│   │   ├── main.rs              # App entry point, command registration
-│   │   │
-│   │   ├── core/                # Infrastructure domain
-│   │   │   ├── components/
-│   │   │   │   ├── config/     # Configuration management
-│   │   │   │   │   ├── loader.rs    # Environment variable loading
-│   │   │   │   │   ├── types.rs     # Config structs
-│   │   │   │   │   ├── validation.rs # Config validation
-│   │   │   │   │   └── mod.rs
-│   │   │   │   ├── db/         # Database management
-│   │   │   │   │   ├── init.rs      # Connection pool setup
-│   │   │   │   │   ├── migrations.rs # Schema migrations
-│   │   │   │   │   ├── backup.rs    # Database backup operations
-│   │   │   │   │   └── mod.rs
-│   │   │   │   ├── settings/   # App settings system
-│   │   │   │   │   ├── entities.rs  # Database entity
-│   │   │   │   │   ├── handlers.rs  # CRUD operations
-│   │   │   │   │   ├── types.rs     # DTOs
-│   │   │   │   │   ├── validation.rs # Setting validation
-│   │   │   │   │   └── mod.rs
-│   │   │   │   ├── storage/    # Storage & file management
-│   │   │   │   │   ├── backup.rs    # Backup operations
-│   │   │   │   │   ├── cleanup.rs   # Cleanup utilities
-│   │   │   │   │   ├── export.rs    # Export/import
-│   │   │   │   │   ├── logs.rs      # Log file management
-│   │   │   │   │   ├── stats.rs     # Storage statistics
-│   │   │   │   │   └── mod.rs
-│   │   │   │   ├── crypto.rs   # AES-GCM encryption
-│   │   │   │   ├── errors/     # Error types & handling
-│   │   │   │   ├── logging/    # Structured logging setup
-│   │   │   │   └── mod.rs
-│   │   │   ├── commands.rs     # Core Tauri commands
-│   │   │   └── mod.rs
-│   │   │
-│   │   ├── writing/             # Content creation domain
-│   │   │   ├── components/
-│   │   │   │   └── ideas/
-│   │   │   │       ├── handlers.rs  # CRUD operations
-│   │   │   │       ├── types.rs     # Entity & DTOs
-│   │   │   │       └── mod.rs
-│   │   │   ├── commands.rs     # 8 Tauri commands
-│   │   │   └── mod.rs
-│   │   │
-│   │   ├── research/            # News & research domain
-│   │   │   ├── components/
-│   │   │   │   └── feed/
-│   │   │   │       ├── entities/    # Database entities
-│   │   │   │       │   ├── articles.rs
-│   │   │   │       │   ├── settings.rs
-│   │   │   │       │   ├── sources.rs
-│   │   │   │       │   └── mod.rs
-│   │   │   │       ├── articles.rs  # Article handlers
-│   │   │   │       ├── settings.rs  # Settings management
-│   │   │   │       ├── sources.rs   # Source management
-│   │   │   │       ├── sync.rs      # API sync logic
-│   │   │   │       ├── types.rs     # DTOs
-│   │   │   │       └── mod.rs
-│   │   │   ├── commands.rs     # 10 Tauri commands
-│   │   │   └── mod.rs
-│   │   │
-│   │   ├── system/              # Scheduling domain
-│   │   │   ├── components/
-│   │   │   │   └── scheduler/
-│   │   │   │       ├── entities.rs    # SystemTask entity model
-│   │   │   │       ├── task_runs.rs   # SystemTaskRuns entity model
-│   │   │   │       ├── types.rs       # DTOs (SystemTaskDto, TaskRunDto, etc.)
-│   │   │   │       ├── executor.rs    # Task execution logic with run history
-│   │   │   │       ├── init.rs        # Scheduler initialization
-│   │   │   │       ├── handlers.rs    # Command handlers
-│   │   │   │       └── mod.rs
-│   │   │   ├── commands.rs     # 4 Tauri commands
-│   │   │   └── mod.rs
-│   │   │
-│   │   └── util/                # Cross-domain utilities
-│   │       ├── commands.rs     # 6 utility commands
-│   │       └── mod.rs
-│   │
-│   ├── storage/                 # Runtime data (created on first run)
-│   │   ├── data/
-│   │   │   ├── db.sql          # SQLite database
-│   │   │   ├── db.sql-shm      # Shared memory
-│   │   │   └── db.sql-wal      # Write-ahead log
-│   │   ├── logs/
-│   │   │   ├── app.log         # Application logs (JSON)
-│   │   │   ├── api_calls.log   # API request/response logs
-│   │   │   └── errors.log      # Error-level logs only
-│   │   ├── backups/            # Database backups
-│   │   ├── exports/            # Data exports
-│   │   └── cache/              # Temporary cache
-│   │
-│   ├── migrations/              # SQL migration files
-│   │   ├── 001_initial_schema_up.sql
-│   │   ├── 001_initial_schema_down.sql
-│   │   ├── 002_app_settings_up.sql
-│   │   ├── 002_app_settings_down.sql
-│   │   ├── 003_performance_indexes_up.sql
-│   │   └── 003_performance_indexes_down.sql
-│   │
-│   ├── capabilities/            # Tauri v2 ACL permissions
-│   │   └── default.json        # Permission manifest
-│   │
-│   ├── icons/                   # App icons (various sizes)
-│   ├── target/                  # Rust build output
-│   │   ├── debug/              # Debug builds
-│   │   └── release/            # Release builds
-│   │       ├── backend         # Compiled binary
-│   │       ├── cockpit         # Tauri app bundle
-│   │       └── bundle/         # Platform installers
-│   │
-│   ├── Cargo.toml              # Rust dependencies
-│   ├── Cargo.lock              # Dependency lock file
-│   ├── tauri.conf.json         # Tauri configuration
-│   ├── build.rs                # Build script
-│   └── .env                    # Environment variables (create this)
+│   │   ├── main.rs      # Entry point, Tauri setup
+│   │   ├── core/        # Infrastructure (db, config, logging)
+│   │   ├── writing/     # Ideas & content management
+│   │   ├── research/    # News aggregation & feeds
+│   │   ├── system/      # Scheduler & system tasks
+│   │   └── util/        # Cross-domain utilities
+│   ├── storage/         # Runtime data (db, logs, backups)
+│   ├── migrations/      # SQL migration files
+│   ├── icons/           # App icons (multiple sizes)
+│   └── tauri.conf.json  # Tauri configuration
 │
-├── frontend/                    # React + TypeScript frontend
+├── frontend/            # React frontend
 │   ├── src/
-│   │   ├── components/
-│   │   │   ├── navigation/     # TopNav, SideNav, ModeContext
-│   │   │   ├── writing/        # Writing mode views
-│   │   │   │   ├── WritingView.tsx
-│   │   │   │   ├── IdeasView.tsx
-│   │   │   │   └── ArchiveView.tsx
-│   │   │   ├── research/       # Research mode views
-│   │   │   │   ├── NewsFeedView.tsx
-│   │   │   │   ├── ArticlesView.tsx
-│   │   │   │   └── SourcesView.tsx
-│   │   │   ├── system/         # System mode views
-│   │   │   │   ├── SettingsView.tsx
-│   │   │   │   ├── StorageView.tsx
-│   │   │   │   ├── LogsView.tsx
-│   │   │   │   └── TasksView.tsx
-│   │   │   ├── news/           # Shared news components
-│   │   │   ├── ui/             # Reusable UI components
-│   │   │   │   ├── button.tsx
-│   │   │   │   ├── card.tsx
-│   │   │   │   ├── dialog.tsx
-│   │   │   │   └── ... (20+ components)
-│   │   │   └── layout/         # Layout components
-│   │   │
-│   │   ├── hooks/
-│   │   │   ├── queries.ts      # TanStack Query hooks
-│   │   │   ├── useDebounce.ts
-│   │   │   └── useLocalStorage.ts
-│   │   │
-│   │   ├── lib/
-│   │   │   ├── utils.ts        # Utility functions
-│   │   │   └── notifications.ts
-│   │   │
-│   │   ├── theme/              # Theme system
-│   │   │   └── theme-provider.tsx
-│   │   │
-│   │   ├── vendor/             # Custom MDEditor
-│   │   │   └── md-editor/
-│   │   │
-│   │   ├── App.tsx             # Main application
-│   │   ├── main.tsx            # React entry point
-│   │   └── index.css           # Global styles
-│   │
-│   ├── public/                 # Static assets
-│   ├── node_modules/           # Node dependencies (gitignored)
-│   ├── dist/                   # Built frontend (gitignored)
-│   ├── package.json            # Node dependencies
-│   ├── package-lock.json       # Dependency lock file
-│   ├── vite.config.ts          # Vite configuration
-│   ├── tsconfig.json           # TypeScript config
-│   ├── tsconfig.node.json      # Node TypeScript config
-│   ├── tailwind.config.cjs     # Tailwind CSS config
-│   └── postcss.config.cjs      # PostCSS config
+│   │   ├── components/  # UI components by domain
+│   │   ├── hooks/       # React hooks (queries, mutations)
+│   │   ├── views/       # Page components
+│   │   └── lib/         # Utilities
+│   └── dist/            # Production build output
 │
-├── docs/                        # Documentation
-│   ├── DONE.md                 # Completed work log
-│   ├── ROADMAP.md              # Future planning
-│   └── TODO_OLD_BACKUP.md      # Historical backups
+├── docs/                # Documentation
+│   ├── BUILD_GUIDE.md
+│   ├── DEPLOYMENT.md
+│   ├── ICON_TROUBLESHOOTING.md
+│   └── archive/         # Historical docs
 │
-├── README.md                    # This file
-├── TODO.md                      # Active tasks
-├── REFACTOR_SUMMARY.md         # Refactoring notes
-└── build.sh                     # Build script (optional)
+├── build/               # Build artifacts
+│   └── target/release/bundle/  # .deb and .rpm packages
+│
+└── dist/                # Distribution packages
 ```
-
-### Architecture Patterns
-
-**Backend (Domain-Driven Design):**
-- **`domain/components/`** - Business logic & handlers (pure Rust)
-- **`domain/commands.rs`** - Tauri command interface (thin wrappers)
-- **`main.rs`** - Application setup & command registration only
-
-**Frontend (Component-Based):**
-- **Mode-based structure** - Writing, Research, System
-- **Shared UI components** - Radix UI primitives + custom components
-- **Hooks for data** - TanStack Query for server state
-- **Theme system** - CSS variables + context provider
-
-**Key Benefits:**
-- ✅ Clear separation of concerns
-- ✅ Easy to navigate and locate functionality
-- ✅ Parallel development friendly
-- ✅ Testable components
-- ✅ Foundation for future plugin system
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-Ensure you have the following installed:
-
-| Tool | Version | Purpose | Installation |
-|------|---------|---------|--------------|
-| **Node.js** | 18+ | Frontend tooling | [nodejs.org](https://nodejs.org/) |
-| **Rust** | 1.75+ | Backend compilation | [rustup.rs](https://rustup.rs/) |
-| **npm/pnpm** | Latest | Package manager | Included with Node.js |
-| **SQLite** | 3.x | Database (usually pre-installed) | [sqlite.org](https://www.sqlite.org/) |
-
-**Platform-Specific Requirements:**
-- **Linux**: `build-essential`, `libssl-dev`, `libsqlite3-dev`, `libgtk-3-dev`, `libwebkit2gtk-4.0-dev`
-- **macOS**: Xcode Command Line Tools (`xcode-select --install`)
-- **Windows**: Visual Studio Build Tools, WebView2
-
-### Quick Start
-
-```bash
-# 1. Clone the repository
-git clone <repository-url>
-cd cockpit
-
-# 2. Install frontend dependencies
-cd frontend
-npm install
-
-# 3. Build backend dependencies
-cd ../backend
-cargo build
-
-# 4. Create environment file (see Configuration below)
-cp .env.example .env
-nano .env  # Edit with your settings
-
-# 5. Run in development mode
-cargo tauri dev
-```
-
-The app will start with hot-reload enabled for both frontend and backend.
 
 ## ⚙️ Configuration
 
 ### Environment Variables
 
-Create `backend/.env` with the following configuration:
+Create `backend/.env`:
 
 ```bash
-# ============================================
-# Database Configuration
-# ============================================
-# Use ABSOLUTE paths to prevent path resolution issues
+# Database (use ABSOLUTE paths)
 DATABASE_URL=sqlite:/absolute/path/to/cockpit/backend/storage/data/db.sql
 DB_MAX_CONNECTIONS=5
-DB_MIN_CONNECTIONS=1
 
-# ============================================
-# Logging Configuration
-# ============================================
-LOG_LEVEL=info                    # Options: trace, debug, info, warn, error
-LOG_JSON=true                     # Enable JSON log format for parsing
-LOG_CONSOLE=true                  # Print logs to console
-LOGS_DIR=/absolute/path/to/cockpit/backend/storage/logs
-LOG_MAX_SIZE_MB=10               # Max log file size before rotation
-LOG_MAX_FILES=5                  # Number of rotated files to keep
-
-# ============================================
-# NewsData API Configuration
-# ============================================
-NEWSDATA_API_KEY=your_api_key_here
-NEWSDATA_DAILY_LIMIT=180         # Free tier: 180 calls/day
-
-# ============================================
-# Storage Configuration
-# ============================================
-# Use ABSOLUTE paths
-STORAGE_ROOT=/absolute/path/to/cockpit/backend/storage
-STORAGE_MAX_SIZE_GB=50           # Maximum storage size (soft limit)
-
-# ============================================
-# Encryption & Security
-# ============================================
-# Generate a secure 64-character hex key
-COCKPIT_MASTER_KEY=$(openssl rand -hex 32)
-# Or manually: COCKPIT_MASTER_KEY=your_64_character_hex_key_here
-```
-
-**⚠️ Critical Notes:**
-- **Always use absolute paths** - Relative paths fail when running from different directories
-- **`COCKPIT_MASTER_KEY` must be 64 hex characters** - App exits silently if wrong length
-- **Backup your `.env` file** - Lost keys = inaccessible encrypted data
-
-### Generating Secure Keys
-
-```bash
-# Generate master encryption key (64 hex characters)
-openssl rand -hex 32
-
-# Example output: 8f7a3e9c1d6b2f0a5c8e4b7d9f1a3c5e...
-```
-
-### Example `.env` File
-
-```bash
-DATABASE_URL=sqlite:/home/user/cockpit/backend/storage/data/db.sql
-DB_MAX_CONNECTIONS=5
-DB_MIN_CONNECTIONS=1
-
+# Logging
 LOG_LEVEL=info
 LOG_JSON=true
-LOG_CONSOLE=true
-LOGS_DIR=/home/user/cockpit/backend/storage/logs
-LOG_MAX_SIZE_MB=10
-LOG_MAX_FILES=5
+LOGS_DIR=/absolute/path/to/cockpit/backend/storage/logs
 
-NEWSDATA_API_KEY=pub_123456789abcdef
-NEWSDATA_DAILY_LIMIT=180
+# API Keys
+NEWSDATA_API_KEY=your_api_key_here
 
-STORAGE_ROOT=/home/user/cockpit/backend/storage
+# Storage
+STORAGE_ROOT=/absolute/path/to/cockpit/backend/storage
 STORAGE_MAX_SIZE_GB=50
 
-COCKPIT_MASTER_KEY=8f7a3e9c1d6b2f0a5c8e4b7d9f1a3c5e2b4d6f8a9c1e3f5a7c9e1b3d5f7a9c1e
+# Encryption (64 hex characters - generate with: openssl rand -hex 32)
+COCKPIT_MASTER_KEY=your_64_character_hex_key_here
 ```
 
-## 🔨 Build & Run
+**⚠️ Critical:**
+- Always use **absolute paths**
+- `COCKPIT_MASTER_KEY` must be exactly **64 hex characters**
+- Backup your `.env` file - lost keys = inaccessible encrypted data
 
-### Development Mode
+## 🔨 Development
 
-**Full Stack (Recommended):**
+### Running Development Server
+
 ```bash
 cd backend
 cargo tauri dev
 ```
-- Starts Rust backend with hot-reload
-- Starts React frontend on `http://localhost:5173`
-- Opens native window automatically
-- Backend logs to console + files
 
-**Frontend Only:**
-```bash
-cd frontend
-npm run dev
-```
-- Frontend dev server only
-- Use when working on UI without backend changes
-- Tauri commands will fail without backend
+This starts:
+- Rust backend with hot-reload
+- React frontend on `http://localhost:5173`
+- Native window automatically opens
 
-**Backend Only:**
-```bash
-cd backend
-cargo run
-```
-- Runs Rust backend without Tauri window
-- Useful for testing backend logic
-- No frontend served
+### Building for Production
 
-### Production Build
-
-**Complete Build:**
 ```bash
 cd backend
 cargo tauri build
 ```
 
-**How It Works (Portable Build System):**
-- Uses portable build scripts: `backend/build-frontend.sh` and `backend/dev-frontend.sh`
-- Scripts auto-detect project root using `$PWD` and `BASH_SOURCE`
-- Works from **any directory** on **any machine** (no absolute paths)
-- Frontend builds first, then Rust backend compiles, then bundles are created
+Creates packages in `build/target/release/bundle/`:
+- `deb/Cockpit_0.1.0_amd64.deb` (Debian/Ubuntu)
+- `rpm/Cockpit-0.1.0-1.x86_64.rpm` (Fedora/RHEL)
 
-**Build Process:**
-1. `cargo tauri build` invoked from `backend/` directory
-2. Tauri calls `bash $PWD/backend/build-frontend.sh`
-3. Script detects project root: `$(cd "$SCRIPT_DIR/.." && pwd)`
-4. Builds frontend: `cd $PROJECT_ROOT/frontend && npm run build`
-5. Tauri compiles Rust backend in release mode
-6. Bundles created for target platforms
+See [BUILD_GUIDE.md](docs/BUILD_GUIDE.md) for detailed build instructions.
 
-**Why This Approach:**
-- ✅ **Portable**: Works on any developer's machine without absolute paths
-- ✅ **Reliable**: Handles Tauri's working directory changes automatically
-- ✅ **Transferable**: Git clone + build works immediately on any system
-- ✅ **Documented**: Build scripts are commented and easy to understand
+### Architecture
 
-**Build Output:**
-```
-build/target/release/            # Centralized build artifacts (root level)
-├── cockpit                      # Tauri bundled app (CORRECT BINARY)
-└── bundle/                      # Platform-specific installers
-    ├── appimage/               # Linux AppImage (requires square icon)
-    ├── deb/                    # Debian package ✅
-    │   └── Cockpit_0.1.0_amd64.deb
-    └── rpm/                    # RPM package ✅
-        └── Cockpit-0.1.0-1.x86_64.rpm
-```
+**Domain-Driven Structure:**
+- Each domain (`writing`, `research`, `system`) owns its business logic
+- `commands.rs` - Thin Tauri command wrappers
+- `components/` - Business logic (pure Rust functions)
+- `core/` - Shared infrastructure (database, config, logging)
 
-**Build Times (Reference):**
-- Frontend build: ~4s (Vite production)
-- Rust compilation: ~1m 30s (release mode, optimized)
-- Bundle creation: ~10s (deb + rpm)
-- **Total**: ~1m 45s
+**Frontend Pattern:**
+- TanStack Query for all backend calls
+- Hooks encapsulate queries and mutations
+- Components stay simple and focused
 
-**Frontend Only Build:**
+## 🧪 Testing
+
 ```bash
-cd frontend
-npm run build
-```
-- Output: `frontend/dist/`
-- Used by Tauri for production bundles
-- Vite optimizes and code-splits automatically
-
-### Running Production Binary
-
-**Tauri App (Correct Way):**
-```bash
-./build/target/release/cockpit        # Full Tauri app with UI
-```
-
-**⚠️ Important**: Do NOT run `./build/target/release/backend` - this is the backend library only, not the full app!
-
-**Platform Installers:**
-- **Linux**: `./build/target/release/bundle/appimage/cockpit_0.2.0_amd64.AppImage`
-- **macOS**: Open `cockpit.app` from `bundle/dmg/`
-- **Windows**: Install from `.msi` or run `.exe`
-
-### Build Optimization
-
-**Faster Debug Builds:**
-```bash
-# Use mold linker (Linux)
-sudo apt install mold
-export RUSTFLAGS="-C link-arg=-fuse-ld=mold"
-cargo build
-```
-
-**Smaller Release Builds:**
-```toml
-# Add to backend/Cargo.toml
-[profile.release]
-opt-level = "z"     # Optimize for size
-lto = true          # Link-time optimization
-codegen-units = 1   # Better optimization
-strip = true        # Remove debug symbols
-```
-
-## 🛠️ Development Guide
-
-### Project Workflow
-
-**1. UI Changes (Frontend)**
-```bash
-cd frontend
-npm run dev    # Hot-reload enabled
-# Edit files in src/components/
-```
-
-**2. Backend Logic**
-```bash
+# Run all tests
 cd backend
-cargo tauri dev    # Restart on Rust changes
-# Edit files in src/
+cargo test
+
+# Run with output
+cargo test -- --nocapture
+
+# Test specific module
+cargo test core::
 ```
-
-**3. Database Changes**
-```bash
-# Add migration in backend/migrations/
-# Format: 00X_description_up.sql and 00X_description_down.sql
-# Increment version in src/core/components/migrations.rs
-```
-
-### Adding a New Feature
-
-The modular architecture makes features easy to add in isolation:
-
-#### Step 1: Identify the Domain
-
-| Domain | Purpose | Examples |
-|--------|---------|----------|
-| **core** | Infrastructure | Settings, storage, logging |
-| **writing** | Content creation | Ideas, markdown editing |
-| **research** | News & articles | Feed sync, sources |
-| **system** | Scheduling | Cron jobs, task runs |
-| **util** | Cross-domain | Utilities, helpers |
-
-#### Step 2: Implement Business Logic
-
-Create handler in `domain/components/`:
-
-```rust
-// backend/src/research/components/feed/articles.rs
-use crate::core::components::errors::AppResult;
-use crate::AppState;
-
-/// Mark article as read
-pub async fn mark_article_read_handler(
-    id: i64,
-    state: &AppState,
-) -> AppResult<()> {
-    // 1. Validate input
-    if id <= 0 {
-        return Err(AppError::InvalidInput("Invalid article ID".into()));
-    }
-    
-    // 2. Update database
-    let article = EntityNewsArticles::find_by_id(id)
-        .one(&state.db)
-        .await?
-        .ok_or(AppError::NotFound("Article not found".into()))?;
-    
-    let mut active: ActiveModel = article.into();
-    active.is_read = Set(1);
-    active.update(&state.db).await?;
-    
-    // 3. Log action
-    info!("Article {} marked as read", id);
-    
-    Ok(())
-}
-```
-
-#### Step 3: Create Tauri Command
-
-Wrap handler in `domain/commands.rs`:
-
-```rust
-// backend/src/research/commands.rs
-use tauri::State;
-
-#[tauri::command]
-pub async fn mark_article_read(
-    id: i64,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    mark_article_read_handler(id, &state)
-        .await
-        .map_err(|e| e.to_string())  // Convert AppError to String
-}
-```
-
-#### Step 4: Register Command
-
-Add to `main.rs` invoke handler:
-
-```rust
-// backend/src/main.rs
-tauri::Builder::default()
-    .invoke_handler(tauri::generate_handler![
-        // ... existing commands
-        research::commands::mark_article_read,  // <-- Add here
-    ])
-```
-
-#### Step 5: Create Frontend Hook
-
-Add to `frontend/src/hooks/queries.ts`:
-
-```typescript
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { invoke } from '@tauri-apps/api/core';
-
-export function useMarkArticleRead() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (id: number) => invoke('mark_article_read', { id }),
-    onSuccess: () => {
-      // Invalidate related queries to refetch
-      queryClient.invalidateQueries({ queryKey: ['articles'] });
-    },
-  });
-}
-```
-
-#### Step 6: Use in Component
-
-```typescript
-// frontend/src/components/research/NewsFeedView.tsx
-import { useMarkArticleRead } from '@/hooks/queries';
-
-function ArticleCard({ article }) {
-  const markAsRead = useMarkArticleRead();
-  
-  const handleMarkRead = () => {
-    markAsRead.mutate(article.id);
-  };
-  
-  return (
-    <button onClick={handleMarkRead}>
-      Mark as Read
-    </button>
-  );
-}
-```
-
-### Code Organization Principles
-
-1. ✅ **Business logic** in `domain/components/` (pure Rust functions)
-2. ✅ **Tauri commands** in `domain/commands.rs` (thin wrappers)
-3. ✅ **Keep main.rs thin** - only setup and registration
-4. ✅ **Use handlers** - separate logic from framework
-5. ✅ **Domain isolation** - minimize cross-dependencies
-6. ✅ **Frontend hooks** - encapsulate Tauri calls
-7. ✅ **Type safety** - leverage TypeScript + Rust
-
-### Working in Parallel
-
-The modular structure enables multiple developers to work simultaneously:
-
-| Developer | Focus Area | Directory | Conflicts |
-|-----------|-----------|-----------|-----------|
-| Dev A | Writing features | `writing/` | Minimal |
-| Dev B | Research features | `research/` | Minimal |
-| Dev C | System features | `system/` | Minimal |
-| Dev D | Core infrastructure | `core/` | Moderate |
-| Dev E | UI components | `frontend/src/components/ui/` | Minimal |
-
-**Merge Conflict Prevention:**
-- Each domain is self-contained
-- Minimal cross-domain dependencies
-- Clear ownership boundaries
-- Only `main.rs` registration may conflict (easy to resolve)
-
-### Adding Tauri Plugins
-
-Tauri v2 uses a capability-based security model (ACL - Access Control List). When adding new plugins, you must configure permissions:
-
-**1. Add Plugin Dependencies**
-
-Backend (`backend/Cargo.toml`):
-```toml
-[dependencies]
-tauri-plugin-dialog = "2"
-```
-
-Frontend:
-```bash
-cd frontend
-npm install @tauri-apps/plugin-dialog
-```
-
-**2. Register Plugin in main.rs**
-
-```rust
-// backend/src/main.rs
-tauri::Builder::default()
-    .plugin(tauri_plugin_dialog::init())  // <-- Add plugin
-    .setup(move |app| {
-        // ... existing setup
-    })
-```
-
-**3. Configure Permissions (ACL)**
-
-Create or update `backend/capabilities/default.json`:
-
-```json
-{
-  "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "default",
-  "description": "Default permissions for the main window",
-  "windows": ["*"],
-  "permissions": [
-    "core:default",
-    "dialog:default",
-    "dialog:allow-open",      // Allow file open dialog
-    "dialog:allow-save"       // Allow file save dialog
-  ]
-}
-```
-
-**Common Plugin Permissions:**
-- **dialog**: `dialog:allow-open`, `dialog:allow-save`, `dialog:allow-message`
-- **fs**: `fs:allow-read-file`, `fs:allow-write-file`, `fs:allow-read-dir`
-- **shell**: `shell:allow-execute`, `shell:allow-open`
-- **http**: `http:default`, `http:allow-fetch`
-- **notification**: `notification:default`, `notification:allow-show`
-
-**4. Rebuild to Generate ACL Manifests**
-
-```bash
-cd backend
-cargo build --release
-```
-
-This regenerates `backend/gen/schemas/acl-manifests.json` with the new permissions.
-
-**5. Use Plugin in Frontend**
-
-```typescript
-import { open } from '@tauri-apps/plugin-dialog';
-
-const filePath = await open({
-  multiple: false,
-  filters: [{ name: 'JSON', extensions: ['json'] }]
-});
-```
-
-**Important Notes:**
-- **Always rebuild** after changing capabilities - permissions are compiled into the app
-- **Test permissions** - missing ACL entries cause "not allowed by ACL" runtime errors
-- **Minimal permissions** - only grant what's needed for security
-- **Wildcard windows** - `"windows": ["*"]` applies to all windows, or specify exact window names
-
-**Troubleshooting ACL Errors:**
-```
-Error: Command plugin:dialog|open not allowed by ACL
-```
-→ Solution: Add `dialog:allow-open` to `capabilities/default.json` and rebuild
-
-**Frontend build only:**
-```bash
-cd frontend
-npm run build
-```
-
-## 🎨 Features & Usage
-
-### Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `⌘/Ctrl + 1` | Switch to Writing Mode |
-| `⌘/Ctrl + 2` | Switch to Research Mode |
-| `⌘/Ctrl + 3` | Switch to System Mode |
-
-### Themes
-
-Toggle themes using the sun/moon icon in the top navigation:
-
-| Theme | Description | Color Scheme |
-|-------|-------------|--------------|
-| **Dark** | Default theme | Cyan accents, dark backgrounds |
-| **Cyberpunk** | Futuristic aesthetic | Orange/neon, warm dark tones |
-| **Light** | Clean interface | Blue accents, light backgrounds |
-
-### Database Management
-
-**Location**: `backend/storage/data/db.sql`
-- **Automatic migrations** on startup
-- **Backup system** via Storage view
-- **Export/Import** for data portability
-- **VACUUM** operations for optimization
-
-**Schema**:
-- `ideas` - Writing mode content
-- `news_articles` - Fetched articles
-- `news_settings` - API configuration
-- `news_sources` - Available sources
-- `app_settings` - Application preferences
-- `system_tasks` - Scheduled jobs
-- `system_task_runs` - Execution history
-
-### Logging System
-
-**Location**: `backend/storage/logs/`
-- **app.log** - Main application logs (JSON format)
-- **api_calls.log** - API request/response logs
-- **errors.log** - Error-level logs only
-
-**Configuration** (via Settings UI or `.env`):
-- Log level: `trace`, `debug`, `info`, `warn`, `error`
-- Max file size: Default 10MB
-- Rotation: Keeps last 5 files
-- Format: JSON for parsing, plain text for viewing
-
-### API Key Security
-
-- ✅ **Encrypted storage** using AES-GCM
-- ✅ **Master key** from `COCKPIT_MASTER_KEY`
-- ✅ **Sanitized logs** - API keys redacted
-- ✅ **UI management** - Settings > News API
-
-### Task Scheduler
-
-**Built-in Tasks**:
-- **NewsData Sync** (`news_sync`) - Fetch articles from NewsData.io API
-- **News Sources Sync** (`news_sources_sync`) - Update available news sources
-
-**Management** (Tasks View):
-- View all scheduled tasks with status, frequency, last run time
-- Execution history with filtering by task
-  - All runs recorded to `system_task_runs` table
-  - Shows start time, end time, duration, status, results, errors
-- Manual task triggering (Run Now button)
-- Enable/disable scheduled tasks
-- Cron-based scheduling (tokio-cron-scheduler)
-
-**Logging**:
-- INFO logs when scheduler triggers tasks
-- INFO logs for successful completion with results
-- ERROR logs for failures with full error details
-- WARN logs for skipped tasks (already running, unknown type)
-- All logs viewable in Logs tab or `backend/storage/logs/app.log`
-
-## Architecture
-
-### Mode-Based Navigation
-The app uses a context-based navigation system with three top-level modes. Each mode has its own side navigation with 3-4 views. State persists to localStorage for seamless session continuity.
-
-### State Management
-- **React Context**: Mode and view state
-- **TanStack Query**: Server state, caching, and data fetching
-- **localStorage**: Theme and navigation persistence
-
-### Backend Communication
-- **Tauri Commands**: Type-safe IPC between frontend and backend
-- **Event System**: Real-time updates from backend to frontend
-- **Error Handling**: Comprehensive error types with user-friendly messages
-
-## Development Workflow
-
-1. **UI Changes**: Work in `frontend/src/components/` with hot-reload
-2. **Backend Logic**: Modify `backend/src/` files, restart `cargo tauri dev`
-3. **Database Changes**: Update entities in `db.rs`, run migrations
-4. **New Features**: Follow the mode-based component structure
-
-## 🐛 Troubleshooting
-
-### Build Errors
-
-| Problem | Solution |
-|---------|----------|
-| **Cargo build fails** | `cd backend && cargo clean && cargo build` |
-| **npm install fails** | `cd frontend && rm -rf node_modules package-lock.json && npm install` |
-| **Tauri CLI missing** | `cargo install tauri-cli --version ^2.0.0` |
-| **Linking errors (Linux)** | Install dev libraries: `sudo apt install libgtk-3-dev libwebkit2gtk-4.0-dev` |
-| **OpenSSL errors** | `sudo apt install libssl-dev pkg-config` (Linux) or `brew install openssl` (macOS) |
-
-### Runtime Issues
-
-| Problem | Solution |
-|---------|----------|
-| **App exits immediately on startup** | Check `COCKPIT_MASTER_KEY` is 64 hex chars in `.env` |
-| **Database not found** | Verify `DATABASE_URL` uses absolute path |
-| **No logs appearing** | Check `LOGS_DIR` path exists and is writable |
-| **API calls failing** | Verify `NEWSDATA_API_KEY` in Settings view |
-| **Permission denied errors** | Check file permissions on `backend/storage/` directory |
-
-### Development Issues
-
-| Problem | Solution |
-|---------|----------|
-| **Port 5173 already in use** | Change port in `vite.config.ts` or kill process: `lsof -ti:5173 \| xargs kill` |
-| **Hot reload not working** | Restart dev server, check file watchers: `echo fs.inotify.max_user_watches=524288 \| sudo tee -a /etc/sysctl.conf` |
-| **TypeScript errors** | Run `npm run build` for full type checking |
-| **Rust analyzer slow** | Increase RAM allocation or use `rust-analyzer.checkOnSave.allTargets: false` |
-
-### Common Error Messages
-
-**"Command not allowed by ACL"**
-```bash
-# Solution: Add permission to backend/capabilities/default.json
-# Then rebuild: cargo build --release
-```
-
-**"Failed to connect to database"**
-```bash
-# Check DATABASE_URL path
-# Ensure directory exists: mkdir -p backend/storage/data
-```
-
-**"API key decryption failed"**
-```bash
-# COCKPIT_MASTER_KEY changed or missing
-# Re-enter API keys in Settings view
-```
-
-### Debug Mode
-
-**Enable verbose logging:**
-```bash
-# Backend
-cd backend
-RUST_LOG=debug RUST_BACKTRACE=1 cargo run
-
-# Check logs
-tail -f storage/logs/app.log
-```
-
-**Browser DevTools (Frontend):**
-- Press `F12` to open DevTools
-- Check Console for errors
-- Network tab shows Tauri command calls
-
-### Getting Help
-
-1. **Check logs**: `backend/storage/logs/app.log`
-2. **Search issues**: [GitHub Issues](link-to-issues)
-3. **Documentation**: [Tauri Docs](https://tauri.app/), [React Docs](https://react.dev/)
-4. **Ask community**: Tauri Discord, Stack Overflow
-
-## 🤝 Contributing
-
-We welcome contributions! Please follow these guidelines:
-
-### Code Style
-
-**TypeScript:**
-- Follow ESLint configuration
-- Use functional components with hooks
-- PascalCase for components, camelCase for functions
-- Explicit return types for functions
-
-**Rust:**
-- Run `cargo fmt` before committing
-- Run `cargo clippy` and fix warnings
-- Use `#[instrument]` for tracing spans
-- Document public APIs with `///` comments
-- Follow domain-driven structure
-
-### Commit Guidelines
-
-```bash
-# Good commit messages
-feat(research): add article filtering by date
-fix(storage): resolve backup path resolution
-docs(readme): update build instructions
-refactor(core): split storage.rs into modules
-
-# Bad commit messages
-update stuff
-fix bug
-wip
-```
-
-**Format**: `type(scope): description`
-
-**Types**: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`
-
-### Pull Request Process
-
-1. Fork the repository
-2. Create feature branch: `git checkout -b feat/amazing-feature`
-3. Make changes following code style
-4. Test thoroughly (build + manual testing)
-5. Commit with descriptive messages
-6. Push to your fork
-7. Open Pull Request with description
-
-### Testing Checklist
-
-- [ ] Backend compiles: `cargo build --release`
-- [ ] Frontend builds: `npm run build`
-- [ ] No TypeScript errors: `npm run type-check`
-- [ ] No Clippy warnings: `cargo clippy`
-- [ ] App runs: `cargo tauri dev`
-- [ ] Feature works as expected
-- [ ] No console errors
-
-## 📄 License
-
-[Add your license here - MIT, Apache 2.0, etc.]
-
-## 🙏 Acknowledgments
-
-Built with amazing open-source projects:
-
-### Backend
-- [Tauri](https://tauri.app/) - Rust-powered desktop framework
-- [SeaORM](https://www.sea-ql.org/SeaORM/) - Async ORM for Rust
-- [tokio](https://tokio.rs/) - Async runtime
-- [tokio-cron-scheduler](https://github.com/mvniekerk/tokio-cron-scheduler) - Cron scheduling
-- [tracing](https://github.com/tokio-rs/tracing) - Structured logging
-
-### Frontend
-- [React](https://react.dev/) - UI library
-- [Vite](https://vitejs.dev/) - Build tooling
-- [TanStack Query](https://tanstack.com/query/) - Data fetching
-- [Radix UI](https://www.radix-ui.com/) - Accessible components
-- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS
-- [Sonner](https://sonner.emilkowal.ski/) - Toast notifications
-
-### Special Thanks
-- NewsData.io for news API
-- The Tauri community for excellent documentation
-- All contributors and testers
-
-## Project Status
-
-**Current Version**: 0.2.0 (December 2025)  
-**Status**: Active Development
-
-### What's Working ✅
-- ✅ **Writing Mode**: Full markdown editor, ideas library, archive
-- ✅ **Research Mode**: News feed, article management, source syncing
-- ✅ **System Mode**: Settings, storage management, logs viewer, tasks scheduler (100% complete)
-- ✅ **Security**: Encrypted API keys, sanitized logs, input validation
-- ✅ **Performance**: Optimized queries, indexed database, code-split bundles
-- ✅ **Code Quality**: Domain-driven architecture, structured logging, comprehensive error handling
-- ✅ **Task Scheduler**: Full execution history tracking, manual triggering, comprehensive logging
-
-### In Progress 🔄
-- 🔄 **Modular Refactoring**: Splitting large files into focused modules (Phase 1a complete)
-- 🔄 **Integration Testing**: System-wide testing of all features
-
-### Completed Recently ✨
-- ✨ **Production Readiness** (Dec 14): Missing logging added (8 functions), Tauri security fixed (CSP, permissions), portable build system
-- ✨ **Tasks View Complete** (Dec 14): Scheduler management, execution history tracking, comprehensive logging
-- ✨ **System Mode 100% Complete** (Dec 14): All four views fully functional
-- ✨ **Modular Refactoring Phase 1a** (Dec 13): Research domain entities organized
-- ✨ **System Mode Integration** (Dec 12-13): Settings, Storage, Logs fully functional
-- ✨ **Backend Refactoring** (Dec 12): Domain-driven architecture, 48% reduction in main.rs
-- ✨ **Security Fix** (Dec 12): API key sanitization in all logs
-- ✨ **Frontend Optimization** (Dec 9-12): Bundle size reduced by 54%, zero vulnerabilities
-- ✨ **Backend Modernization** (Dec 9-12): Package updates, performance indexes, column optimization
-
-### Roadmap
-
-See [TODO.md](TODO.md) for current tasks and [ROADMAP.md](./docs/ROADMAP.md) for long-term planning.
-
-## 🔧 Troubleshooting
-
-### Build Issues
-
-**Problem**: `cargo tauri build` fails with "No such file or directory" for frontend
-**Solution**: The portable build scripts (`backend/build-frontend.sh`) handle this automatically. Ensure you run from `backend/` directory:
-```bash
-cd backend
-cargo tauri build
-```
-
-**Problem**: AppImage build fails with "couldn't find a square icon"
-**Status**: Known issue, .deb and .rpm packages build successfully
-**Workaround**: Add a square icon or use `--bundles deb,rpm` to skip AppImage
-
-**Problem**: Build scripts not executable
-**Solution**:
-```bash
-cd backend
-chmod +x build-frontend.sh dev-frontend.sh
-```
-
-### Runtime Issues
-
-**Problem**: App won't start or exits immediately
-**Check**:
-1. `COCKPIT_MASTER_KEY` in `.env` is exactly 64 hex characters
-2. Database path in `.env` is correct: `DATABASE_URL=sqlite:./storage/data/db.sql`
-3. Run with logging: `RUST_LOG=debug ./build/target/release/cockpit`
-
-**Problem**: "Failed to open icon" error during build
-**Solution**: Icon paths in `tauri.conf.json` updated to use existing files (frac-32x32.png, frac-128x128.png)
-
-**Problem**: Frontend dev server won't start with `cargo tauri dev`
-**Solution**: Ensure frontend dependencies installed:
-```bash
-cd frontend && npm install
-cd ../backend && cargo tauri dev
-```
-
-### Path Resolution
-
-The project uses **portable build scripts** that work anywhere:
-
-**How it works**:
-- Scripts detect project root from their own location using `BASH_SOURCE`
-- Tauri calls scripts using `$PWD/backend/script.sh` (always correct)
-- Works from any directory, on any machine, no configuration needed
-
-**Build from different locations**:
-```bash
-# From backend directory (recommended)
-cd backend && cargo tauri build
-
-# From project root (also works)
-cd cockpit && cargo tauri build --config backend/tauri.conf.json
-
-# From anywhere (not recommended, but possible)
-cd /any/directory && cargo tauri build --config /path/to/cockpit/backend/tauri.conf.json
-```
-
-### Database Issues
-
-**Problem**: "Database is locked" error
-**Solution**: Close any other running instances of the app
-
-**Problem**: Migrations fail on startup
-**Solution**:
-1. Backup database: Copy `backend/storage/data/db.sql`
-2. Delete corrupted database
-3. Restart app (creates fresh database with migrations)
-4. Restore from backup via Storage View → Restore
-
-### Security
-
-See [backend/PERMISSIONS.md](backend/PERMISSIONS.md) for detailed security documentation including:
-- What permissions are granted and why
-- What's explicitly NOT granted (filesystem, network, shell)
-- CSP (Content Security Policy) configuration
-- Security boundaries between frontend and backend
 
 ## 📚 Documentation
 
-- **[TODO.md](TODO.md)** - Current sprint tasks and active work
-- **[DONE.md](./docs/DONE.md)** - Completed work archive
-- **[ROADMAP.md](./docs/ROADMAP.md)** - Long-term planning and future features
-- **[REFACTOR_SUMMARY.md](REFACTOR_SUMMARY.md)** - Backend refactoring notes
+### Project Management
+- **[TODO.md](TODO.md)** - Current sprint tasks
+- **[DONE.md](docs/DONE.md)** - Completed work archive
+- **[ROADMAP.md](docs/ROADMAP.md)** - Long-term planning
 
-## 📞 Support
+### Build & Deployment
+- **[BUILD_GUIDE.md](docs/BUILD_GUIDE.md)** - Complete build instructions
+- **[BUILD_PACKAGE_GUIDE.md](docs/BUILD_PACKAGE_GUIDE.md)** - Creating distribution packages
+- **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Production deployment guide
 
-- **Issues**: [GitHub Issues](link-to-issues)
-- **Discussions**: [GitHub Discussions](link-to-discussions)
-- **Email**: [your-email@example.com](mailto:your-email@example.com)
+### Installation & Setup
+- **[INSTALLATION.md](docs/INSTALLATION.md)** - User installation guide
+- **[INSTALL.md](docs/INSTALL.md)** - Alternative installation methods
+
+### Troubleshooting
+- **[ICON_TROUBLESHOOTING.md](docs/ICON_TROUBLESHOOTING.md)** - Icon display issues (COSMIC DE)
+
+### Technical Reference
+- **[PERMISSIONS.md](docs/PERMISSIONS.md)** - Security model and ACL permissions
+- **[Archive](docs/archive/)** - Historical documentation
+
+## 🐛 Common Issues
+
+**Icons don't show (COSMIC desktop):**
+```bash
+killall -9 cosmic-launcher cosmic-panel
+# Or log out and back in
+```
+
+**"Database is locked":**
+Close other running instances of the app.
+
+**Build fails:**
+```bash
+cd backend
+cargo clean
+cargo tauri build
+```
+
+See [ICON_TROUBLESHOOTING.md](docs/ICON_TROUBLESHOOTING.md) for detailed troubleshooting.
+
+## 🔒 Security
+
+- **Encrypted API Keys**: Stored using AES-256-GCM encryption
+- **Restricted Permissions**: No filesystem, network, or shell access by default
+- **CSP**: Content Security Policy prevents XSS attacks
+- **Sandboxed Frontend**: Isolated from system resources
+
+See [PERMISSIONS.md](docs/PERMISSIONS.md) for complete security documentation.
+
+## 📦 Data Management
+
+### Storage Locations
+
+**Development:**
+```
+backend/storage/
+  ├── data/db.sql       # SQLite database
+  ├── logs/             # Application logs
+  ├── backups/          # Database backups
+  └── exports/          # Data exports
+```
+
+**Production (after install):**
+```
+~/.cockpit/
+  ├── data/db.sql       # SQLite database
+  ├── logs/             # Application logs
+  ├── backups/          # Database backups
+  └── exports/          # Data exports
+```
+
+### Backups
+
+The app automatically creates backups:
+- On-demand via Storage View
+- Before migrations
+- Configurable retention
+
+Restore from backup via: **System → Storage → Restore Backup**
+
+## 🚦 Project Status
+
+**Current Version:** 0.1.0 (Alpha)
+
+**Working:**
+- ✅ Writing mode with markdown editor and ideas management
+- ✅ Research mode with news aggregation
+- ✅ System settings and configuration
+- ✅ Database management and backups
+- ✅ Log viewer with filtering
+- ✅ Task scheduler with cron expressions
+- ✅ Encrypted API key storage
+
+**In Progress:**
+- 📝 Reddit integration refinements
+- 📝 Export/import improvements
+- 📝 UI/UX enhancements
+
+**Planned:**
+- 🔜 Cloud sync capabilities
+- 🔜 Plugin system
+- 🔜 Custom themes
+- 🔜 Mobile companion app
+
+See [ROADMAP.md](docs/ROADMAP.md) for detailed planning.
+
+## 📄 License
+
+MIT License - See LICENSE file for details.
+
+## 🤝 Contributing
+
+Contributions welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+## 📧 Contact
+
+- Issues: [GitHub Issues](https://github.com/yourusername/cockpit/issues)
+- Discussions: [GitHub Discussions](https://github.com/yourusername/cockpit/discussions)
 
 ---
 
-**Made with ❤️ for content creators and researchers**
-
-*Last Updated: December 14, 2025*
+**Built with ❤️ using Rust and React**

@@ -2,7 +2,22 @@
 set -e
 
 # Cockpit Installation Script
-# Installs the application and sets up user directories
+# Installs the .deb package (recommended method)
+# DEPRECATED: Use 'sudo dpkg -i build/target/release/bundle/deb/Cockpit_0.1.0_amd64.deb' instead
+
+echo "⚠️  This script is deprecated!"
+echo ""
+echo "✅ RECOMMENDED: Install the .deb package directly:"
+echo "   sudo dpkg -i build/target/release/bundle/deb/Cockpit_0.1.0_amd64.deb"
+echo ""
+echo "🧹 To clean old installations first:"
+echo "   ./cleanup-old-installs.sh"
+echo ""
+read -p "Continue with manual install anyway? (y/N) " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    exit 0
+fi
 
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 DESKTOP_DIR="${HOME}/.local/share/applications"

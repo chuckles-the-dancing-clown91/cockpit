@@ -4,252 +4,392 @@ Current sprint work in progress. For completed work see [DONE.md](./docs/DONE.md
 
 ---
 
-## 🎯 Current Sprint: Modular Refactoring
+## 🎯 Current Sprint: Research Mode - Feed Management System
 
-**Goal**: Split large monolithic files into focused, single-responsibility modules
-**Timeline**: December 12-15, 2025  
-**Status**: In progress
-**Pattern**: Split by feature/responsibility
+**Goal**: Build modular, plugin-ready feed system with stream view  
+**Timeline**: December 15-18, 2025  
+**Status**: Planning  
 
-### Why Refactor?
-Large files (1000+ lines) become difficult to navigate and maintain. Splitting into focused modules improves:
-- ✅ **Readability**: Each file has single responsibility
-- ✅ **Maintainability**: Easier to locate and update functionality
-- ✅ **Testing**: Smaller, focused units are easier to test
-- ✅ **Parallel Development**: Multiple developers can work without conflicts
-- ✅ **Future**: Foundation for plugin system architecture
+### Vision
 
-### Phase 1a: Research Domain - Feed Module ✅
-**Status**: Complete! Entity models organized into submodules.
-- [x] Created `research/components/feed/entities/` directory
-- [x] Moved entity models: articles.rs, settings.rs, sources.rs
-- [x] Created `entities/mod.rs` with re-exports
-- [x] Updated all imports in feed handlers (articles, settings, sources, sync)
-- [x] Updated writing domain imports (ideas module)
-- [x] Cleaned up `research/components/mod.rs`
+Transform Research mode into a powerful, extensible feed aggregation platform where:
+- **Feed sources are plugins** - NewsData.io, Reddit, RSS, Twitter/X, etc.
+- **API keys managed per-source** - Encrypted, with test connection functionality
+- **Stream view** - Real-time feed with filtering, sorting, starring, dismissal
+- **Unified interface** - All feeds conform to common article schema
 
-**New Structure**:
-```
-research/components/feed/
-├── entities/          # Database entity models
-│   ├── articles.rs   # NewsArticles entity
-│   ├── settings.rs   # NewsSettings entity  
-│   ├── sources.rs    # NewsSources entity
-│   └── mod.rs        # Re-exports
-├── articles.rs       # Article CRUD handlers
-├── settings.rs       # Settings management
-├── sources.rs        # Source management
-├── sync.rs           # News sync logic
-├── types.rs          # DTOs and API types
-└── mod.rs            # Module exports
+### Architecture Goals
 
-system/components/scheduler/
-├── entities.rs       # SystemTask entity model
-├── task_runs.rs      # SystemTaskRuns entity model
-├── types.rs          # DTOs (SystemTaskDto, TaskRunDto, etc.)
-├── executor.rs       # Task execution logic with run history
-├── init.rs           # Scheduler initialization
-├── handlers.rs       # Command handlers (list, history, run, update)
-└── mod.rs            # Module exports
-```
+1. **Plugin System Foundation**
+   - Each feed source is a self-contained module
+   - Common trait/interface for all sources
+   - Hot-pluggable (enable/disable without restart)
+   - Independent API key management
+   - Per-source configuration (fetch interval, filters, etc.)
 
-**Completed**: December 13, 2025
+2. **Database Schema**
+   - NEW: `feed_sources` table - Plugin metadata, API keys, enabled status, task_id
+   - `news_articles` table - Unified article storage (already exists)
+   - `system_tasks` table - Links each feed source to a scheduled sync task
+   - Source types: NewsData, Reddit, RSS, Twitter, Custom
+   - Each feed source has its own scheduled task for independent sync intervals
 
-**Design Principles**:
-- Single responsibility per module
-- Explicit dependencies (no global state)
-- Pure functions where possible
-- Clear public API in mod.rs
-- Consistent naming patterns
+3. **Task System Integration** ⭐ NEW
+   - Each feed source creates a corresponding system_task
+   - Task type: `feed_sync_{source_id}` (e.g., `feed_sync_1`, `feed_sync_2`)
+   - Independent cron schedules per source
+   - "Sync All" button triggers all enabled source tasks
+   - Task history shows per-source sync results
+
+4. **Frontend Organization**
+   - **Feed Sources** - Configure and manage feed plugins (with sync controls)
+   - **Stream** - View aggregated feed with filters
+   - **Articles** (existing) - Individual article view
 
 ---
 
-## ✅ Sprint Complete: System Mode - Tasks View
+## 📋 Sprint Tasks
 
-**Goal**: Complete the final System Mode view for task management  
-**Status**: Complete! ✅  
-**Completed**: December 14, 2025
+### Phase 1: Database Schema & Backend Foundation
 
-### Task #8: Tasks View - Backend Commands ✅
-- [x] Created `list_system_tasks` command
-  - Queries system_tasks table with full task metadata
-  - Returns task list with schedule, enabled status, last run time
-  - Includes error count and last run status
-- [x] Created `get_task_history` command
-  - Queries system_task_runs table with pagination (limit/offset)
-  - Filters by task_id (optional - shows all if omitted)
-  - Returns runs with duration, status, error messages, timestamps
-- [x] Created `run_system_task_now` command
-  - Accepts task_type, validates task exists
-  - Triggers immediate execution via executor
-  - Returns RunTaskNowResult with status and error details
-- [x] Created `update_system_task` command
-  - Updates task enabled status and other properties
-  - Supports enabling/disabling scheduled tasks
-  - Validates task exists before update
-- [x] Added missing `QuerySelect` import for pagination
-- [x] All commands registered in main.rs
+#### Task #1: Feed Sources Table & Migration 🔴
+**Priority**: HIGH - New table for feed plugins  
+**Estimated Effort**: 1 hour
 
-### Task #9: Tasks View - Frontend Integration ✅
-- [x] Completely rewrote `TasksView.tsx` with real backend integration
-- [x] Replaced all mock data with TanStack Query hooks
-  - `useListSystemTasks` for task list
-  - `useGetTaskHistory` for execution history with filtering
-  - `useRunTaskNow` mutation for manual execution
-  - `useUpdateSystemTask` mutation for enable/disable
-- [x] Added loading states with Loader2 spinners
-- [x] Added error handling with toast notifications
-- [x] Added confirmation dialogs for run/toggle actions
-- [x] Task status indicators (success/error/running badges)
-- [x] Stats cards (total, enabled, errors, recent runs)
-- [x] Task history filtering by task ID
-- [x] Duration formatting (ms/s/m format)
-- [x] Human-readable cron schedule parsing
-- [x] Error display for failed tasks
-- [x] Responsive layout with proper spacing
+**Action**: Create new `feed_sources` table (distinct from existing `news_sources`)
 
-### Task #10: Execution History Tracking ✅
-- [x] Fixed task run history recording
-  - Task runs now properly saved to `system_task_runs` table
-  - Records start time, end time, status, result JSON, error messages
-- [x] Added comprehensive scheduler logging
-  - INFO logs when scheduler triggers tasks
-  - INFO logs for successful completion with results
-  - ERROR logs for failures with error details
-  - WARN logs for skipped tasks (already running, unknown type)
-- [x] Frontend console logging for debugging
-  - Logs when "Run Now" button is clicked
-  - Logs task execution results
-  - Logs query invalidation after execution
-- [x] History section now populates with real execution data
-  - Shows manual runs (Run Now button)
-  - Shows scheduled runs (cron triggers)
-  - Displays duration, status, timestamps, errors
+- [ ] **Create migration 004_feed_sources_up.sql**:
+  - [ ] Create `feed_sources` table with fields:
+    - `id` - Primary key
+    - `name` - Display name (e.g., "NewsData.io Tech News")
+    - `source_type` - Enum: NewsData, Reddit, RSS, Twitter, Custom
+    - `enabled` - Boolean (0/1)
+    - `api_key_encrypted` - BLOB (encrypted API key)
+    - `config` - TEXT (JSON config: fetch_interval, categories, filters)
+    - `task_id` - Foreign key to system_tasks (nullable)
+    - `last_sync_at` - DATETIME
+    - `article_count` - INTEGER (cached count)
+    - `error_count` - INTEGER
+    - `created_at`, `updated_at` - DATETIME
+  - [ ] Create indexes on source_type, enabled, task_id
 
-### Build & Configuration ✅
-- [x] Fixed tauri.conf.json build commands
-  - Changed from `--prefix` to `cd` with `bash -c`
-  - Works correctly from backend directory
-- [x] Frontend builds successfully (8.74 kB gzipped)
-- [x] Backend compiles with zero warnings (cleaned unused imports)
-- [x] Production build verified
+- [ ] **Update `news_articles` table**:
+  - [ ] Add `feed_source_id` column (foreign key to feed_sources)
+  - [ ] Keep existing `provider` and `source_name` for backward compatibility
 
-**System Mode is now 100% complete!** All four views are fully functional:
-- ✅ Settings View
-- ✅ Storage View  
-- ✅ Logs View
-- ✅ Tasks View
+- [ ] **Note**: Existing `news_sources` table tracks individual news outlets (CNN, BBC, etc.) - keep as-is
+
+#### Task #2: Source Types & Plugin Trait 🔴
+**Priority**: HIGH - Foundation for plugin system  
+**Estimated Effort**: 2-3 hours
+
+Create the plugin architecture:
+
+- [ ] **backend/src/research/components/feed/plugin.rs**:
+  - [ ] Define `FeedSource` trait with methods:
+    - `fetch_articles()` - Fetch articles from source
+    - `test_connection()` - Verify API key and connectivity
+    - `get_metadata()` - Return source name, type, description
+    - `parse_article()` - Convert source format to common Article schema
+  - [ ] Define `SourceType` enum: NewsData, Reddit, RSS, Twitter, Custom
+  - [ ] Define `SourceConfig` struct for per-source settings
+
+- [ ] **backend/src/research/components/feed/sources/mod.rs**:
+  - [ ] Create sources directory for plugin implementations
+  - [ ] Re-export all source plugins
+
+#### Task #3: NewsData.io Plugin Implementation 🔴
+**Priority**: HIGH - Migrate existing integration  
+**Estimated Effort**: 2 hours
+
+Extract NewsData.io to plugin:
+3 hours
+
+Backend commands for source management:
+
+- [ ] **backend/src/research/commands.rs**:
+  - [ ] `list_feed_sources` - Get all sources with metadata (includes task info)
+  - [ ] `get_feed_source` - Get single source by ID
+  - [ ] `create_feed_source` - Add new source + create system_task
+    - Creates feed source record
+    - Creates corresponding system_task with cron schedule
+    - LiAdd `sync_single_source(source_id)` function
+    - Query feed source by ID
+    - Instantiate appropriate plugin
+    - Call plugin.fetch_articles()
+    - Save articles with feed_source_id
+    - Update source last_sync_at and article_count
+    - Log success/errors
+  - [ ] Add `sync_all_sources()` function
+    - Query all enabled sources
+    - Iterate and call sync_single_source()
+    - Return summary (sources synced, articles added, errors) config, API key, enabled status
+    - Updates feed source
+    - Updates corresponding system_task schedule if changed
+  - [ ] `delete_feed_source` - Remove source + cleanup
+    - Soft deletes associated articles (set feed_source_id = NULL)
+    - Deletes corresponding system_task
+    - Deletes feed source record
+  - [ ] `test_feed_source_connection` - Test API key validity
+  - [ ] `toggle_feed_source` - Enable/disable source + task
+    - Updates feed source enabled status
+    - Updates system_task enabled status
+  - [ ] `sync_feed_source_now` - Manual trigger for single source
+  - [ ] `sync_all_feed_sources` - Trigger all enabled sources ⭐es()`
+  - [ ] Handle per-source errors gracefully
+
+#### Task #4: Source Management Commands 🔴
+**Priority**: HIGH - CRUD for feed sources  
+**Estimated Effort**: 2 hours
+
+Backend commands for source management:
+
+- [ ] **Header with actions:
+    - **"Sync All" button** ⭐ - Triggers all enabled sources
+    - "Add Source" button → opens modal/drawer
+    - Filter by source type dropdown
+    - Search by source name
+  - [ ] Sources list with cards showing:
+    - Source name, type badge (NewsData, Reddit, etc.)
+    - Enabled toggle switch
+    - Last sync time, article count
+    - Sync schedule (cron expression in human readable)
+    - "Sync Now" button per source ⭐
+    - Edit and delete buttons
+  - [ ] Loading states during sync operations
+  - [ ] Toast notifications for sync results- Enable/disable source
+  - [ ] Register all commands in main.rs
 
 ---
 
-## 🔜 Next Sprint: Production Readiness (Backend Audit Fixes)
+### Phase 2: Frontend - Feed Sources View
 
-### Task #11: Add Missing Logging (CRITICAL 🔥) ✅
-**Priority**: CRITICAL - No audit trail for critical operations  
-**Estimated Effort**: 2-3 hours  
-**Status**: Complete! ✅  
-**Completed**: December 14, 2025
+#### Task #5: Feed Sources Management Page 🔴
+**Priority**: HIGH - Primary configuration interface  
+**Estimated Effort**: 3-4 hours
 
-- [x] **research/components/feed/articles.rs** - Added logging to 3 functions:
-  - [x] `dismiss_news_article_handler` - #[instrument] with article_id, INFO logs at start/completion, ERROR on not found
-  - [x] `toggle_star_news_article_handler` - #[instrument] with article_id & starred, logs star status change
-  - [x] `mark_news_article_read_handler` - #[instrument] with article_id, logs read_at timestamp, skips if already read
+Create dedicated sources management:
+syncing, error, disabled)
+  - [ ] Stats: articles fetched today, total, errors
+  - [ ] Sync schedule display (e.g., "Every 45 minutes")
+  - [ ] Last sync timestamp (relative: "2 hours ago")
+  - [ ] Quick actions: Sync Now ⭐, Edit, Test Connection, Delete
+  - [ ] Sync progress spinner when syncing
+    - Source name, type badge (NewsData, Reddit, etc.)
+    - Enabled toggle switch
+    - Last fetch time, article count
+    - Edit and delete buttons
+  - [ ] "Add Source" button → opens modal/drawer
+  - [ ] Filter by source type dropdown
+  - [ ] Search by source name
 
-- [x] **writing/components/ideas/handlers.rs** - Added logging to 5 functions:
-  - [x] `update_idea_metadata_handler` - #[instrument] with field flags, logs title/status/tags/priority changes
-  - [x] `update_idea_notes_handler` - #[instrument] with notes_size, logs content size tracking
-  - [x] `update_idea_article_handler` - #[instrument] with content sizes, logs updated_at timestamp
-  - [x] `archive_idea_handler` - #[instrument] with idea_id, logs archived_at with is_archived=true
+- [ ] **frontend
+    - name (text input)
+    - source type dropdown (NewsData, Reddit, RSS, etc.)
+    - API key input (show/hide with eye icon)
+    - **Sync schedule** ⭐ (cron expression builder or preset intervals)
+  - [ ] Config section (source-specific settings):
+    - Fetch inteFeedSources()` query hook
+  - [ ] `useGetFeedSource(id)` query hook
+  - [ ] `useCreateFeedSource()` mutation
+  - [ ] `useUpdateFeedSource()` mutation
+  - [ ] `useDeleteFeedSource()` mutation
+  - [ ] `useTestSourceConnection()` mutation
+  - [ ] `useToggleFeedSource()` mutation
+  - [ ] `useSyncFeedSourceNow(id)` mutation ⭐
+  - [ ] `useSyncAllFeedSources()` mutation ⭐sk)cators (active, error, disabled)
+  - [ ] Stats: articles fetched today, total, errors
+  - [ ] Quick actions: Edit, Test Connection, Delete
 
-- [x] Added #[tracing::instrument] spans with proper field annotations to all 8 functions
-- [x] All functions log at INFO level for successful operations
-- [x] All functions log at ERROR level when entity not found
-- [x] Backend compiles cleanly with zero warnings
-- [x] Logs will appear in `storage/logs/app.log` with JSON format
+- [ ] **frontend/src/components/research/SourceFormDialog.tsx**:
+  - [ ] Form for create/edit source
+  - [ ] Fields: name, source type dropdown, API key input (show/hide)
+  - [ ] Config section (fetch interval, categories, filters)
+  - [ ] "Test Connection" button with loading state
+  - [ ] Save button
 
-**Implementation Details**:
-- All functions use `#[tracing::instrument(skip(state/db, input), fields(...))]`
-- Field tracking includes IDs, sizes, boolean flags for audit trail
-- Error paths log before returning error (e.g., "Article not found for dismissal")
-- Success paths include relevant data (timestamps, status changes, sizes)
-- Skipped operations logged (e.g., "Article already marked as read")
+- [ ] **frontend/src/hooks/queries.ts**:
+  - [ ] `useListNewsSources()` query hook
+  - [ ] `useGetNewsSource(id)` query hook
+  - [ ] `useCreateNewsSource()` mutation
+  - [ ] `useUpdateNewsSource()` mutation
+  - [ ] `useDeleteNewsSource()` mutation
+  - [ ] `useTestSourceConnection()` mutation
+  - [ ] `useToggleNewsSource()` mutation
 
-**Next Step**: Test logging output by running app and performing these operations, then check `storage/logs/app.log`
+#### Task #6: Update Navigation 🔴
+**Priority**: MEDIUM - User discoverability  
+**Estimated Effort**: 30 minutes
 
-### Task #12: Fix Tauri Security Configuration (CRITICAL 🔥) ✅
-**Priority**: CRITICAL - No Content Security Policy configured  
-**Estimated Effort**: 1-2 hours  
-**Status**: Complete! ✅  
-**Completed**: December 14, 2025
+Add Feed Sources to Research navigation:
 
-- [x] **backend/tauri.conf.json** - Added Content Security Policy:
-  - [x] Added CSP: `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://newsdata.io`
-  - [x] Restricts scripts to app origin + WASM (required for Rust)
-  - [x] Allows inline styles (required for Tailwind CSS)
-  - [x] Restricts network access to NewsData API only
-  - [x] Prevents XSS attacks via strict CSP
+- [ ] **frontend/src/components/navigation/ResearchNav.tsx**:
+  - [ ] Add "Feed Sources" nav item (icon: Rss or Plug)
+  - [ ] Update routing in App.tsx
+  - [ ] Reorder: Stream → Feed Sources → Articles
 
-- [x] **backend/tauri.conf.json** - Fixed absolute paths to relative:
-  - [x] Changed `beforeDevCommand` from absolute path to `../frontend`
-  - [x] Changed `beforeBuildCommand` from absolute path to `../frontend`
-  - [x] Changed `frontendDist` from absolute path to `../frontend/dist`
-  - [x] Build now works from any directory (portable across environments)
-  - [x] Tested: `cargo build --release` completes successfully
+- [ ] **frontend/src/App.tsx**:
+  - [ ] Add route for `/research/sources`
+  - [ ] Import and render `FeedSourcesView`
 
-- [x] **backend/tauri.conf.json** - Added comprehensive bundle metadata:
-  - [x] Updated `identifier` to `com.cockpit.app` (from com.architect.cockpit)
-  - [x] Updated `productName` to `Cockpit` (simplified)
-  - [x] Added `publisher: "Cockpit Project"`
-  - [x] Added `copyright: "Copyright © 2025 Cockpit Project"`
-  - [x] Added `category: "Productivity"`
-  - [x] Added `shortDescription` for app stores
-  - [x] Added detailed `longDescription` explaining features
-  - [x] Fixed icon paths to use existing icons (frac-32x32.png, frac-128x128.png)
-  - [x] Enabled bundle with `active: true`, `targets: "all"`
+---
 
-- [x] **backend/capabilities/default.json** - Reviewed and documented ACL permissions:
-  - [x] Verified all 7 permissions follow principle of least privilege
-  - [x] Added platform support: Linux, macOS, Windows
-  - [x] Permissions granted (all justified):
-    - `core:default` - Basic Tauri runtime
-    - `core:window:default` - Window management
-    - `core:window:allow-set-title` - Dynamic title updates
-    - `core:window:allow-close` - Exit functionality
-    - `core:event:default` - Frontend-backend events
-    - `dialog:default` - File dialogs baseline
-    - `dialog:allow-open` - Import operations
-    - `dialog:allow-save` - Export operations
-  - [x] Permissions NOT granted (security by design):
-    - ❌ File system access (backend handles all I/O)
-    - ❌ HTTP access (backend uses reqwest)
-    - ❌ Shell access (no command execution)
-    - ❌ System tray, clipboard, notifications
+### Phase 3: Frontend - Stream View
 
-- [x] **backend/PERMISSIONS.md** - Created comprehensive documentation:
-  - [x] Documented justification for each permission
-  - [x] Explained what permissions are NOT granted and why
-  - [x] Documented platform-specific considerations
-  - [x] Defined security boundaries (frontend vs backend)
-  - [x] Established review schedule for permission changes
-  - [x] Added audit trail and references
+#### Task #7: Stream View - Article Feed 🔴
+**Priority**: HIGH - Core reading experience  
+**Estimated Effort**: 3-4 hours
 
-**Security Improvements Achieved**:
-- ✅ XSS protection via CSP
-- ✅ Network access restricted to NewsData API
-- ✅ No arbitrary file system access from frontend
-- ✅ No shell command execution
-- ✅ Minimal attack surface (7 permissions vs potential 50+)
-- ✅ Fully documented and auditable permissions
-- ✅ Portable configuration (works on any machine)
+Build real-time article stream:
 
-**Next Step**: Test CSP doesn't break frontend functionality, verify dialogs work
+- [ ] **frontend/src/views/StreamView.tsx**:
+  - [ ] Infinite scroll feed of articles
+  - [ ] Article cards with:
+    - Title, description, source badge
+    - Read/unread indicator
+    - Star button
+    - Dismiss button (archive)
+    - "Open in Articles" link
+  - [ ] Filters toolbar:
+    - Source dropdown (show only from source X)
+    - Date range picker
+    - Starred only toggle
+    - Unread only toggle
+  - [ ] Sort dropdown: Latest, Oldest, Starred
+  - [ ] Empty state: "No articles yet - configure sources"
 
-**Build Fix Applied**: Created portable build scripts (`build-frontend.sh`, `dev-frontend.sh`) that:
-- Use `$PWD/backend/script.sh` to locate scripts reliably
-- Auto-detect project root from script location
-- Work regardless of where `cargo tauri build` is executed from
-- Successfully build .deb and .rpm packages
-- Note: AppImage requires square icon (future fix)
+- [ ] **frontend/src/components/research/StreamArticleCard.tsx**:
+  - [ ] Compact card design for stream
+  - [ ] Source badge with color/icon
+  - [ ] Quick actions: star, dismiss, open
+  - [ ] Published time (relative: "2h ago")
+  - [ ] Read status visual indicator
+
+- [ ] **Update frontend/src/hooks/queries.ts**:
+  - [ ] Enhance `useNewsArticles()` with filters:
+    - `source_id?: number`
+    - `starred?: boolean`
+    - `dismissed?: boolean`
+    - `start_date?: string`
+    - `end_date?: string`
+    - `limit?: number` (pagination)
+    - `offset?: number`
+  - [ ] Update backend command to support filters
+
+#### Task #8: Backend - Enhanced Article Filtering 🔴
+**Priority**: HIGH - Support stream filters  
+**Estimated Effort**: 1-2 hours
+
+Enhance article queries:
+
+- [ ] **backend/src/research/components/feed/articles.rs**:
+  - [ ] Update `get_news_articles_handler` to support:
+    - Filter by source_id
+    - Filter by date range
+    - Filter by starred status
+    - Filter by dismissed status
+    - Pagination (limit/offset)
+    - Sorting (latest, oldest, starred)
+  - [ ] Return total count for pagination
+
+- [ ] **backend/src/research/commands.rs**:
+  - [ ] Update `get_news_articles` command signature
+  - [ ] Add validation for filter parameters
+
+---
+
+### Phase 4: Migration & Cleanup
+
+#### Task #9: Move NewsData Toggle from Settings 🔴
+**Priority**: MEDIUM - Better organization  
+**Estimated Effort**: 1 hour
+
+Clean up Settings page:
+
+- [ ] **frontend/src/vicheduler for Per-Source Tasks 🔴
+**Priority**: HIGH - Dynamic task execution  
+**Estimated Effort**: 2 hours
+
+Update scheduler to handle per-source sync tasks:
+
+- [ ] **backend/src/system/components/scheduler/executor.rs**:
+  - [ ] Add new task type handler: `feed_sync_{source_id}`
+    - Parse source_id from task_type
+    - Call sync_single_source(source_id)
+    - Log results with source name
+    - Update task run history
+  - [ ] Update `TaskType` enum to support dynamic feed sync tasks
+  - [ ] Remove old `news_sync` task type (replaced by per-source tasks)
+  
+- [ ] **backend/src/system/components/scheduler/init.rs**:
+  - [ ] Remove hardcoded news_sync task seed
+  - [ ] On app start, query all feed_sources
+  - [ ] Ensure each enabled feed source has corresponding system_task
+  - [ ] Create missing tasks if needed (repair function)reate NewsData source
+  - [ ] Mark as enabled if news fetching was enabled
+
+#### Task #10: Update Sync Task 🔴
+**Priority**: HIGH - Use plugin system  
+**Estimated Effort**: 1 hour
+
+Update scheduler to use plugins:
+
+- [ ] **backend/src/system/components/scheduler/executor.rs**:
+  - [ ] Update `fetch_news` task execution
+  - [ ] Query enabled sources from `news_sources`
+  - [ ] Loop through sources and call plugin.fetch_articles()
+  - [ ] Log per-source success/failure
+  - [ ] Update task run history with source breakdown
+
+---
+
+### Phase 5: Testing & Polish
+
+#### Task #11: Integration Testing 🔴
+**Priority**: MEDIUM - Ensure reliability  
+**Estimated Effort**: 2 hours
+
+- [ ] Test source CRUD operations
+- [ ] Test enable/disable source functionality
+- [ ] Test connection validation (valid/invalid API keys)
+- [ ] Test article fetching from multiple sources
+- [ ] Test stream filters and sorting
+- [ ] Test migration from old settings to new sources
+- [ ] Test sync task with plugin system
+
+#### Task #12: Documentation 🔴
+**Priority**: LOW - User guidance  
+**Estimated Effort**: 1 hour
+
+- [ ] Update README.md with Feed Sources feature
+- [ ] Create PLUGINS.md guide for adding new sources
+- [ ] Document plugin trait implementation
+- [ ] Add screenshots to docs
+
+---
+
+## 🔜 Future Enhancements (Post-Sprint)
+
+### Additional Feed Plugins
+- [ ] **Reddit Plugin** - Monitor subreddits, saved posts, mod queue
+- [ ] **RSS Plugin** - Generic RSS/Atom feed parser
+- [ ] **Twitter/X Plugin** - Timeline, lists, bookmarks
+- [ ] **Hacker News Plugin** - Front page, user submissions
+- [ ] **Dev.to Plugin** - Followed tags, bookmarks
+- [ ] **Medium Plugin** - Reading list, publications
+- [ ] **Custom Webhook Plugin** - Generic JSON webhook receiver
+
+### Advanced Features
+- [ ] **Source priorities** - Weight articles from certain sources
+- [ ] **Duplicate detection** - Same article from multiple sources
+- [ ] **Article tagging** - Auto-tag by source, category, keywords
+- [ ] **Collections** - Group articles into custom collections
+- [ ] **Export feeds** - Generate RSS feed from starred articles
+- [ ] **Read later queue** - Separate view for bookmarked articles
+
+---
+
+## 🐛 Known Issues
 
 ### Task #13: Minor Error Handling Improvements (HIGH ⚠️)
 **Priority**: HIGH - Prevent potential panics  
@@ -273,21 +413,6 @@ system/components/scheduler/
   - [ ] Add tracing::error! before rollback in all transactions
   - [ ] Include error context in rollback logs
 
-**Example Fix**:
-```rust
-// Before
-let client = client.try_clone().unwrap();
-
-// After
-let client = client
-    .try_clone()
-    .map_err(|e| AppError::Internal(format!("Failed to clone HTTP client: {}", e)))?;
-```
-
----
-
-## 🔜 Integration Testing Sprint (After Production Fixes)
-
 ### Task #14: System Mode - Integration Testing 🔴
 - [ ] **Settings**: Test all setting updates persist correctly
 - [ ] **Settings**: Test validation rules work (invalid intervals, limits)
@@ -304,288 +429,15 @@ let client = client
 
 ---
 
-## 🎯 Future Roadmap
-
-### Phase 13: News Feed Management (Lower Priority)
-Separate feed configuration from general settings for better organization.
-
-#### Feed Sources View
-- [ ] Create dedicated News Feeds management page
-- [ ] Backend: Add news source CRUD operations
-- [ ] Backend: Store API keys per source (encrypted)
-- [ ] Backend: Source enable/disable toggle
-- [ ] Frontend: Feed configuration UI
-  - API key management (show/hide, test connection)
-  - Source selection (NewsData.io, Reddit, RSS, etc.)
-  - Fetch frequency per source
-  - Category/topic filters per source
-- [ ] Frontend: Test connection button with feedback
-- [ ] Frontend: Source statistics (articles fetched, errors)
-
-#### Posts Management View
-- [ ] Create Posts/Publishing management page
-- [ ] Backend: Add publishing destinations table
-- [ ] Backend: Store API keys for publishing platforms
-  - Twitter/X API
-  - LinkedIn API
-  - Medium API
-  - Dev.to API
-  - Custom webhooks
-- [ ] Backend: Post queue/scheduling system
-- [ ] Frontend: Publishing destinations UI
-  - Add/edit/delete destinations
-  - API key management
-  - Test connection
-  - Enable/disable per destination
-- [ ] Frontend: Post queue viewer
-  - Schedule posts
-  - View publishing history
-  - Retry failed posts
-
-**Note**: This is a substantial feature requiring:
-- API integration for multiple platforms
-- OAuth flows for some platforms
-- Secure credential storage (consider using system keyring)
-- Rate limiting and retry logic
-- Post formatting per platform
-
----
-
-## 🐛 Known Issues
-
-- [ ] Number input validation improvements
-- [ ] Mobile drawer scroll prevention
-- [ ] Theme switch animation smoothness
-- [ ] Select dropdowns min-width
-
----
-
 ## 📋 Reference Documents
 
-- **[CODE_REVIEW.md](./CODE_REVIEW.md)** - Comprehensive backend audit report (December 14, 2025)
-  - Detailed analysis of logging, security, encryption, portability, error handling
-  - Scorecard: Logging 6/10, Security 5/10, Encryption 9/10, Portability 3/10, Errors 9/10
-  - CRITICAL and HIGH priority fixes documented above
-  - MEDIUM and LOW priority items moved to ROADMAP.md
+- **[DONE.md](./docs/DONE.md)** - Completed work archive (6 sprints completed!)
+- **[ROADMAP.md](./docs/ROADMAP.md)** - Long-term planning
+- **[BUILD_GUIDE.md](./docs/BUILD_GUIDE.md)** - Build instructions
+- **[DEPLOYMENT.md](./docs/DEPLOYMENT.md)** - Production deployment
+- **[scripts/README.md](./scripts/README.md)** - Build, install, and diagnostic scripts
 
 ---
 
----
-
-## 🔜 Distribution & Installation System
-
-### Task #15: Installation Scripts & First-Run Setup ✅
-**Priority**: HIGH - Required for distribution  
-**Estimated Effort**: 3-4 hours  
-**Status**: Complete! ✅  
-**Completed**: December 14, 2025
-
-- [x] **install.sh** - Linux installation script:
-  - [x] Creates `~/.cockpit/` directory structure (data, logs, cache, backups, exports, icons)
-  - [x] Installs binary to `/usr/local/bin/cockpit`
-  - [x] Creates desktop entry (`~/.local/share/applications/cockpit.desktop`)
-  - [x] Installs application icons (32x32, 128x128)
-  - [x] Generates initial `.env` configuration template
-  - [x] Updates icon cache and desktop database
-  - [x] Provides clear next-steps instructions
-
-- [x] **uninstall.sh** - Removal script:
-  - [x] Removes binary, desktop entry, icons
-  - [x] Optionally preserves user data in `~/.cockpit/`
-  - [x] Interactive prompts for data removal
-  - [x] Updates system caches
-
-- [x] **backend/src/core/components/setup.rs** - First-run logic:
-  - [x] `ensure_directories()` - Creates `~/.cockpit/` if not exists
-  - [x] `verify_directories()` - Checks all required subdirectories
-  - [x] `is_dev_mode()` - Detects development vs production environment
-  - [x] `get_storage_root()` - Returns correct path for dev/prod
-  - [x] `get_cockpit_home()` - Gets `~/.cockpit/` path
-
-- [x] **backend/src/main.rs** - Integration:
-  - [x] Calls `ensure_directories()` before configuration loading
-  - [x] Exits gracefully if directory creation fails
-
-- [x] **INSTALL.md** - End-user documentation:
-  - [x] Quick install guide
-  - [x] System requirements
-  - [x] Configuration instructions
-  - [x] First launch steps
-  - [x] Troubleshooting section
-  - [x] Security notes (master key, file permissions)
-  - [x] Manual uninstall instructions
-
-- [x] **Dependencies**:
-  - [x] Added `dirs = "5.0"` to Cargo.toml for home directory detection
-
-**Distribution Structure**:
-```
-~/.cockpit/
-├── .env              # Configuration (master key, API keys)
-├── data/
-│   └── db.sql        # SQLite database
-├── logs/
-│   ├── app.log
-│   ├── api_calls.log
-│   └── errors.log
-├── backups/          # Database backups
-├── exports/          # JSON exports, log exports
-├── cache/            # Temporary cache
-└── icons/            # Default application icons
-```
-
-**Next Steps**:
-- Test installation on clean Linux system
-- Create .deb package metadata for Debian-based distros
-- Create .rpm spec file for Red Hat-based distros
-- Add Windows installer (WiX or NSIS)
-- Add macOS DMG/PKG installer
-
-### Task #16: Fully Automated Installation & First-Run Setup ✅
-**Priority**: HIGH - Zero-configuration installation  
-**Estimated Effort**: 3-4 hours  
-**Status**: Complete! ✅  
-**Completed**: December 14, 2025
-
-- [x] **install.sh - Automatic Configuration**:
-  - [x] Auto-generates 256-bit master key using openssl
-  - [x] Creates ~/.cockpit/.env with all required settings
-  - [x] Sets secure file permissions (600) automatically
-  - [x] No manual configuration required
-
-- [x] **Backend Commands** (for optional wizard if needed):
-  - [x] `check_setup_status_command` - Detects first run, checks master key and database
-  - [x] `generate_master_key_command` - Generates cryptographically secure 256-bit key
-  - [x] `save_setup_config_command` - Saves configuration to ~/.cockpit/.env with secure permissions
-
-- [x] **backend/src/core/components/setup.rs** - Auto-initialization:
-  - [x] `ensure_directories()` - Returns bool indicating first run
-  - [x] `initialize_default_settings()` - Creates default app settings in database
-  - [x] Automatic database initialization on first launch
-  - [x] Default settings for all categories (app, news, logging, storage)
-
-- [x] **backend/src/core/components/setup_wizard.rs** - Optional wizard (kept for future use):
-  - [x] `check_setup_status()` - Returns setup completion status
-  - [x] `generate_master_key()` - Uses rand crate for secure random generation
-  - [x] `save_setup_config()` - Validates and writes .env file, sets 600 permissions
-  - [x] Master key validation (64 hex characters)
-  - [x] Placeholder detection (CHANGE_ME, your_key_here)
-
-- [x] **frontend/src/components/setup/SetupWizard.tsx** - 4-step wizard (kept for future use):
-  - [x] Step 1: Welcome screen with feature overview
-  - [x] Step 2: Master key generation with copy-to-clipboard
-  - [x] Step 3: Optional API key configuration (NewsData, log level)
-  - [x] Step 4: Configuration summary and completion
-  - [x] Progress bar showing current step
-  - [x] Form validation and error handling
-  - [x] Beautiful gradient UI with purple theme
-
-- [x] **frontend/src/App.tsx** - Automatic setup integration:
-  - [x] Added `useSetupStatus()` hook query
-  - [x] Shows loading/setup spinner with progress indicators
-  - [x] Displays status messages (initializing, creating database, etc.)
-  - [x] Automatically transitions to main app when ready
-  - [x] No user interaction required
-
-- [x] **frontend/src/hooks/queries.ts**:
-  - [x] Added `SetupStatus` type definition
-  - [x] Added `useSetupStatus()` query hook
-
-**Features**:
-- ✅ **Fully Automated**: Zero user interaction required
-- ✅ **Secure by Default**: 256-bit master key auto-generated
-- ✅ **Smart Initialization**: Database and settings created automatically
-- ✅ **Production Ready**: Proper file permissions and directory structure
-- ✅ **Status Indicators**: Clear progress messages during setup
-- ✅ **Seamless**: Automatic transition to main app
-
-**User Experience (Completely Automated)**:
-1. User runs `./install.sh`
-   - Script generates master key with openssl
-   - Creates ~/.cockpit directory structure
-   - Saves secure configuration
-2. User launches Cockpit
-   - App detects first run
-   - Automatically creates database
-   - Initializes default settings
-   - Shows progress indicators
-3. Main app loads - ready to use!
-   - No wizard, no forms, no configuration
-   - API keys can be added later in Settings
-
-**Testing Results**:
-✅ Master key generation verified (64 hex characters)
-✅ Database initialization confirmed (21 default settings)
-✅ ~/.cockpit/.env loading fixed (loads before config)
-✅ Production path working (/home/user/.cockpit/data/db.sql)
-✅ Both backend and frontend compile successfully
-
----
-
-### Task #17: Distribution Package System ✅
-**Priority**: HIGH - Enable end-user distribution  
-**Estimated Effort**: 2 hours  
-**Status**: Complete! ✅  
-**Completed**: December 14, 2025
-
-- [x] **package.sh - Automated Package Builder**:
-  - [x] Builds both tarball and .deb packages
-  - [x] Creates proper directory structures
-  - [x] Includes all necessary files (binary, icons, docs)
-  - [x] Generates SHA256 checksums
-  - [x] Creates installation wrapper scripts
-
-- [x] **Tarball Distribution**:
-  - [x] Portable .tar.gz with automated ./install script
-  - [x] Includes install.sh, uninstall.sh in scripts/
-  - [x] README.txt with quick start instructions
-  - [x] Desktop entry and icons bundled
-
-- [x] **Debian Package (.deb)**:
-  - [x] Proper DEBIAN/control with dependencies
-  - [x] postinst script for desktop integration
-  - [x] prerm script for clean removal
-  - [x] FHS-compliant structure (usr/bin, usr/share)
-  - [x] Automatic dependency handling via apt
-
-- [x] **Documentation**:
-  - [x] DISTRIBUTION.md - Complete build/release guide
-  - [x] Updated README.md with installation methods
-  - [x] Updated INSTALL.md for end users
-
-**Distribution Methods**:
-1. **Tarball**: `tar -xzf ... && cd ... && ./install`
-   - Works on any Linux distribution
-   - Installs to /usr/local/bin
-   - Creates ~/.cockpit automatically
-   
-2. **Debian Package**: `sudo dpkg -i cockpit_0.1.0_amd64.deb`
-   - For Ubuntu/Debian/derivatives
-   - Installs to /usr/bin
-   - Handles dependencies automatically
-
-**Automated Features**:
-- ✅ Master key generation (256-bit, openssl)
-- ✅ Directory structure creation
-- ✅ Configuration file generation
-- ✅ Desktop integration (launcher + icons)
-- ✅ Database initialization on first run
-- ✅ Default settings (21 entries)
-- ✅ Zero user configuration required
-
-**Build Command**:
-```bash
-./package.sh  # Creates both .tar.gz and .deb in dist/
-```
-
-**Next Steps**:
-- Test packages on clean Ubuntu 22.04 VM
-- Test packages on clean Debian 12 VM
-- Verify uninstallation preserves user data
-- Create GitHub release workflow
-- Consider Snap/Flatpak packages for wider distribution
-
----
-
-**Last Updated**: December 14, 2025  
-**Next Review**: After testing setup wizard
+**Last Updated**: December 15, 2025  
+**Next Review**: After Phase 1 completion (Database schema verification)

@@ -36,7 +36,8 @@
           "libwebkit2gtk-4.1-0 (>= 2.40)",
           "libayatana-appindicator3-1"
         ],
-        "desktopTemplate": "cockpit.desktop"
+        "desktopTemplate": "cockpit.desktop",
+        "postInstallScript": "postinst.sh"
       }
     }
   },

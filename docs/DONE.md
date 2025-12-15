@@ -143,6 +143,196 @@ Focus: Complete backend integration for Settings, Storage, Logs, and Tasks views
 
 ---
 
+## 🎉 Sprint 4: Modular Refactoring Complete (Dec 13, 2025)
+
+**Duration**: 1 day  
+**Status**: Entity models organized into submodules ✅
+
+### Phase 1a: Research Domain - Feed Module ✅
+**Completed**: December 13, 2025
+
+- ✅ Created `research/components/feed/entities/` directory
+- ✅ Moved entity models: articles.rs, settings.rs, sources.rs
+- ✅ Created `entities/mod.rs` with re-exports
+- ✅ Updated all imports in feed handlers (articles, settings, sources, sync)
+- ✅ Updated writing domain imports (ideas module)
+- ✅ Cleaned up `research/components/mod.rs`
+
+**New Structure**:
+```
+research/components/feed/
+├── entities/          # Database entity models
+│   ├── articles.rs   # NewsArticles entity
+│   ├── settings.rs   # NewsSettings entity  
+│   ├── sources.rs    # NewsSources entity
+│   └── mod.rs        # Re-exports
+├── articles.rs       # Article CRUD handlers
+├── settings.rs       # Settings management
+├── sources.rs        # Source management
+├── sync.rs           # News sync logic
+├── types.rs          # DTOs and API types
+└── mod.rs            # Module exports
+
+system/components/scheduler/
+├── entities.rs       # SystemTask entity model
+├── task_runs.rs      # SystemTaskRuns entity model
+├── types.rs          # DTOs (SystemTaskDto, TaskRunDto, etc.)
+├── executor.rs       # Task execution logic with run history
+├── init.rs           # Scheduler initialization
+├── handlers.rs       # Command handlers (list, history, run, update)
+└── mod.rs            # Module exports
+```
+
+**Design Principles**:
+- Single responsibility per module
+- Explicit dependencies (no global state)
+- Pure functions where possible
+- Clear public API in mod.rs
+- Consistent naming patterns
+
+---
+
+## 🎉 Sprint 5: System Mode - Tasks View Complete (Dec 14, 2025)
+
+**Duration**: 1 day  
+**Status**: All four System Mode views fully functional ✅
+
+### Task #8: Tasks View - Backend Commands ✅
+- ✅ Created `list_system_tasks` command with full metadata
+- ✅ Created `get_task_history` command with pagination & filtering
+- ✅ Created `run_system_task_now` command with immediate execution
+- ✅ Created `update_system_task` command for enable/disable
+- ✅ Added missing `QuerySelect` import for pagination
+- ✅ All commands registered in main.rs
+
+### Task #9: Tasks View - Frontend Integration ✅
+- ✅ Completely rewrote `TasksView.tsx` with real backend integration
+- ✅ Replaced all mock data with TanStack Query hooks
+- ✅ Added loading states with Loader2 spinners
+- ✅ Added error handling with toast notifications
+- ✅ Added confirmation dialogs for run/toggle actions
+- ✅ Task status indicators (success/error/running badges)
+- ✅ Stats cards (total, enabled, errors, recent runs)
+- ✅ Task history filtering by task ID
+- ✅ Duration formatting and cron schedule parsing
+- ✅ Error display for failed tasks
+
+### Task #10: Execution History Tracking ✅
+- ✅ Fixed task run history recording in `system_task_runs` table
+- ✅ Added comprehensive scheduler logging (INFO/ERROR/WARN)
+- ✅ Frontend console logging for debugging
+- ✅ History section populates with real execution data
+
+### Build & Configuration ✅
+- ✅ Fixed tauri.conf.json build commands
+- ✅ Frontend builds successfully (8.74 kB gzipped)
+- ✅ Backend compiles with zero warnings
+- ✅ Production build verified
+
+**System Mode is now 100% complete!** All four views fully functional:
+- ✅ Settings View
+- ✅ Storage View  
+- ✅ Logs View
+- ✅ Tasks View
+
+---
+
+## 🎉 Sprint 6: Production Readiness (Dec 14, 2025)
+
+**Duration**: 1 day  
+**Status**: Security hardened, logging complete, fully automated install ✅
+
+### Task #11: Add Missing Logging (CRITICAL) ✅
+**Completed**: December 14, 2025
+
+- ✅ **research/components/feed/articles.rs** - Added logging to 3 functions
+  - dismiss_news_article_handler, toggle_star_news_article_handler, mark_news_article_read_handler
+  - #[tracing::instrument] spans with proper field annotations
+  - INFO logs for successful operations, ERROR logs on not found
+
+- ✅ **writing/components/ideas/handlers.rs** - Added logging to 5 functions
+  - update_idea_metadata_handler, update_idea_notes_handler, update_idea_article_handler, archive_idea_handler
+  - Field tracking includes IDs, sizes, boolean flags for audit trail
+  - Logs appear in `storage/logs/app.log` with JSON format
+
+### Task #12: Fix Tauri Security Configuration (CRITICAL) ✅
+**Completed**: December 14, 2025
+
+- ✅ **Content Security Policy**:
+  - Added strict CSP to prevent XSS attacks
+  - Network access restricted to NewsData API only
+  - Script execution limited to app origin + WASM
+
+- ✅ **Portable Configuration**:
+  - Fixed absolute paths to relative paths
+  - Build works from any directory
+
+- ✅ **Bundle Metadata**:
+  - Updated identifier, publisher, copyright, category
+  - Added short/long descriptions for app stores
+
+- ✅ **ACL Permissions Review**:
+  - Verified all 7 permissions follow least privilege
+  - Documented justifications in PERMISSIONS.md
+  - NO filesystem, HTTP, or shell access from frontend
+
+**Security Improvements**:
+- ✅ XSS protection via CSP
+- ✅ Network access restricted
+- ✅ Minimal attack surface (7 vs 50+ permissions)
+- ✅ Fully documented and auditable
+
+### Task #15: Installation Scripts & First-Run Setup ✅
+**Completed**: December 14, 2025
+
+- ✅ **install.sh** - Linux installation script
+  - Creates `~/.cockpit/` directory structure
+  - Installs binary to `/usr/local/bin/cockpit`
+  - Creates desktop entry and installs icons
+  - Generates initial `.env` configuration
+  - Updates system caches
+
+- ✅ **uninstall.sh** - Removal script with data preservation option
+- ✅ **backend/src/core/components/setup.rs** - First-run logic
+- ✅ **INSTALL.md** - End-user documentation
+
+### Task #16: Fully Automated Installation ✅
+**Completed**: December 14, 2025
+
+- ✅ **Zero-configuration installation**:
+  - Auto-generates 256-bit master key using openssl
+  - Creates ~/.cockpit/.env with secure permissions (600)
+  - Automatic database initialization on first launch
+  - Default settings for all categories
+
+- ✅ **Setup wizard components** (optional, kept for future):
+  - Backend: check_setup_status, generate_master_key, save_setup_config commands
+  - Frontend: 4-step wizard with progress bar
+  - App automatically transitions when ready
+
+**User Experience**:
+1. User runs `./install.sh` → secure config auto-generated
+2. User launches Cockpit → database/settings auto-created
+3. Main app loads → ready to use!
+
+### Task #17: Distribution Package System ✅
+**Completed**: December 14, 2025
+
+- ✅ **package.sh** - Automated package builder
+  - Builds both .tar.gz and .deb packages
+  - Includes SHA256 checksums
+  - FHS-compliant structure
+
+- ✅ **Tarball Distribution**: Portable with ./install script
+- ✅ **Debian Package**: Proper control files, postinst/prerm scripts
+- ✅ **Documentation**: DISTRIBUTION.md, updated README/INSTALL
+
+**Distribution Methods**:
+1. Tarball: Works on any Linux distro
+2. Debian Package: Ubuntu/Debian with dependency handling
+
+---
+
 ### Task #1: SQL Injection Vulnerability ✅
 **Completed**: December 12, 2025
 

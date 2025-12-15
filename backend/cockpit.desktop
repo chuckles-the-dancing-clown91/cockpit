@@ -3,7 +3,7 @@ Name={{{name}}}
 GenericName=Writing and Research Tool
 Comment={{{comment}}}
 Exec={{{exec}}}
-Icon={{{icon}}}
+Icon=cockpit
 Terminal=false
 Type=Application
 Categories={{{categories}}}
@@ -15,3 +15,4 @@ Actions=NewWindow;
 [Desktop Action NewWindow]
 Name=New Window
 Exec={{{exec}}}
+
