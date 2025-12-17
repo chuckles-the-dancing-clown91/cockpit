@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Article Viewer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: white;
+      overflow: hidden;
+    }
+
+    #article-frame {
+      width: 100vw;
+      height: 100vh;
+      border: none;
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-size: 18px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="loading" id="loading">Loading article...</div>
+  <iframe id="article-frame" style="display: none;" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
+
+  <script>
+    console.log('Article viewer loaded');
+    
+    // Get URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const articleUrl = urlParams.get('url');
+    
+    console.log('Article URL:', articleUrl);
+
+    if (articleUrl) {
+      const iframe = document.getElementById('article-frame');
+      const loading = document.getElementById('loading');
+      
+      const decodedUrl = decodeURIComponent(articleUrl);
+      console.log('Loading iframe with URL:', decodedUrl);
+      
+      iframe.src = decodedUrl;
+      
+      iframe.addEventListener('load', () => {
+        console.log('Iframe loaded');
+        loading.style.display = 'none';
+        iframe.style.display = 'block';
+      });
+
+      iframe.addEventListener('error', () => {
+        console.error('Iframe failed to load');
+        loading.textContent = 'Failed to load article. Opening in browser...';
+        window.open(decodedUrl, '_blank');
+      });
+
+      // Timeout fallback
+      setTimeout(() => {
+        if (iframe.style.display === 'none') {
+          console.log('Iframe load timeout, showing anyway');
+          loading.style.display = 'none';
+          iframe.style.display = 'block';
+        }
+      }, 3000);
+    } else {
+      console.error('No article URL provided');
+      document.getElementById('loading').textContent = 'No article URL provided';
+    }
+
+    // Set up context menu
+    document.addEventListener('contextmenu', async (e) => {
+      e.preventDefault();
+      console.log('Context menu triggered');
+      
+      const selection = window.getSelection();
+      const text = selection?.toString().trim() || '';
+      
+      console.log('Selected text:', text);
+      
+      if (!text) {
+        return;
+      }
+
+      try {
+        const { Menu, MenuItem } = await import('@tauri-apps/api/menu');
+        const { emit } = await import('@tauri-apps/api/event');
+        
+        console.log('Creating menu...');
+        
+        const contextMenu = await Menu.new({
+          items: [
+            await MenuItem.new({
+              text: 'Add to Notes',
+              action: async () => {
+                console.log('Add to Notes clicked, emitting event');
+                await emit('add-to-notes', text);
+              },
+            }),
+            await MenuItem.new({
+              text: 'Copy',
+              action: async () => {
+                console.log('Copy clicked');
+                await navigator.clipboard.writeText(text);
+              },
+            }),
+          ],
+        });
+
+        console.log('Showing popup...');
+        await contextMenu.popup({ x: e.clientX, y: e.clientY });
+        console.log('Popup shown');
+      } catch (error) {
+        console.error('Context menu error:', error);
+      }
+    });
+  </script>
+</body>
+</html>

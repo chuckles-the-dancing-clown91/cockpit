@@ -1,0 +1,208 @@
+@import './core/theme/tokens.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Remove number input spinners */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* ===========================
+   ANIMATIONS
+   =========================== */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* Navigation Menu Animations */
+@keyframes enterFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-200px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes enterFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(200px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes exitToLeft {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-200px);
+  }
+}
+
+@keyframes exitToRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(200px);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scaleOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.animate-enterFromLeft {
+  animation: enterFromLeft 250ms ease;
+}
+
+.animate-enterFromRight {
+  animation: enterFromRight 250ms ease;
+}
+
+.animate-exitToLeft {
+  animation: exitToLeft 250ms ease;
+}
+
+.animate-exitToRight {
+  animation: exitToRight 250ms ease;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 200ms ease;
+}
+
+.animate-scaleOut {
+  animation: scaleOut 200ms ease;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 200ms ease;
+}
+
+.animate-fadeOut {
+  animation: fadeOut 200ms ease;
+}
+
+/* ===========================
+   LAYOUT UTILITIES
+   =========================== */
+
+/* Full-height container pattern for main layouts */
+.layout-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0; /* Critical for nested flex items */
+}
+
+/* Scrollable content area that fills available space */
+.layout-scroll-area {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Fixed-size header/footer that doesn't shrink */
+.layout-fixed {
+  flex-shrink: 0;
+}
+
+/* Full-height grid layout (3-column like WritingView) */
+.layout-grid-full {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ===========================
+   CARD EFFECTS
+   =========================== */
+
+.card-sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 15% 15%, var(--color-glow), transparent 40%);
+  opacity: 0.5;
+  pointer-events: none;
+}

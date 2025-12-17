@@ -25,21 +25,43 @@ export default defineConfig({
   },
   resolve: {
     alias: [
+      // Domain path aliases
+      {
+        find: '@/core',
+        replacement: path.resolve(__dirname, './src/core'),
+      },
+      {
+        find: '@/writing',
+        replacement: path.resolve(__dirname, './src/writing'),
+      },
+      {
+        find: '@/research',
+        replacement: path.resolve(__dirname, './src/research'),
+      },
+      {
+        find: '@/system',
+        replacement: path.resolve(__dirname, './src/system'),
+      },
+      {
+        find: '@/setup',
+        replacement: path.resolve(__dirname, './src/setup'),
+      },
+      // Vendor overrides
       {
         find: '@uiw/react-md-editor/markdown-editor.css',
-        replacement: path.resolve(__dirname, './src/vendor/markdown-editor.css'),
+        replacement: path.resolve(__dirname, './src/core/vendor/markdown-editor.css'),
       },
       {
         find: '@uiw/react-markdown-preview/markdown.css',
-        replacement: path.resolve(__dirname, './src/vendor/markdown-preview.css'),
+        replacement: path.resolve(__dirname, './src/core/vendor/markdown-preview.css'),
       },
       {
         find: '@uiw/react-md-editor',
-        replacement: path.resolve(__dirname, './src/vendor/MDEditor.tsx'),
+        replacement: path.resolve(__dirname, './src/core/vendor/MDEditor.tsx'),
       },
       {
         find: '@uiw/react-markdown-preview',
-        replacement: path.resolve(__dirname, './src/vendor/MarkdownPreview.tsx'),
+        replacement: path.resolve(__dirname, './src/core/vendor/MarkdownPreview.tsx'),
       },
     ],
   },

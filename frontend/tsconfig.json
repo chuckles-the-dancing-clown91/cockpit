@@ -11,7 +11,15 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@/core/*": ["src/core/*"],
+      "@/writing/*": ["src/writing/*"],
+      "@/research/*": ["src/research/*"],
+      "@/system/*": ["src/system/*"],
+      "@/setup/*": ["src/setup/*"]
+    }
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]

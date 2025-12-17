@@ -222,3 +222,64 @@ pub(crate) fn idea_to_dto(model: Model) -> IdeaDto {
         is_pinned: model.is_pinned != 0,
     }
 }
+
+// ============================================================================
+// Idea References Types
+// ============================================================================
+
+/// Reference type enum
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ReferenceType {
+    Article,
+    Manual,
+    Url,
+}
+
+impl ReferenceType {
+    pub fn as_str(&self) -> &str {
+        match self {
+            ReferenceType::Article => "article",
+            ReferenceType::Manual => "manual",
+            ReferenceType::Url => "url",
+        }
+    }
+}
+
+/// DTO for idea reference (API response/request)
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IdeaReferenceDto {
+    pub id: i64,
+    pub idea_id: i64,
+    pub reference_type: String,
+    pub news_article_id: Option<i64>,
+    pub title: Option<String>,
+    pub url: Option<String>,
+    pub description: Option<String>,
+    pub notes_markdown: Option<String>,
+    pub source_id: Option<i64>,
+    pub added_at: String,
+    pub updated_at: String,
+}
+
+/// Input for adding a reference to an idea
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddReferenceInput {
+    pub idea_id: i64,
+    pub reference_type: String,
+    pub news_article_id: Option<i64>,
+    pub title: Option<String>,
+    pub url: Option<String>,
+    pub description: Option<String>,
+    pub source_id: Option<i64>,
+}
+
+/// Input for updating reference notes
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateReferenceNotesInput {
+    pub reference_id: i64,
+    pub notes_markdown: Option<String>,
+}

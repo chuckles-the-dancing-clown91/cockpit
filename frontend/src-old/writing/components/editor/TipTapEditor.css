@@ -1,0 +1,314 @@
+.tiptap-editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.tiptap-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-soft);
+  flex-wrap: wrap;
+}
+
+.toolbar-group {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0 0.5rem;
+  border-right: 1px solid var(--color-border-subtle);
+}
+
+.toolbar-group:last-child {
+  border-right: none;
+}
+
+.toolbar-group button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-input);
+  color: var(--color-text-soft);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toolbar-group button:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.toolbar-group button.is-active {
+  background: var(--color-primary);
+  color: white;
+}
+
+.toolbar-group button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.tiptap-content {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--color-surface);
+}
+
+/* TipTap Editor Styles */
+.ProseMirror {
+  color: var(--color-text-primary);
+  padding: 1.5rem;
+  min-height: 100%;
+}
+
+.ProseMirror:focus {
+  outline: none;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: var(--color-text-muted);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Headings */
+.ProseMirror h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+  line-height: 1.2;
+  color: var(--color-text-primary);
+}
+
+.ProseMirror h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.3;
+  color: var(--color-text-primary);
+}
+
+.ProseMirror h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+  color: var(--color-text-primary);
+}
+
+.ProseMirror h1:first-child,
+.ProseMirror h2:first-child,
+.ProseMirror h3:first-child {
+  margin-top: 0;
+}
+
+/* Paragraphs */
+.ProseMirror p {
+  margin-bottom: 1rem;
+  line-height: 1.7;
+}
+
+/* Lists */
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.ProseMirror ul li,
+.ProseMirror ol li {
+  margin-bottom: 0.5rem;
+  line-height: 1.7;
+}
+
+.ProseMirror ul {
+  list-style-type: disc;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+}
+
+/* Blockquotes */
+.ProseMirror blockquote {
+  padding-left: 1rem;
+  border-left: 3px solid var(--color-border);
+  margin: 1.5rem 0;
+  color: var(--color-text-soft);
+  font-style: italic;
+}
+
+/* Inline Code */
+.ProseMirror code {
+  background: rgba(135, 131, 120, 0.15);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-input);
+  font-size: 0.9em;
+  color: #eb5757;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-weight: 500;
+  border: 1px solid rgba(135, 131, 120, 0.2);
+}
+
+/* Code Blocks */
+.ProseMirror pre {
+  background: #1e1e1e;
+  padding: 1.25rem;
+  border-radius: var(--radius-card);
+  overflow-x: auto;
+  margin: 1.5rem 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.ProseMirror pre code {
+  background: transparent;
+  padding: 0;
+  color: #d4d4d4;
+  border: none;
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+/* Syntax Highlighting */
+.ProseMirror .code-block-highlighted {
+  background: #1e1e1e;
+  color: #d4d4d4;
+}
+
+/* Syntax tokens - VS Code Dark+ theme colors */
+.ProseMirror .hljs-comment {
+  color: #6a9955;
+  font-style: italic;
+}
+
+.ProseMirror .hljs-keyword,
+.ProseMirror .hljs-selector-tag,
+.ProseMirror .hljs-literal,
+.ProseMirror .hljs-section,
+.ProseMirror .hljs-link {
+  color: #569cd6;
+}
+
+.ProseMirror .hljs-string {
+  color: #ce9178;
+}
+
+.ProseMirror .hljs-number,
+.ProseMirror .hljs-regexp,
+.ProseMirror .hljs-built_in {
+  color: #b5cea8;
+}
+
+.ProseMirror .hljs-function .hljs-title,
+.ProseMirror .hljs-title.function_ {
+  color: #dcdcaa;
+}
+
+.ProseMirror .hljs-tag,
+.ProseMirror .hljs-name,
+.ProseMirror .hljs-selector-id,
+.ProseMirror .hljs-selector-class,
+.ProseMirror .hljs-selector-attr,
+.ProseMirror .hljs-selector-pseudo {
+  color: #4ec9b0;
+}
+
+.ProseMirror .hljs-variable,
+.ProseMirror .hljs-template-variable {
+  color: #9cdcfe;
+}
+
+.ProseMirror .hljs-type,
+.ProseMirror .hljs-class .hljs-title {
+  color: #4ec9b0;
+}
+
+.ProseMirror .hljs-attribute {
+  color: #9cdcfe;
+}
+
+.ProseMirror .hljs-symbol,
+.ProseMirror .hljs-bullet,
+.ProseMirror .hljs-subst,
+.ProseMirror .hljs-meta,
+.ProseMirror .hljs-meta .hljs-keyword {
+  color: #d4d4d4;
+}
+
+.ProseMirror .hljs-deletion {
+  color: #f44747;
+}
+
+.ProseMirror .hljs-addition {
+  color: #89d185;
+}
+
+.ProseMirror .hljs-emphasis {
+  font-style: italic;
+}
+
+.ProseMirror .hljs-strong {
+  font-weight: bold;
+}
+
+/* Links */
+.ProseMirror a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ProseMirror a:hover {
+  color: var(--color-primary-hover);
+}
+
+/* Images */
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-card);
+  margin: 1rem 0;
+}
+
+/* Horizontal Rule */
+.ProseMirror hr {
+  border: none;
+  border-top: 2px solid var(--color-border);
+  margin: 2rem 0;
+}
+
+/* Strong/Bold */
+.ProseMirror strong {
+  font-weight: 700;
+}
+
+/* Emphasis/Italic */
+.ProseMirror em {
+  font-style: italic;
+}
+
+/* Strikethrough */
+.ProseMirror s {
+  text-decoration: line-through;
+}
+
+/* Selection */
+.ProseMirror ::selection {
+  background: var(--color-primary);
+  color: white;
+  opacity: 0.3;
+}

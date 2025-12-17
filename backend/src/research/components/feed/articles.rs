@@ -40,8 +40,8 @@ pub(crate) fn article_to_dto(m: news_articles::Model) -> NewsArticleDto {
 
 /// List news articles with filtering, search, and pagination
 /// 
-/// Supports filtering by read status, dismissal, search text.
-/// Returns articles sorted by published date (newest first).
+/// Supports filtering by read status, dismissal, search text, source, date range, starred.
+/// Returns articles sorted by specified order (default: newest first).
 #[instrument(skip(state), fields(limit = ?limit, offset = ?offset))]
 pub async fn list_news_articles_handler(
     status: Option<String>,
@@ -49,9 +49,16 @@ pub async fn list_news_articles_handler(
     offset: Option<u64>,
     include_dismissed: Option<bool>,
     search: Option<String>,
+    source_id: Option<i64>,
+    starred: Option<bool>,
+    start_date: Option<String>,
+    end_date: Option<String>,
+    sort_by: Option<String>,
     state: &crate::AppState,
 ) -> AppResult<Vec<NewsArticleDto>> {
     let mut query = EntityNewsArticles::find().filter(news_articles::Column::UserId.eq(1));
+    
+    // Status filter (unread, dismissed, ideas, all)
     match status.as_deref() {
         Some("unread") => {
             query = query
@@ -68,6 +75,30 @@ pub async fn list_news_articles_handler(
             }
         }
     }
+    
+    // Source filter
+    if let Some(sid) = source_id {
+        query = query.filter(news_articles::Column::SourceId.eq(sid.to_string()));
+    }
+    
+    // Starred filter
+    if let Some(is_starred) = starred {
+        query = query.filter(news_articles::Column::IsStarred.eq(if is_starred { 1 } else { 0 }));
+    }
+    
+    // Date range filters
+    if let Some(start) = start_date {
+        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&start) {
+            query = query.filter(news_articles::Column::PublishedAt.gte(dt.with_timezone(&chrono::Utc)));
+        }
+    }
+    if let Some(end) = end_date {
+        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&end) {
+            query = query.filter(news_articles::Column::PublishedAt.lte(dt.with_timezone(&chrono::Utc)));
+        }
+    }
+    
+    // Search filter
     if let Some(term) = search {
         if !term.trim().is_empty() {
             let like = format!("%{}%", term.trim());
@@ -81,7 +112,7 @@ pub async fn list_news_articles_handler(
     }
     // Optimize by excluding heavy content field in list view
     // Content can be large, only fetch when viewing individual articles
-    let items = query
+    let mut items_query = query
         .select_only()
         .columns([
             news_articles::Column::Id,
@@ -107,15 +138,36 @@ pub async fn list_news_articles_handler(
             news_articles::Column::IsRead,
             news_articles::Column::AddedToIdeasAt,
             news_articles::Column::DismissedAt,
-        ])
-        // Exclude: Content (can be large text field)
-        .order_by_desc(news_articles::Column::PublishedAt)
-        .order_by_desc(news_articles::Column::FetchedAt)
-        .limit(limit.unwrap_or(30))
+        ]);
+    
+    // Sorting
+    match sort_by.as_deref() {
+        Some("oldest") => {
+            items_query = items_query
+                .order_by_asc(news_articles::Column::PublishedAt)
+                .order_by_asc(news_articles::Column::FetchedAt);
+        }
+        Some("starred") => {
+            items_query = items_query
+                .order_by_desc(news_articles::Column::IsStarred)
+                .order_by_desc(news_articles::Column::PublishedAt);
+        }
+        _ => {
+            // Default: latest first
+            items_query = items_query
+                .order_by_desc(news_articles::Column::PublishedAt)
+                .order_by_desc(news_articles::Column::FetchedAt);
+        }
+    }
+    
+    // Pagination
+    let items = items_query
+        .limit(limit.unwrap_or(100))
         .offset(offset.unwrap_or(0))
         .into_model::<news_articles::Model>()
         .all(&state.db)
         .await?;
+    
     Ok(items.into_iter().map(article_to_dto).collect())
 }
 

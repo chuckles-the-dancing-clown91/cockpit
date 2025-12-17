@@ -114,13 +114,19 @@ pub async fn init_db(db_url: &str) -> Result<DatabaseConnection, AppError> {
         info!("SQLite PRAGMAs configured");
     }
 
-    // Run migrations
+    // Run schema migrations
     info!("Running database migrations...");
     super::migrations::run_migrations(&db).await?;
 
     // Log current version
     if let Ok(Some(version)) = super::migrations::get_db_version(&db).await {
         info!("Database version: {}", version);
+    }
+    
+    // Run one-time data migrations
+    if let Err(e) = super::migrations::migrate_newsdata_settings_to_feed_source(&db).await {
+        warn!("Data migration warning: {}", e);
+        // Don't fail startup - this is not critical
     }
 
     Ok(db)

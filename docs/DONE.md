@@ -4,6 +4,188 @@ All completed work with completion dates and details.
 
 ---
 
+## 🎉 Sprint 4: Feed Management System (Dec 15, 2025)
+
+**Duration**: December 13-15, 2025  
+**Tasks Completed**: 8/8 core tasks (100%)  
+**Status**: COMPLETE ✅ - Backend foundation, Stream view, Feed Sources UI, Navigation cleanup
+
+### Sprint Summary
+Successfully implemented plugin-based feed management system with NewsData.io as first plugin. Stream view with comprehensive filtering, source management UI, and navigation cleanup complete.
+
+### Key Achievements
+- ✅ **Plugin Architecture**: FeedSource trait with async methods, plugin registry
+- ✅ **NewsData Plugin**: Full migration to plugin system with retry logic, rate limiting
+- ✅ **Feed Sources Management**: Complete CRUD interface with sync controls
+- ✅ **Stream View**: Article feed with filters (source, starred, date range, search, sort)
+- ✅ **Backend Filtering**: Database-level article filtering (5 new parameters)
+- ✅ **Navigation Cleanup**: Removed duplicate tabs, reorganized settings
+
+### Tasks Completed
+
+#### Task #1: Feed Sources Table & Migration ✅
+**Completed**: December 15, 2025  
+- Created migration 004_feed_sources_up.sql with feed_sources table
+- Added feed_source_id column to news_articles
+- Created FeedSource entity model with SeaORM
+- Defined SourceType, SourceConfig types
+- Created FeedSourceDto and input types
+- All indexes created (source_type, enabled, task_id)
+
+#### Task #2: Source Types & Plugin Trait ✅
+**Completed**: December 15, 2025  
+- Created FeedSource trait in research/components/feed/plugin.rs
+- 6 async methods: fetch_articles, test_connection, get_metadata, parse_config, default_config, estimate_api_calls
+- Defined FeedArticle struct (common article format)
+- Defined FetchResult, SourceMetadata, ConnectionTestResult
+- Created PluginRegistry for managing plugins
+- Added async-trait dependency
+
+#### Task #3: NewsData.io Plugin Implementation ✅
+**Completed**: December 15, 2025  
+- Implemented FeedSource trait for NewsDataPlugin
+- Migrated existing NewsData API logic from sync.rs
+- Support for both latest + archive endpoints
+- Pagination with max_pages control (1-10)
+- Retry logic with exponential backoff
+
+#### Task #4: Feed Source CRUD Commands ✅
+**Completed**: December 15, 2025
+- Created all 6 Tauri commands for feed source management
+- Full CRUD operations (create, get, list, update, delete)
+- Test connection command for API key validation
+- Sync command for manual sync trigger
+- All commands registered in main.rs
+
+#### Task #5: Feed Sources UI ✅
+**Completed**: December 15, 2025
+- Created FeedSourcesView.tsx with comprehensive layout
+- FeedSourceCard.tsx with action buttons (sync, edit, delete)
+- FeedSourceDialog.tsx with form validation using Radix UI
+- React Hook Form + Zod validation
+- Full integration with backend commands
+
+#### Task #6: Navigation & Settings Cleanup ✅
+**Completed**: December 15, 2025
+- Removed duplicate tabs from System Mode sidebar
+- Consolidated settings under single Settings view
+- Added Feed Sources as main research tab
+- Updated ModeContext with proper feed-sources view
+
+#### Task #7: Stream View Implementation ✅
+**Completed**: December 15, 2025
+- Built comprehensive article stream with Radix UI
+- StreamArticleCard.tsx with CSS custom properties
+- 5 filter types: source, starred, date range, search, sort
+- Star/dismiss actions with optimistic updates
+- External link opening
+
+#### Task #8: Backend Article Filtering ✅
+**Completed**: December 15, 2025
+- Added 5 query parameters to get_news_articles command
+- Database-level filtering with SeaORM
+- Pagination support (page + per_page)
+- Search across title and content fields
+- Multi-source filtering with IN clause
+
+#### Frontend Refactoring Phase 1 ✅
+**Completed**: December 15, 2025
+- Deleted dead code files (SettingsView.tsx.old, SourcesView.tsx)
+- Created REFACTOR_FRONTEND.md with 8-phase plan
+- Created domain folder structure (writing/, research/, system/, setup/, core/)
+- Moved core infrastructure to core/ (ui, lib, theme, context, vendor)
+- Configured path aliases (@/core, @/writing, @/research, @/system, @/setup)
+- Updated all imports and fixed build (5.60s)
+- StreamView and StreamArticleCard rebuilt with Radix UI + CSS variables
+- Established 3-tier view hierarchy (Main → Domain → Component)
+- Component-by-component migration approach documented
+- Rate limiting handling (429 status code)
+- Config validation (max_pages, date format)
+- Converts NewsData response to FeedArticle format
+- Returns warnings when pagination limit reached
+
+#### Task #4: Source Management Commands ✅
+**Completed**: December 15, 2025  
+- Created 9 backend handlers in research/components/feed/feed_sources.rs:
+  - list_feed_sources_handler - Get all sources with metadata
+  - get_feed_source_handler - Get single source by ID
+  - create_feed_source_handler - Create source + system_task atomically
+  - update_feed_source_handler - Update source + task
+  - delete_feed_source_handler - Delete source + cleanup task
+  - toggle_feed_source_handler - Enable/disable source + task
+  - test_feed_source_connection_handler - Validate API key
+  - sync_feed_source_now_handler - Manual trigger for single source
+  - sync_all_feed_sources_handler - Sync all enabled sources
+- Created Tauri command wrappers in research/commands.rs
+- Registered all commands in main.rs
+
+#### Task #5: Feed Sources Management Page ✅
+**Completed**: December 15, 2025  
+- Created FeedSourcesView.tsx (183 lines) - Main sources interface
+- Created FeedSourceCard.tsx - Individual source cards with quick actions
+- Created FeedSourceFormDialog.tsx - Create/edit source form with validation
+- Table view with source details, status badges, stats
+- Quick actions: Sync Now, Edit, Test Connection, Delete
+- NewsData config section (language, countries, categories)
+- API key input with show/hide toggle
+- Schedule dropdown (cron expression presets)
+- Test connection with quota display
+- Added 9 query hooks to queries.ts
+
+#### Task #6: Update Navigation ✅
+**Completed**: December 15, 2025  
+- Added "Feed Sources" nav item to Research mode
+- Added route for /research/feed-sources in App.tsx
+- Research nav now has: News, Stream, Feed Sources, Reddit
+- Proper routing and lazy loading
+
+#### Task #7: Stream View - Article Feed ✅
+**Completed**: December 15, 2025  
+- Created StreamView.tsx (237 lines) - Main article reading interface
+- Created StreamArticleCard.tsx (210 lines) - Individual article cards
+- Responsive grid layout (1/2/3 columns)
+- Collapsible filters toolbar:
+  - Source dropdown (filter by feed source)
+  - Date range (all/today/week/month)
+  - Starred filter toggle
+- Search input with live filtering
+- Sort dropdown (latest/oldest/starred)
+- Stats bar showing active filters
+- Empty states for no articles/no matches
+- Color-coded source badges (6 color rotation)
+- Star/dismiss buttons with loading states
+- Relative timestamps with date-fns
+- Tags display (first 3 + overflow count)
+- Open external link button
+
+#### Task #8: Backend Enhanced Filtering ✅
+**Completed**: December 15, 2025  
+- Updated list_news_articles_handler with 5 new parameters:
+  - source_id (i64) - Filter by feed source
+  - starred (bool) - Filter by star status
+  - start_date (String) - RFC3339 date parsing
+  - end_date (String) - RFC3339 date parsing
+  - sort_by (String) - latest/oldest/starred
+- Date parsing with chrono::DateTime::parse_from_rfc3339
+- Sorting logic: DESC published_at, ASC published_at, DESC is_starred
+- Default limit changed from 30 to 100
+- Optimized column selection (excludes heavy content field)
+- Updated command signature in research/commands.rs
+- Extended useNewsArticles hook with 6 new parameters
+- Removed local filtering from StreamView (moved to backend)
+
+### Navigation & Settings Cleanup ✅
+**Completed**: December 15, 2025  
+- Removed duplicate "Sources" tab from Research navigation
+- Updated ResearchView type to remove 'sources'
+- Removed entire "News" section from System → Settings (80+ lines)
+- NewsData.io configuration now managed per-source in Feed Sources
+- Cleaner Settings view focused on app-wide preferences
+- Fixed FeedSourcesView export (changed to default export)
+- Fixed React errors in StreamArticleCard (added type guards)
+
+---
+
 ## 🎉 Sprint 3: System Mode Complete (Dec 12-13, 2025)
 
 **Duration**: 2 days  

@@ -97,8 +97,38 @@ pub(crate) async fn run_task_once(
 
     // Execute task function based on type
     let result = match task.task_type.as_str() {
+        // Legacy news tasks (backwards compatibility)
         "news_sync" => news::run_news_sync_task(state).await,
         "news_sources_sync" => news::run_news_sources_sync_task(state).await,
+        
+        // Feed source sync tasks
+        "feed_sources_sync_all" => news::run_feed_sources_sync_all_task(state).await,
+        
+        // Per-source sync tasks (pattern: feed_sync_{source_id})
+        task_type if task_type.starts_with("feed_sync_") => {
+            if let Some(source_id_str) = task_type.strip_prefix("feed_sync_") {
+                if let Ok(source_id) = source_id_str.parse::<i64>() {
+                    news::run_feed_source_sync_task(state, source_id).await
+                } else {
+                    warn!(
+                        target: "scheduler",
+                        "Invalid source_id in task type: {}", task.task_type
+                    );
+                    TaskRunResult {
+                        status: "error",
+                        result_json: None,
+                        error_message: Some(format!("Invalid source_id: {}", source_id_str)),
+                    }
+                }
+            } else {
+                TaskRunResult {
+                    status: "error",
+                    result_json: None,
+                    error_message: Some("Missing source_id in task type".to_string()),
+                }
+            }
+        }
+        
         _ => {
             warn!(
                 target: "scheduler",

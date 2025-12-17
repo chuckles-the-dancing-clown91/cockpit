@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Article Viewer</title>
+  <script type="module">
+    // Polyfill for Tauri API if not loaded yet
+    if (!window.__TAURI__) {
+      console.warn('Tauri API not loaded, importing...');
+      const modules = await Promise.all([
+        import('@tauri-apps/api/menu'),
+        import('@tauri-apps/api/event'),
+        import('@tauri-apps/api/webviewWindow')
+      ]);
+      window.__TAURI_IMPORTS__ = {
+        menu: modules[0],
+        event: modules[1],
+        webviewWindow: modules[2]
+      };
+    }
+  </script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: white;
+      overflow: hidden;
+    }
+
+    #article-frame {
+      width: 100vw;
+      height: 100vh;
+      border: none;
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-size: 18px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="loading" id="loading">Loading article...</div>
+  <iframe id="article-frame" style="display: none;"></iframe>
+
+  <script>
+    // Wait for Tauri API to be available
+    async function initViewer() {
+      const menu = window.__TAURI_IMPORTS__?.menu || window.__TAURI__?.menu;
+      const event = window.__TAURI_IMPORTS__?.event || window.__TAURI__?.event;
+      const webviewWindow = window.__TAURI_IMPORTS__?.webviewWindow || window.__TAURI__?.webviewWindow;
+
+      if (!menu || !event || !webviewWindow) {
+        console.error('Tauri API not available');
+        return;
+      }
+
+      const { Menu, MenuItem } = menu;
+      const { emit } = event;
+      const { getCurrentWebviewWindow } = webviewWindow;
+
+    // Get URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const articleUrl = urlParams.get('url');
+
+    if (articleUrl) {
+      const iframe = document.getElementById('article-frame');
+      const loading = document.getElementById('loading');
+      
+      iframe.src = decodeURIComponent(articleUrl);
+      
+      iframe.onload = () => {
+        loading.style.display = 'none';
+        iframe.style.display = 'block';
+      };
+
+      iframe.onerror = () => {
+        loading.textContent = 'Failed to load article. Opening in browser...';
+        window.open(decodeURIComponent(articleUrl), '_blank');
+        setTimeout(() => {
+          getCurrentWebviewWindow().close();
+        }, 2000);
+      };
+    }
+
+    // Set up native context menu for text selection
+    document.addEventListener('contextmenu', async (e) => {
+      e.preventDefault();
+      
+      // Get selected text
+      const selection = window.getSelection();
+      const text = selection?.toString().trim() || '';
+      
+      if (!text) {
+        // No text selected, allow default behavior
+        return;
+      }
+
+      try {
+        console.log('Creating context menu for text:', text);
+        
+        // Create native context menu
+        const contextMenu = await Menu.new({
+          items: [
+            await MenuItem.new({
+              text: 'Add to Notes',
+              action: async () => {
+                console.log('Add to Notes clicked');
+                // Emit event to main window to add text to notes
+                await emit('add-to-notes', text);
+                console.log('Event emitted');
+              },
+            }),
+            await MenuItem.new({
+              text: 'Copy',
+              action: async () => {
+                console.log('Copy clicked');
+                await navigator.clipboard.writeText(text);
+              },
+            }),
+          ],
+        });
+
+        console.log('Showing context menu at:', e.clientX, e.clientY);
+        // Show context menu at cursor position
+        await contextMenu.popup({
+          x: e.clientX,
+          y: e.clientY,
+        });
+        console.log('Context menu shown');
+      } catch (error) {
+        console.error('Failed to show context menu:', error);
+      }
+    });
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initViewer);
+    } else {
+      initViewer();
+    }
+  </script>
+</body>
+</html>

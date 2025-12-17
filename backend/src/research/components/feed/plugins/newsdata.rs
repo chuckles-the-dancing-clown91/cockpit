@@ -363,7 +363,7 @@ impl FeedSource for NewsDataPlugin {
             
             if !response.status().is_success() {
                 let status = response.status();
-                let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+                let _error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
                 return Err(AppError::ApiRequest {
                     endpoint: endpoint.to_string(),
                     status: status.as_u16(),

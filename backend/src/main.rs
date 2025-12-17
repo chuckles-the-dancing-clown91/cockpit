@@ -27,6 +27,8 @@ use core::commands::{
 use writing::commands::{
     list_ideas, get_idea, create_idea, create_idea_for_article,
     update_idea_metadata, update_idea_notes, update_idea_article, archive_idea,
+    open_article_modal, add_highlight,
+    list_idea_references, add_reference_to_idea, remove_reference, update_reference_notes,
 };
 use research::commands::{
     get_news_settings, save_news_settings, list_news_articles, get_news_article,
@@ -202,7 +204,13 @@ fn main() {
             update_idea_metadata,
             update_idea_notes,
             update_idea_article,
-            archive_idea
+            archive_idea,
+            open_article_modal,
+            add_highlight,
+            list_idea_references,
+            add_reference_to_idea,
+            remove_reference,
+            update_reference_notes
         ])
         .run(tauri::generate_context!())
         .expect("error while running Architect Cockpit backend");

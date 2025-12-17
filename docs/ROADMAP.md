@@ -4,11 +4,12 @@ High-level project phases, milestones, and long-term vision.
 
 ---
 
-## Current Status (December 12, 2025)
+## Current Status (December 17, 2025)
 
-- ✅ **UI Complete**: Phases 1-10 (100%)
-- 🔄 **Backend Modernization**: Phase 1 (HIGH priority complete - 7/17 tasks)
-- ⏳ **Backend Integration**: Phase 11 (pending)
+- 🔥 **Frontend Rebuild**: Phase 11 (IN PROGRESS - Top Priority)
+- ✅ **Backend Foundation**: Phase 1-10 Complete
+- 🔄 **Backend Modernization**: Phase 12 (MEDIUM priority ongoing)
+- ⏳ **Full Stack Integration**: Phase 13 (After frontend rebuild)
 - ⏳ **Testing**: 0%
 - 📖 **Documentation**: 60%
 
@@ -39,10 +40,64 @@ High-level project phases, milestones, and long-term vision.
 
 ---
 
-### 🔄 Phase 11: Backend Modernization (IN PROGRESS)
+### � Phase 11: Complete Frontend Rebuild (TOP PRIORITY)
+**Status**: Foundation Phase Started  
+**Started**: December 17, 2025  
+**Target**: Complete by December 31, 2025  
+**Goal**: Clean, feature-based architecture with Radix Themes, Zustand, and domain alignment
+
+**Why Rebuild?**
+- Current frontend has severe architectural issues (1152-line queries.ts, duplicated components, scattered state)
+- Status value mismatches causing bugs (done vs complete, backlog vs in_progress)
+- No clear separation between features and domains
+- Component duplication across views (IdeaCard, StatusDropdown, etc.)
+- Incremental refactoring proved too complex with existing technical debt
+
+**New Architecture**:
+```
+src/
+├── core/           # Infrastructure (shell, providers, stores, API)
+├── shared/         # Domain types and constants (backend-aligned)
+├── ui/             # Generic Radix wrapper components
+├── features/       # Reusable business UI (ideas, references, notes, writing)
+└── domains/        # Page compositions (writing, research, system)
+```
+
+**Key Benefits**:
+- ✅ Single source of truth for domain types (prevents drift)
+- ✅ Centralized state management with Zustand
+- ✅ Reusable atomic components with variants
+- ✅ Feature-based structure matching backend domains
+- ✅ Radix Themes with custom color scales (Dark/Light/Cyberpunk)
+- ✅ Consistent naming aligned with backend (in_progress, stalled, complete)
+- ✅ True modularity - features are dumb UI, domains handle wiring
+
+**Scope**:
+1. **Week 1 (Dec 17-23)**: Foundation + Ideas Feature
+   - Bootstrap structure, Radix Themes, Zustand stores
+   - Build Ideas feature (IdeaCard, IdeasList, IdeaDetailModal)
+   - Extract TipTap notes editor
+   - Build IdeasLibraryView, ArchiveView, EditorView
+   - Build References feature
+
+2. **Week 2 (Dec 24-31)**: Research + System Domains
+   - Build Research domain (Stream, Feed Sources)
+   - Build System domain (Settings, Logs, Tasks, Storage)
+   - Integration testing across all domains
+   - Documentation (ARCHITECTURE.md)
+
+**Approach**:
+- Start with empty src/, salvage working code from src-old incrementally
+- Use "Coming Soon" placeholders where needed during build
+- Test each feature end-to-end before moving to next
+- All naming aligned with backend (no more done/complete mismatches)
+
+---
+
+### 🔄 Phase 12: Backend Modernization (ONGOING)
 **Status**: HIGH Priority Complete (7/17 tasks)  
 **Started**: December 11, 2025  
-**Target**: Complete MEDIUM priority by December 20, 2025
+**Target**: Complete MEDIUM priority by January 15, 2026
 
 **CRITICAL Security (3/3 complete)**:
 - ✅ SQL injection fix
@@ -68,9 +123,10 @@ High-level project phases, milestones, and long-term vision.
 
 ---
 
-### ⏳ Phase 12: System Mode Backend Integration (PENDING)
+### ⏳ Phase 13: Full Stack Integration & Testing (PENDING)
 **Status**: Not Started  
-**Target**: January 2026
+**Target**: January 2026  
+**Depends On**: Phase 11 (Frontend Rebuild) Complete
 
 Wire up all System mode views to Tauri backend:
 
@@ -99,19 +155,7 @@ Wire up all System mode views to Tauri backend:
 
 ---
 
-### ⏳ Phase 13: Frontend Modernization (PENDING)
-**Status**: Phase 1/5 Complete  
-**Target**: January-February 2026
-
-**Phase 1**: ✅ Package cleanup (13 removed, 8 updated)  
-**Phase 2**: Vite 7 upgrade (security fix)  
-**Phase 3**: tailwind-merge & sonner updates  
-**Phase 4**: Code modularization & bundle optimization  
-**Phase 5**: Tailwind v4 (Q2 2026 - wait for stable)
-
----
-
-### ⏳ Phase 13b: Backend Code Quality Improvements (Q1 2026)
+### ⏳ Phase 14: Backend Code Quality Improvements (Q1 2026)
 **Status**: Planning - Identified from December 2025 Backend Audit  
 **Source**: See [CODE_REVIEW.md](../CODE_REVIEW.md) for detailed analysis  
 **Priority**: MEDIUM 📝  
@@ -199,7 +243,7 @@ Wire up all System mode views to Tauri backend:
 - ✅ Industry-standard for production deployments
 - ✅ Advanced features (full-text search, JSON operators, extensions)
 
-### ⏳ Phase 14: Testing Infrastructure (Q1 2026)
+### ⏳ Phase 15: Testing Infrastructure (Q1 2026)
 **Status**: Not Started
 
 - Unit tests for backend commands
@@ -210,7 +254,7 @@ Wire up all System mode views to Tauri backend:
 
 ---
 
-### ⏳ Phase 15: Production Readiness (Q1 2026)
+### ⏳ Phase 16: Production Readiness (Q1-Q2 2026)
 **Status**: Not Started
 
 #### Security Enhancements (LOW 📝)
@@ -273,7 +317,7 @@ Wire up all System mode views to Tauri backend:
 
 ---
 
-### ⏳ Phase 16: Modular Component Architecture (Q1-Q2 2026)
+### ⏳ Phase 17: Modular Component Architecture (Q2 2026)
 **Status**: Planning Phase
 **Goal**: True drop-in component system for maximum modularity
 
@@ -481,5 +525,25 @@ my_component/
 
 ---
 
-**Roadmap Last Updated**: December 12, 2025  
+**Roadmap Last Updated**: December 17, 2025  
 **Next Review**: January 1, 2026
+
+---
+
+## Critical Success Factors
+
+### Frontend Rebuild (Phase 11)
+- ✅ **Complete rebuild before production** - All 3 domains rebuilt with clean architecture
+- ✅ **Backend naming alignment** - Status values, field names match exactly
+- ✅ **Radix Themes with custom scales** - Full accessibility and theming
+- ✅ **Zustand for state management** - Centralized, predictable state
+- ✅ **Feature-based architecture** - Reusable components, clear boundaries
+- ✅ **Salvage incrementally** - Extract working code from src-old as needed
+
+### Key Metrics for Rebuild Success
+- **Type Safety**: Zero runtime type mismatches (done vs complete, etc.)
+- **Code Reuse**: Single IdeaCard component (not 3 variations)
+- **State Management**: Active idea selection works across all views
+- **Performance**: Bundle size < 500KB, load time < 2s
+- **Accessibility**: Full keyboard navigation, ARIA compliance
+- **Developer Experience**: Clear folder structure, easy to add new features

@@ -64,6 +64,8 @@ pub use feed_sources::{
     test_feed_source_connection_handler,
     sync_feed_source_now_handler,
     sync_all_feed_sources_handler,
+    run_feed_source_sync_task,
+    run_feed_sources_sync_all_task,
 };
 
 // Feed source types already exported above from types module

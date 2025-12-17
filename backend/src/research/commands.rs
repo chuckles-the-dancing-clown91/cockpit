@@ -40,14 +40,19 @@ pub async fn save_news_settings(
 /// List news articles with filtering and pagination
 /// 
 /// # Parameters
-/// - `status`: Filter by read status ("unread", "read", "all")
-/// - `limit`: Max number of results (default: 50)
+/// - `status`: Filter by read status ("unread", "dismissed", "ideas", "all")
+/// - `limit`: Max number of results (default: 100)
 /// - `offset`: Pagination offset (default: 0)
 /// - `include_dismissed`: Include dismissed articles (default: false)
-/// - `search`: Text search in title/excerpt
+/// - `search`: Text search in title/excerpt/content
+/// - `source_id`: Filter by feed source ID
+/// - `starred`: Filter by starred status
+/// - `start_date`: Filter articles published after this date (RFC3339)
+/// - `end_date`: Filter articles published before this date (RFC3339)
+/// - `sort_by`: Sort order ("latest", "oldest", "starred")
 /// 
 /// # Returns
-/// Paginated list of news articles sorted by published date (newest first)
+/// Paginated list of news articles with applied filters and sorting
 #[tauri::command]
 pub async fn list_news_articles(
     status: Option<String>,
@@ -55,11 +60,28 @@ pub async fn list_news_articles(
     offset: Option<u64>,
     include_dismissed: Option<bool>,
     search: Option<String>,
+    source_id: Option<i64>,
+    starred: Option<bool>,
+    start_date: Option<String>,
+    end_date: Option<String>,
+    sort_by: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<NewsArticleDto>, String> {
-    list_news_articles_handler(status, limit, offset, include_dismissed, search, &state)
-        .await
-        .map_err(|e| e.to_string())
+    list_news_articles_handler(
+        status,
+        limit,
+        offset,
+        include_dismissed,
+        search,
+        source_id,
+        starred,
+        start_date,
+        end_date,
+        sort_by,
+        &state,
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

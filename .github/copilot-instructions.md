@@ -19,23 +19,119 @@ cd /home/daddy/Documents/Commonwealth/cockpit/frontend && <command>
 ```
 
 ### Build Process
+
+**CRITICAL BUILD RULES**:
+- ⚠️ **NEVER use `cargo build --release`** - it corrupts the binary!
+- ✅ **ALWAYS use `cargo tauri build`** for ALL backend builds
+- ✅ Use `cargo check` for quick syntax validation only (does NOT produce working binary)
+
 ```bash
-# Full production build - ALWAYS use this exact command
+# PRODUCTION BUILD - ONLY correct way to build backend
 cd /home/daddy/Documents/Commonwealth/cockpit/backend && cargo tauri build
 
-# Development builds
-cd /home/daddy/Documents/Commonwealth/cockpit/backend && cargo build --release
+# SYNTAX CHECKING ONLY (no binary produced)
+cd /home/daddy/Documents/Commonwealth/cockpit/backend && cargo check
+
+# Development - run directly without building
 cd /home/daddy/Documents/Commonwealth/cockpit/backend && cargo run
 
-# Frontend dev server
-cd /home/daddy/Documents/Commonwealth/cockpit/frontend && npm run dev
-cd /home/daddy/Documents/Commonwealth/cockpit/frontend && npm run build
+# Frontend builds
+cd /home/daddy/Documents/Commonwealth/cockpit/frontend && npm run dev   # Dev server with hot reload
+cd /home/daddy/Documents/Commonwealth/cockpit/frontend && npm run build  # Production bundle
 
-# Running backend binary
+# Running the built binary
 cd /home/daddy/Documents/Commonwealth/cockpit/backend && ./target/release/backend
 ```
 
+**Build Output Locations**:
+- Backend binary: `backend/target/release/cockpit` (from `cargo tauri build`)
+- Frontend bundle: `frontend/dist/` (from `npm run build`)
+- Tauri app bundle: `backend/target/release/bundle/` (platform-specific installers)
+
 **Never run cargo/npm commands without cd first - they will fail silently!**
+
+## Frontend Architecture & Standards
+
+### UI Component Library: Radix UI
+**CRITICAL**: ALL UI components MUST use Radix UI primitives (https://www.radix-ui.com/primitives)
+
+**Why Radix UI:**
+- Unstyled, accessible components (WAI-ARIA compliant)
+- Full keyboard navigation support
+- Focus management out of the box
+- Composable primitives for complete control
+- No conflicting styles with our CSS custom properties
+
+**Required Pattern for Modals/Dialogs:**
+```tsx
+import * as Dialog from '@radix-ui/react-dialog';
+
+export function MyDialog({ open, onClose }) {
+  return (
+    <Dialog.Root open={open} onOpenChange={onClose}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-[color:var(--color-overlay-scrim)] backdrop-blur-[2px]" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[min(800px,100%-2rem)] max-h-[90vh] flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface-soft)] shadow-[var(--shadow-card-elevated)] text-[var(--color-text-primary)]">
+          <div className="flex items-center justify-between p-6 border-b border-[var(--color-border-subtle)] bg-[var(--color-surface)]">
+            <Dialog.Title className="text-xl font-semibold text-[var(--color-text-primary)]">
+              Title
+            </Dialog.Title>
+            <Dialog.Close asChild>
+              <button className="p-1 hover:bg-[var(--color-surface-hover)] rounded transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </Dialog.Close>
+          </div>
+          {/* Content */}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+```
+
+**CSS Custom Properties (Always Use):**
+- Backgrounds: `var(--color-surface)`, `var(--color-surface-soft)`, `var(--color-surface-hover)`
+- Text: `var(--color-text-primary)`, `var(--color-text-soft)`, `var(--color-text-muted)`
+- Borders: `var(--color-border)`, `var(--color-border-subtle)`
+- Interactive: `var(--color-primary)`, `var(--color-primary-hover)`
+- Radius: `var(--radius-card)`, `var(--radius-input)`
+- Shadows: `var(--shadow-card)`, `var(--shadow-card-elevated)`
+
+**Input/Form Styling (Standard Pattern):**
+```tsx
+<input
+  className="w-full px-3 py-2 border border-[var(--color-border)] rounded-md bg-[var(--color-surface)] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-soft)]"
+/>
+```
+
+**Reference Implementation:**
+- See `frontend/src/components/news/NewsFeedDialog.tsx` for complete modal example
+- See `frontend/src/components/research/FeedSourceDialog.tsx` for form patterns
+
+**NEVER:**
+- ❌ Use plain `<div>` wrappers for modals (causes transparency issues)
+- ❌ Use Tailwind color classes directly (`bg-gray-100`, `text-white`) - always use CSS custom properties
+- ❌ Skip accessibility attributes - Radix handles this automatically
+- ❌ Create custom dropdown/select implementations - use Radix primitives
+
+**Available Radix Primitives:**
+- Dialog (modals, popovers)
+- Toast (notifications - use `@/core/lib/toast`)
+- Dropdown Menu
+- Select
+- Tooltip
+- Accordion
+- Tabs
+- Radio Group
+- Checkbox
+- Switch
+- Slider
+- Progress
+- ScrollArea
+- HoverCard
+- Popover
+- AlertDialog
 
 ## Environment Configuration
 

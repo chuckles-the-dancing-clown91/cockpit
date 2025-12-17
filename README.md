@@ -63,9 +63,14 @@ cargo tauri dev
 - **Writing Stats**: Real-time word count, reading time, paragraph tracking
 
 ### Research Mode
-- **News Feed**: Automated article fetching from NewsData.io
-- **Reddit Integration**: Monitor subreddits, manage mod queue
-- **Source Management**: Enable/disable sources, configure fetch intervals
+- **Feed Sources**: Plugin-based feed aggregation system with unified management
+  - NewsData.io plugin for news articles
+  - Per-source API key management (encrypted)
+  - Individual sync schedules with cron expressions
+  - Test connections, sync on-demand, or auto-sync via scheduler
+  - Health monitoring with error tracking and rate limit warnings
+- **Stream View**: Unified article feed from all sources (coming soon)
+- **Reddit Integration**: Monitor subreddits, manage mod queue (coming soon)
 
 ### System Mode
 - **Settings**: App preferences, API keys (encrypted), logging configuration
@@ -100,7 +105,8 @@ cockpit/
 │   │   ├── main.rs      # Entry point, Tauri setup
 │   │   ├── core/        # Infrastructure (db, config, logging)
 │   │   ├── writing/     # Ideas & content management
-│   │   ├── research/    # News aggregation & feeds
+│   │   ├── research/    # Feed plugins & article aggregation
+│   │   │   └── feed/    # Feed system (plugin trait, sources, sync)
 │   │   ├── system/      # Scheduler & system tasks
 │   │   └── util/        # Cross-domain utilities
 │   ├── storage/         # Runtime data (db, logs, backups)
@@ -311,15 +317,15 @@ Restore from backup via: **System → Storage → Restore Backup**
 - ✅ Encrypted API key storage
 
 **In Progress:**
-- 📝 Reddit integration refinements
-- 📝 Export/import improvements
-- 📝 UI/UX enhancements
+- 📝 Feed plugin system expansion (Reddit, RSS, Twitter)
+- 📝 Stream view for unified article reading
+- 📝 Enhanced article filtering and search
 
 **Planned:**
 - 🔜 Cloud sync capabilities
-- 🔜 Plugin system
-- 🔜 Custom themes
 - 🔜 Mobile companion app
+- 🔜 Custom themes
+- 🔜 Export/import enhancements
 
 See [ROADMAP.md](docs/ROADMAP.md) for detailed planning.
 
