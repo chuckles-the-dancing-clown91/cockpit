@@ -1,11 +1,13 @@
-import { Flex, Heading, Tabs } from '@radix-ui/themes';
+import { Flex, Heading, Tabs, Text } from '@radix-ui/themes';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { PenTool, Search, Settings } from 'lucide-react';
 import { ThemeSwitcher } from './ThemeSwitcher';
+import { useCurrentUser } from '@/core/hooks/useCurrentUser';
 
 export function AppNavigation() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { data: currentUser } = useCurrentUser();
 
   // Determine active tab based on current path
   const getActiveTab = () => {
@@ -20,7 +22,7 @@ export function AppNavigation() {
   };
 
   return (
-    <Flex justify="between" align="center" py="4">
+    <Flex justify="between" align="center" py="3" px="4">
       {/* Logo/Title */}
       <Flex align="center" gap="3">
         <Heading size="6">Cockpit</Heading>
@@ -50,8 +52,15 @@ export function AppNavigation() {
         </Tabs.List>
       </Tabs.Root>
 
-      {/* Theme Switcher */}
-      <ThemeSwitcher />
+      {/* Right Side: Welcome + Theme Switcher */}
+      <Flex align="center" gap="4">
+        {currentUser && (
+          <Text size="2" color="gray">
+            Welcome, <Text weight="medium" style={{ color: 'var(--gray-12)' }}>{currentUser.username}</Text>
+          </Text>
+        )}
+        <ThemeSwitcher />
+      </Flex>
     </Flex>
   );
 }

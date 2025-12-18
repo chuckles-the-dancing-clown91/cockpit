@@ -1,48 +1,17 @@
-import { Flex, Tabs } from '@radix-ui/themes';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { FileEdit, Lightbulb, Archive } from 'lucide-react';
+import { Flex, Box } from '@radix-ui/themes';
+import { Outlet } from 'react-router-dom';
+import { Sidebar } from '@/core/components/layout/Sidebar';
 
 export function WritingView() {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const getActiveTab = () => {
-    if (location.pathname === '/writing' || location.pathname === '/writing/editor') return 'editor';
-    if (location.pathname === '/writing/ideas') return 'ideas';
-    if (location.pathname === '/writing/archive') return 'archive';
-    return 'editor';
-  };
-
-  const handleTabChange = (value: string) => {
-    navigate(`/writing/${value}`);
-  };
-
   return (
-    <Flex direction="column" gap="4">
-      <Tabs.Root value={getActiveTab()} onValueChange={handleTabChange}>
-        <Tabs.List>
-          <Tabs.Trigger value="editor">
-            <Flex gap="2" align="center">
-              <FileEdit size={16} />
-              Editor
-            </Flex>
-          </Tabs.Trigger>
-          <Tabs.Trigger value="ideas">
-            <Flex gap="2" align="center">
-              <Lightbulb size={16} />
-              Ideas
-            </Flex>
-          </Tabs.Trigger>
-          <Tabs.Trigger value="archive">
-            <Flex gap="2" align="center">
-              <Archive size={16} />
-              Archive
-            </Flex>
-          </Tabs.Trigger>
-        </Tabs.List>
-      </Tabs.Root>
+    <Flex style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+      {/* Sidebar Navigation */}
+      <Sidebar domain="writing" />
 
-      <Outlet />
+      {/* Main Content */}
+      <Box style={{ flex: 1, overflow: 'auto', padding: 'var(--space-6)' }}>
+        <Outlet />
+      </Box>
     </Flex>
   );
 }

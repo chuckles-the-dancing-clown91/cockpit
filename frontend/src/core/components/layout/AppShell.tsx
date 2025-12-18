@@ -1,10 +1,10 @@
-import { Flex, Container, Box } from '@radix-ui/themes';
+import { Flex, Box } from '@radix-ui/themes';
 import { Outlet } from 'react-router-dom';
 import { AppNavigation } from './AppNavigation';
 
 export function AppShell() {
   return (
-    <Flex direction="column" style={{ minHeight: '100vh' }}>
+    <Flex direction="column" style={{ height: '100vh', overflow: 'hidden' }}>
       {/* Header with Navigation */}
       <Box
         style={{
@@ -12,17 +12,13 @@ export function AppShell() {
           backgroundColor: 'var(--color-background)',
         }}
       >
-        <Container size="4">
-          <AppNavigation />
-        </Container>
+        <AppNavigation />
       </Box>
 
-      {/* Main Content */}
-      <Box style={{ flex: 1, backgroundColor: 'var(--gray-a2)' }}>
-        <Container size="4" style={{ paddingTop: 'var(--space-6)', paddingBottom: 'var(--space-6)' }}>
-          <Outlet />
-        </Container>
-      </Box>
+      {/* Main Content with Sidebar */}
+      <Flex style={{ flex: 1, overflow: 'hidden' }}>
+        <Outlet />
+      </Flex>
     </Flex>
   );
 }

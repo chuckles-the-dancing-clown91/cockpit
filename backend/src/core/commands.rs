@@ -16,6 +16,36 @@ use super::components::setup_wizard::{
     check_setup_status, generate_master_key, save_setup_config,
     SetupStatus, SetupConfig
 };
+use serde::{Deserialize, Serialize};
+
+/// Current user information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CurrentUser {
+    pub username: String,
+    pub home_dir: String,
+    pub user_id: String,
+}
+
+/// Get current system user information
+#[tauri::command]
+pub async fn get_current_user() -> Result<CurrentUser, String> {
+    let username = std::env::var("USER")
+        .or_else(|_| std::env::var("USERNAME"))
+        .unwrap_or_else(|_| "user".to_string());
+    
+    let home_dir = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_else(|_| ".".to_string());
+    
+    // Use username as user_id for now (can be enhanced with actual system UID later)
+    let user_id = username.clone();
+    
+    Ok(CurrentUser {
+        username,
+        home_dir,
+        user_id,
+    })
+}
 
 /// Get all application settings grouped by category
 #[tauri::command]

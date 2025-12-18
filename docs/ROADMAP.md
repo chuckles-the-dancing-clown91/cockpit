@@ -41,16 +41,18 @@ High-level project phases, milestones, and long-term vision.
 ---
 
 ### � Phase 11: Complete Frontend Rebuild (TOP PRIORITY)
-**Status**: Foundation Phase Started  
+**Status**: Schema Implementation Started  
 **Started**: December 17, 2025  
 **Target**: Complete by December 31, 2025  
-**Goal**: Clean, feature-based architecture with Radix Themes, Zustand, and domain alignment
+**Goal**: Clean, feature-based architecture with Radix Themes, Zustand, domain alignment, and knowledge graph
 
 **Why Rebuild?**
 - Current frontend has severe architectural issues (1152-line queries.ts, duplicated components, scattered state)
 - Status value mismatches causing bugs (done vs complete, backlog vs in_progress)
 - No clear separation between features and domains
 - Component duplication across views (IdeaCard, StatusDropdown, etc.)
+- Ideas table conflates concepts with draft content (article_markdown)
+- No many-to-many relationships for ideas ↔ references ↔ writings
 - Incremental refactoring proved too complex with existing technical debt
 
 **New Architecture**:
@@ -72,15 +74,45 @@ src/
 - ✅ Consistent naming aligned with backend (in_progress, stalled, complete)
 - ✅ True modularity - features are dumb UI, domains handle wiring
 
-**Scope**:
-1. **Week 1 (Dec 17-23)**: Foundation + Ideas Feature
-   - Bootstrap structure, Radix Themes, Zustand stores
-   - Build Ideas feature (IdeaCard, IdeasList, IdeaDetailModal)
-   - Extract TipTap notes editor
-   - Build IdeasLibraryView, ArchiveView, EditorView
-   - Build References feature
+**Writing Knowledge Graph Model** (Migration 006):
+- **Core Entities**: 
+  - `ideas` - Concepts only (no content storage)
+  - `references` - Unified sources (news, URLs, tweets, papers, books, PDFs, manuals)
+  - `writings` - Your outputs (articles, chapters, books)
+  - `notes` - Polymorphic notes on entities
+- **Join Tables**:
+  - `idea_reference_links` - Many-to-many idea ↔ reference
+  - `writing_idea_links` - Many-to-many writing ↔ idea
+- **Workflow Support**:
+  - "Add to Idea" → creates reference + link
+  - "Write Article from Idea" → creates writing + links ideas + aggregates references
+  - "Link Idea to Article" → connects existing idea to writing
+- **Phase 2 (Deferred)**: writing_parent_links (book structure), idea_relation (hierarchy), article_revisions, article_authors
 
-2. **Week 2 (Dec 24-31)**: Research + System Domains
+**Scope**:
+1. **Day 1 (Dec 17)**: Foundation + Infrastructure ✅
+   - Bootstrap structure, Radix Themes, providers
+   - Settings registry, query keys, feature flags
+   - Standard Loading/Error/Empty components
+   
+2. **Day 2 (Dec 18)**: Writing Knowledge Graph Schema 🚧
+   - Migration 006: Core tables (references, writings, links, notes)
+   - Rust entities + handlers
+   - Tauri commands registration
+
+3. **Days 3-4 (Dec 19-20)**: Ideas Feature MVP
+   - Zustand stores (ideas, references, writings)
+   - Ideas list + detail views
+   - Reference management UI
+   - Notes editor (TipTap)
+
+4. **Days 5-7 (Dec 21-23)**: Writing Feature
+   - Article editor with markdown
+   - Linked ideas sidebar
+   - References panel
+   - Series management
+
+5. **Week 2 (Dec 24-31)**: Research + System Domains
    - Build Research domain (Stream, Feed Sources)
    - Build System domain (Settings, Logs, Tasks, Storage)
    - Integration testing across all domains

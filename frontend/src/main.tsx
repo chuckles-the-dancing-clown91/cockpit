@@ -1,17 +1,50 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './core/providers/ThemeProvider';
 import { AppShell } from './core/components/layout/AppShell';
 import { WritingView } from './domains/writing/WritingView';
+import { IdeasView } from './domains/writing/IdeasView';
 import { ResearchView } from './domains/research/ResearchView';
 import { SystemView } from './domains/system/SystemView';
+import { Settings } from './domains/system/Settings';
+import { Storage } from './domains/system/Storage';
+import { Logs } from './domains/system/Logs';
+import { Tasks } from './domains/system/Tasks';
 import { ComingSoonPage } from './core/components/ui/ComingSoonPage';
+import { Toaster } from './core/components/ui/Toaster';
+import { DialogProvider } from './core/providers/DialogProvider';
+import { ErrorBoundary } from './core/components/ErrorBoundary';
+
+// Configure TanStack Query
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) => {
+        // Don't retry on 404s or other client errors
+        if (error instanceof Error && error.message.includes('404')) {
+          return false;
+        }
+        return failureCount < 3;
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      staleTime: 1000 * 30, // 30 seconds
+      refetchOnWindowFocus: false,
+    },
+    mutations: {
+      retry: false,
+    },
+  },
+});
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider>
-      <BrowserRouter>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <DialogProvider>
+            <BrowserRouter>
         <Routes>
           <Route path="/" element={<AppShell />}>
             {/* Redirect root to writing */}
@@ -19,9 +52,9 @@ createRoot(document.getElementById('root')!).render(
 
             {/* Writing Domain */}
             <Route path="writing" element={<WritingView />}>
-              <Route index element={<Navigate to="/writing/editor" replace />} />
+              <Route index element={<Navigate to="/writing/ideas" replace />} />
               <Route path="editor" element={<ComingSoonPage title="Editor" description="Write and edit your articles" />} />
-              <Route path="ideas" element={<ComingSoonPage title="Ideas Library" description="Manage your writing ideas" />} />
+              <Route path="ideas" element={<IdeasView />} />
               <Route path="archive" element={<ComingSoonPage title="Archive" description="View archived ideas" />} />
             </Route>
 
@@ -36,17 +69,21 @@ createRoot(document.getElementById('root')!).render(
             {/* System Domain */}
             <Route path="system" element={<SystemView />}>
               <Route index element={<Navigate to="/system/settings" replace />} />
-              <Route path="settings" element={<ComingSoonPage title="Settings" description="Configure your app" />} />
-              <Route path="storage" element={<ComingSoonPage title="Storage" description="Manage database and backups" />} />
-              <Route path="logs" element={<ComingSoonPage title="Logs" description="View application logs" />} />
-              <Route path="tasks" element={<ComingSoonPage title="Tasks" description="Manage scheduled tasks" />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="storage" element={<Storage />} />
+              <Route path="logs" element={<Logs />} />
+              <Route path="tasks" element={<Tasks />} />
             </Route>
 
             {/* Catch all */}
             <Route path="*" element={<Navigate to="/writing" replace />} />
           </Route>
         </Routes>
-      </BrowserRouter>
-    </ThemeProvider>
+            </BrowserRouter>
+            <Toaster />
+          </DialogProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   </StrictMode>,
 );

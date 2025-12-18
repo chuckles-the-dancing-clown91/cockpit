@@ -24,45 +24,13 @@ export default defineConfig({
     },
   },
   resolve: {
-    alias: [
-      // Domain path aliases
-      {
-        find: '@/core',
-        replacement: path.resolve(__dirname, './src/core'),
-      },
-      {
-        find: '@/writing',
-        replacement: path.resolve(__dirname, './src/writing'),
-      },
-      {
-        find: '@/research',
-        replacement: path.resolve(__dirname, './src/research'),
-      },
-      {
-        find: '@/system',
-        replacement: path.resolve(__dirname, './src/system'),
-      },
-      {
-        find: '@/setup',
-        replacement: path.resolve(__dirname, './src/setup'),
-      },
-      // Vendor overrides
-      {
-        find: '@uiw/react-md-editor/markdown-editor.css',
-        replacement: path.resolve(__dirname, './src/core/vendor/markdown-editor.css'),
-      },
-      {
-        find: '@uiw/react-markdown-preview/markdown.css',
-        replacement: path.resolve(__dirname, './src/core/vendor/markdown-preview.css'),
-      },
-      {
-        find: '@uiw/react-md-editor',
-        replacement: path.resolve(__dirname, './src/core/vendor/MDEditor.tsx'),
-      },
-      {
-        find: '@uiw/react-markdown-preview',
-        replacement: path.resolve(__dirname, './src/core/vendor/MarkdownPreview.tsx'),
-      },
-    ],
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+      '@core': path.resolve(__dirname, './src/core'),
+      '@shared': path.resolve(__dirname, './src/shared'),
+      '@ui': path.resolve(__dirname, './src/ui'),
+      '@features': path.resolve(__dirname, './src/features'),
+      '@domains': path.resolve(__dirname, './src/domains'),
+    },
   },
 });

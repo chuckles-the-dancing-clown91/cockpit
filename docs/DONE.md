@@ -4,6 +4,128 @@ All completed work with completion dates and details.
 
 ---
 
+## 🎉 Sprint 5: Frontend Infrastructure & Ideas Feature (Dec 17, 2025)
+
+**Duration**: December 17, 2025  
+**Tasks Completed**: System domain fixes, Ideas feature implementation  
+**Status**: COMPLETE ✅ - All System components fixed, Ideas CRUD complete
+
+### Sprint Summary
+Fixed critical backend/frontend serialization mismatches across all System domain components (Storage, Tasks, Logs). Built complete Ideas feature with hooks, components, and views following 3-tier architecture.
+
+### Key Achievements
+- ✅ **System Domain Fixes**: Fixed camelCase mismatches in StorageStats, BackupInfo, SystemTaskDto, LogStats
+- ✅ **Infrastructure Cleanup**: All components now use custom toast, queryKeys factory, LoadingState/ErrorState
+- ✅ **Ideas Feature**: Complete CRUD with IdeaCard, IdeaDetailDialog, NewIdeaDialog, IdeasView
+- ✅ **Ideas Hooks**: 8 TanStack Query hooks (useIdeas, useIdea, useCreateIdea, useUpdateIdea, etc.)
+- ✅ **Dialog Confirmations**: Replaced confirm() with Radix Dialog useDialog() across System domain
+- ✅ **Logs Enhancement**: Scrollable (600px max), component filter, 100-entry limit
+
+### Tasks Completed
+
+#### Task #1: Fix Storage Component ✅
+**Completed**: December 17, 2025
+- Fixed StorageStats interface: totalBytes, dataBytes, logsBytes, cacheBytes, backupBytes, exportBytes
+- Fixed BackupInfo interface: filePath, fileSize, timestamp
+- Added restoreDatabaseFromBackup functionality with dialog confirmation
+- Added ErrorState for stats and backups
+- Fixed component exports (LoadingInline, EmptyInline)
+- Added useDialog for delete/restore confirmations
+
+#### Task #2: Fix Tasks Component ✅
+**Completed**: December 17, 2025
+- Fixed SystemTaskDto: taskType, enabled, frequencyCron, frequencySeconds, lastRunAt, lastStatus, lastResult, errorCount
+- Fixed Switch toggle to use task.id and task.enabled
+- Fixed handleUpdateSchedule to use frequency_cron
+- Added LoadingState and ErrorState
+- Fixed JSX structure (removed duplicate closing tag)
+
+#### Task #3: Fix Logs Component ✅
+**Completed**: December 17, 2025
+- Fixed LogStats: totalCount, infoCount, warnCount, errorCount, last24hCount, last7dCount, last30dCount
+- Added scrollable container: maxHeight 600px with overflow auto
+- Added component filter: dropdown with unique components from logs
+- Changed limit from 1000 to 100 entries
+- Replaced confirm() with dialog.confirm()
+
+#### Task #4: Create Ideas Hooks ✅
+**Completed**: December 17, 2025
+- Created features/ideas/hooks/useIdeas.ts with 8 TanStack Query hooks
+- useIdeas() - Query all ideas with 30s stale time
+- useIdea(id) - Query single idea with enabled check
+- useCreateIdea() - Mutation with toast and cache invalidation
+- useUpdateIdea() - Mutation for metadata (title, summary, status, priority)
+- useUpdateIdeaNotes() - Separate mutation for notes field
+- useDeleteIdea(), useArchiveIdea(), useRestoreIdea() - Lifecycle mutations
+- All use queryKeys.ideas factory, all invalidate cache on success
+
+#### Task #5: Create IdeaCard Component ✅
+**Completed**: December 17, 2025
+- Reusable presentational component with Radix UI Card
+- Displays title, summary, status badge, priority badge
+- Shows metadata (dateAdded, dateUpdated)
+- Click handler to open detail dialog
+- Quick actions (archive, delete) with event handlers
+- Hover state with shadow transition
+
+#### Task #6: Create IdeaDetailDialog Component ✅
+**Completed**: December 17, 2025
+- Full modal with Radix Dialog primitive
+- Tabbed interface (Details, Notes) with Radix Tabs
+- Details tab: Edit title, summary, status, priority, target
+- Notes tab: Markdown editor for notesMarkdown
+- Separate save mutations per tab (useUpdateIdea, useUpdateIdeaNotes)
+- Form validation and change detection
+
+#### Task #7: Create NewIdeaDialog Component ✅
+**Completed**: December 17, 2025
+- Modal for creating new ideas with Radix Dialog
+- Required field: title
+- Optional fields: summary, status, priority, target
+- Form validation and auto-reset on close
+- Uses useCreateIdea() hook with toast feedback
+
+#### Task #8: Create IdeasView Page ✅
+**Completed**: December 17, 2025
+- Grid layout for idea cards (responsive: 1/2/3 columns)
+- 4 filter types: search, status, priority, sort (dateAdded/dateUpdated/title)
+- New Idea button with NewIdeaDialog
+- Empty state for no ideas with action
+- Loading and error states
+- Delete and archive confirmations with useDialog()
+
+#### Task #9: Wire Up WritingView Routing ✅
+**Completed**: December 17, 2025
+- Updated main.tsx to import IdeasView
+- Changed writing route index to redirect to /writing/ideas
+- Replaced ComingSoonPage with IdeasView component
+- WritingView already had Outlet for nested routes
+
+### Technical Details
+
+**Backend Serialization Pattern**:
+All backend structs use `#[serde(rename_all = "camelCase")]`
+- StorageStats: totalBytes, dataBytes, logsBytes, cacheBytes, backupBytes, exportBytes
+- BackupInfo: filePath, fileSize, timestamp
+- SystemTaskDto: taskType, frequencyCron, frequencySeconds, enabled, lastRunAt, lastStatus, lastResult, errorCount
+- LogStats: totalCount, infoCount, warnCount, errorCount, last24hCount, last7dCount, last30dCount
+
+**Frontend Components Fixed**:
+- Storage.tsx: Uses ErrorState, LoadingInline, EmptyInline, useDialog for confirmations
+- Tasks.tsx: Uses LoadingState, ErrorState, proper field names
+- Logs.tsx: Uses LoadingState, ErrorState, useDialog, scrollable container, component filter
+
+**Ideas Feature Architecture**:
+- Types: Idea, IdeaStatus, IdeaPriority in shared/types/index.ts
+- API: All CRUD commands in core/api/tauri.ts
+- Hooks: features/ideas/hooks/useIdeas.ts with 8 hooks
+- Components: IdeaCard, IdeaDetailDialog, NewIdeaDialog in features/ideas/components/
+- View: IdeasView in domains/writing/IdeasView.tsx
+
+**Build Status**: ✅ All compiles successfully
+
+---
+
 ## 🎉 Sprint 4: Feed Management System (Dec 15, 2025)
 
 **Duration**: December 13-15, 2025  

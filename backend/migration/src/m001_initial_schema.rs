@@ -1,0 +1,629 @@
+use sea_orm_migration::prelude::*;
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // System Tasks Table
+        manager
+            .create_table(
+                Table::create()
+                    .table(SystemTasks::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(SystemTasks::Id)
+                            .big_integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(SystemTasks::Name).string().not_null())
+                    .col(ColumnDef::new(SystemTasks::TaskType).string().not_null())
+                    .col(ColumnDef::new(SystemTasks::Component).string().not_null())
+                    .col(ColumnDef::new(SystemTasks::FrequencyCron).string())
+                    .col(ColumnDef::new(SystemTasks::FrequencySeconds).integer())
+                    .col(
+                        ColumnDef::new(SystemTasks::Enabled)
+                            .integer()
+                            .not_null()
+                            .default(1),
+                    )
+                    .col(ColumnDef::new(SystemTasks::LastRunAt).timestamp())
+                    .col(ColumnDef::new(SystemTasks::LastStatus).string())
+                    .col(ColumnDef::new(SystemTasks::LastResult).text())
+                    .col(
+                        ColumnDef::new(SystemTasks::ErrorCount)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(
+                        ColumnDef::new(SystemTasks::CreatedAt)
+                            .timestamp()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(SystemTasks::UpdatedAt)
+                            .timestamp()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx_system_tasks_task_type")
+                    .table(SystemTasks::Table)
+                    .col(SystemTasks::TaskType)
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
+
+        // System Task Runs Table
+        manager
+            .create_table(
+                Table::create()
+                    .table(SystemTaskRuns::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(SystemTaskRuns::Id)
+                            .big_integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(SystemTaskRuns::TaskId)
+                            .big_integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(SystemTaskRuns::StartedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(SystemTaskRuns::FinishedAt).timestamp())
+                    .col(ColumnDef::new(SystemTaskRuns::Status).string().not_null())
+                    .col(ColumnDef::new(SystemTaskRuns::Result).text())
+                    .col(ColumnDef::new(SystemTaskRuns::ErrorMessage).text())
+                    .to_owned(),
+            )
+            .await?;
+
+        // News Settings Table
+        manager
+            .create_table(
+                Table::create()
+                    .table(NewsSettings::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(NewsSettings::Id)
+                            .big_integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(NewsSettings::UserId).big_integer().not_null())
+                    .col(ColumnDef::new(NewsSettings::Provider).string().not_null())
+                    .col(
+                        ColumnDef::new(NewsSettings::ApiKeyEncrypted)
+                            .binary()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(NewsSettings::Language).string())
+                    .col(ColumnDef::new(NewsSettings::Languages).text())
+                    .col(ColumnDef::new(NewsSettings::Countries).text())
+                    .col(ColumnDef::new(NewsSettings::Categories).text())
+                    .col(ColumnDef::new(NewsSettings::Sources).text())
+                    .col(ColumnDef::new(NewsSettings::Query).text())
+                    .col(ColumnDef::new(NewsSettings::KeywordsInTitle).text())
+                    .col(ColumnDef::new(NewsSettings::FromDate).string())
+                    .col(ColumnDef::new(NewsSettings::ToDate).string())
+                    .col(ColumnDef::new(NewsSettings::MaxStored).integer())
+                    .col(
+                        ColumnDef::new(NewsSettings::MaxArticles)
+                            .integer()
+                            .not_null()
+                            .default(4000),
+                    )
+                    .col(
+                        ColumnDef::new(NewsSettings::DailyCallLimit)
+                            .integer()
+                            .not_null()
+                            .default(180),
+                    )
+                    .col(
+                        ColumnDef::new(NewsSettings::CallsToday)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(ColumnDef::new(NewsSettings::LastResetDate).date())
+                    .col(ColumnDef::new(NewsSettings::LastSyncedAt).timestamp())
+                    .col(
+                        ColumnDef::new(NewsSettings::CreatedAt)
+                            .timestamp()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(NewsSettings::UpdatedAt)
+                            .timestamp()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        // News Articles Table
+        manager
+            .create_table(
+                Table::create()
+                    .table(NewsArticles::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(NewsArticles::Id)
+                            .big_integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(NewsArticles::UserId).big_integer().not_null())
+                    .col(ColumnDef::new(NewsArticles::Provider).string().not_null())
+                    .col(ColumnDef::new(NewsArticles::ProviderArticleId).string())
+                    .col(ColumnDef::new(NewsArticles::SourceName).string())
+                    .col(ColumnDef::new(NewsArticles::SourceDomain).string())
+                    .col(ColumnDef::new(NewsArticles::SourceId).string())
+                    .col(ColumnDef::new(NewsArticles::Title).string().not_null())
+                    .col(ColumnDef::new(NewsArticles::Excerpt).text())
+                    .col(ColumnDef::new(NewsArticles::Content).text())
+                    .col(ColumnDef::new(NewsArticles::Tags).text())
+                    .col(ColumnDef::new(NewsArticles::Url).string())
+                    .col(ColumnDef::new(NewsArticles::ImageUrl).string())
+                    .col(ColumnDef::new(NewsArticles::Language).string())
+                    .col(ColumnDef::new(NewsArticles::Category).string())
+                    .col(ColumnDef::new(NewsArticles::Country).string())
+                    .col(ColumnDef::new(NewsArticles::PublishedAt).timestamp())
+                    .col(
+                        ColumnDef::new(NewsArticles::FetchedAt)
+                            .timestamp()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(NewsArticles::AddedVia)
+                            .string()
+                            .not_null()
+                            .default("sync"),
+                    )
+                    .col(
+                        ColumnDef::new(NewsArticles::IsStarred)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(
+                        ColumnDef::new(NewsArticles::IsDismissed)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(
+                        ColumnDef::new(NewsArticles::IsRead)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(ColumnDef::new(NewsArticles::AddedToIdeasAt).timestamp())
+                    .col(ColumnDef::new(NewsArticles::DismissedAt).timestamp())
+                    .col(
+                        ColumnDef::new(NewsArticles::IsPinned)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(
+                        ColumnDef::new(NewsArticles::CreatedAt)
+                            .timestamp()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(NewsArticles::UpdatedAt)
+                            .timestamp()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx_news_articles_published_at")
+                    .table(NewsArticles::Table)
+                    .col(NewsArticles::PublishedAt)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx_news_articles_fetched_at")
+                    .table(NewsArticles::Table)
+                    .col(NewsArticles::FetchedAt)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx_news_articles_user_provider")
+                    .table(NewsArticles::Table)
+                    .col(NewsArticles::UserId)
+                    .col(NewsArticles::Provider)
+                    .to_owned(),
+            )
+            .await?;
+
+        // News Sources Table
+        manager
+            .create_table(
+                Table::create()
+                    .table(NewsSources::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(NewsSources::Id)
+                            .big_integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(NewsSources::SourceId).string().not_null())
+                    .col(ColumnDef::new(NewsSources::Name).string().not_null())
+                    .col(ColumnDef::new(NewsSources::Url).string())
+                    .col(ColumnDef::new(NewsSources::Country).string())
+                    .col(ColumnDef::new(NewsSources::Language).string())
+                    .col(ColumnDef::new(NewsSources::Category).string())
+                    .col(
+                        ColumnDef::new(NewsSources::IsActive)
+                            .integer()
+                            .not_null()
+                            .default(1),
+                    )
+                    .col(
+                        ColumnDef::new(NewsSources::IsMuted)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(
+                        ColumnDef::new(NewsSources::CreatedAt)
+                            .timestamp()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(NewsSources::UpdatedAt)
+                            .timestamp()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx_news_sources_source_id")
+                    .table(NewsSources::Table)
+                    .col(NewsSources::SourceId)
+                    .to_owned(),
+            )
+            .await?;
+
+        // Ideas Table
+        manager
+            .create_table(
+                Table::create()
+                    .table(Ideas::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(Ideas::Id)
+                            .big_integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Ideas::Title).string().not_null())
+                    .col(ColumnDef::new(Ideas::Summary).text())
+                    .col(ColumnDef::new(Ideas::Status).string().not_null())
+                    .col(ColumnDef::new(Ideas::NewsArticleId).big_integer())
+                    .col(ColumnDef::new(Ideas::Target).string())
+                    .col(ColumnDef::new(Ideas::Tags).text())
+                    .col(ColumnDef::new(Ideas::NotesMarkdown).text())
+                    .col(ColumnDef::new(Ideas::ArticleTitle).string())
+                    .col(ColumnDef::new(Ideas::ArticleMarkdown).text())
+                    .col(
+                        ColumnDef::new(Ideas::DateAdded)
+                            .timestamp()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(Ideas::DateUpdated)
+                            .timestamp()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(ColumnDef::new(Ideas::DateCompleted).timestamp())
+                    .col(ColumnDef::new(Ideas::DateRemoved).timestamp())
+                    .col(
+                        ColumnDef::new(Ideas::Priority)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(
+                        ColumnDef::new(Ideas::IsPinned)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_ideas_news_article")
+                            .from(Ideas::Table, Ideas::NewsArticleId)
+                            .to(NewsArticles::Table, NewsArticles::Id)
+                            .on_delete(ForeignKeyAction::SetNull),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx_ideas_status")
+                    .table(Ideas::Table)
+                    .col(Ideas::Status)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx_ideas_date_updated")
+                    .table(Ideas::Table)
+                    .col(Ideas::DateUpdated)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx_ideas_date_removed")
+                    .table(Ideas::Table)
+                    .col(Ideas::DateRemoved)
+                    .to_owned(),
+            )
+            .await?;
+
+        // Seed initial system tasks
+        manager
+            .exec_stmt(
+                Query::insert()
+                    .into_table(SystemTasks::Table)
+                    .columns([
+                        SystemTasks::Name,
+                        SystemTasks::TaskType,
+                        SystemTasks::Component,
+                        SystemTasks::FrequencyCron,
+                        SystemTasks::Enabled,
+                    ])
+                    .values_panic([
+                        "NewsData Sync".into(),
+                        "news_sync".into(),
+                        "news".into(),
+                        "0 0/45 * * * * *".into(),
+                        1.into(),
+                    ])
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .exec_stmt(
+                Query::insert()
+                    .into_table(SystemTasks::Table)
+                    .columns([
+                        SystemTasks::Name,
+                        SystemTasks::TaskType,
+                        SystemTasks::Component,
+                        SystemTasks::FrequencyCron,
+                        SystemTasks::Enabled,
+                    ])
+                    .values_panic([
+                        "News Sources Sync".into(),
+                        "news_sources_sync".into(),
+                        "news".into(),
+                        "0 0 2 * * * *".into(),
+                        1.into(),
+                    ])
+                    .to_owned(),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(Ideas::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(NewsSources::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(NewsArticles::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(NewsSettings::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(SystemTaskRuns::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(SystemTasks::Table).to_owned())
+            .await?;
+
+        Ok(())
+    }
+}
+
+#[derive(DeriveIden)]
+enum SystemTasks {
+    Table,
+    Id,
+    Name,
+    TaskType,
+    Component,
+    FrequencyCron,
+    FrequencySeconds,
+    Enabled,
+    LastRunAt,
+    LastStatus,
+    LastResult,
+    ErrorCount,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum SystemTaskRuns {
+    Table,
+    Id,
+    TaskId,
+    StartedAt,
+    FinishedAt,
+    Status,
+    Result,
+    ErrorMessage,
+}
+
+#[derive(DeriveIden)]
+enum NewsSettings {
+    Table,
+    Id,
+    UserId,
+    Provider,
+    ApiKeyEncrypted,
+    Language,
+    Languages,
+    Countries,
+    Categories,
+    Sources,
+    Query,
+    KeywordsInTitle,
+    FromDate,
+    ToDate,
+    MaxStored,
+    MaxArticles,
+    DailyCallLimit,
+    CallsToday,
+    LastResetDate,
+    LastSyncedAt,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum NewsArticles {
+    Table,
+    Id,
+    UserId,
+    Provider,
+    ProviderArticleId,
+    SourceName,
+    SourceDomain,
+    SourceId,
+    Title,
+    Excerpt,
+    Content,
+    Tags,
+    Url,
+    ImageUrl,
+    Language,
+    Category,
+    Country,
+    PublishedAt,
+    FetchedAt,
+    AddedVia,
+    IsStarred,
+    IsDismissed,
+    IsRead,
+    AddedToIdeasAt,
+    DismissedAt,
+    IsPinned,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum NewsSources {
+    Table,
+    Id,
+    SourceId,
+    Name,
+    Url,
+    Country,
+    Language,
+    Category,
+    IsActive,
+    IsMuted,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum Ideas {
+    Table,
+    Id,
+    Title,
+    Summary,
+    Status,
+    NewsArticleId,
+    Target,
+    Tags,
+    NotesMarkdown,
+    ArticleTitle,
+    ArticleMarkdown,
+    DateAdded,
+    DateUpdated,
+    DateCompleted,
+    DateRemoved,
+    Priority,
+    IsPinned,
+}

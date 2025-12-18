@@ -23,12 +23,19 @@ use core::commands::{
     delete_database_backup, export_database, import_database, cleanup_logs, cleanup_news,
     get_application_logs, get_application_log_stats, export_application_logs, clear_application_logs,
     check_setup_status_command, generate_master_key_command, save_setup_config_command,
+    get_current_user,
 };
 use writing::commands::{
     list_ideas, get_idea, create_idea, create_idea_for_article,
     update_idea_metadata, update_idea_notes, update_idea_article, archive_idea,
     open_article_modal, add_highlight,
     list_idea_references, add_reference_to_idea, remove_reference, update_reference_notes,
+    // Knowledge Graph commands
+    kg_list_references, kg_get_reference, kg_create_reference, kg_update_reference, kg_delete_reference,
+    kg_list_writings, kg_get_writing, kg_create_writing, kg_update_writing, kg_publish_writing, kg_delete_writing,
+    kg_link_idea_reference, kg_unlink_idea_reference, kg_list_references_for_idea, kg_list_ideas_for_reference,
+    kg_link_writing_idea, kg_unlink_writing_idea, kg_list_ideas_for_writing, kg_list_writings_for_idea,
+    kg_list_notes_for_entity, kg_get_note, kg_create_note, kg_update_note, kg_delete_note,
 };
 use research::commands::{
     get_news_settings, save_news_settings, list_news_articles, get_news_article,
@@ -149,6 +156,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             get_system_user,
+            get_current_user,
             log_frontend_error,
             get_mixed_feed,
             get_upcoming_events,
@@ -210,7 +218,35 @@ fn main() {
             list_idea_references,
             add_reference_to_idea,
             remove_reference,
-            update_reference_notes
+            update_reference_notes,
+            // Knowledge Graph - Reference Items
+            kg_list_references,
+            kg_get_reference,
+            kg_create_reference,
+            kg_update_reference,
+            kg_delete_reference,
+            // Knowledge Graph - Writings
+            kg_list_writings,
+            kg_get_writing,
+            kg_create_writing,
+            kg_update_writing,
+            kg_publish_writing,
+            kg_delete_writing,
+            // Knowledge Graph - Links
+            kg_link_idea_reference,
+            kg_unlink_idea_reference,
+            kg_list_references_for_idea,
+            kg_list_ideas_for_reference,
+            kg_link_writing_idea,
+            kg_unlink_writing_idea,
+            kg_list_ideas_for_writing,
+            kg_list_writings_for_idea,
+            // Knowledge Graph - Notes
+            kg_list_notes_for_entity,
+            kg_get_note,
+            kg_create_note,
+            kg_update_note,
+            kg_delete_note
         ])
         .run(tauri::generate_context!())
         .expect("error while running Architect Cockpit backend");
