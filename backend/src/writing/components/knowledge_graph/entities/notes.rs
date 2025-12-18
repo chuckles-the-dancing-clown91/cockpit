@@ -32,6 +32,9 @@ impl std::fmt::Display for EntityType {
 #[derive(Clone, Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
 #[sea_orm(rs_type = "String", db_type = "String(StringLen::N(32))")]
 pub enum NoteType {
+    /// Main note document for an entity (one per entity)
+    #[sea_orm(string_value = "main")]
+    Main,
     #[sea_orm(string_value = "highlight")]
     Highlight,
     #[sea_orm(string_value = "annotation")]
@@ -45,6 +48,7 @@ pub enum NoteType {
 impl std::fmt::Display for NoteType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            NoteType::Main => write!(f, "main"),
             NoteType::Highlight => write!(f, "highlight"),
             NoteType::Annotation => write!(f, "annotation"),
             NoteType::Todo => write!(f, "todo"),
@@ -63,11 +67,12 @@ pub struct Model {
     pub entity_type: EntityType,
     pub entity_id: i64,
     
-    pub note_type: NoteType,
-    pub content: String,
+    pub note_type: Option<String>,
     
-    /// JSON array: ["important", "follow-up"]
-    pub tags: Option<String>,
+    /// HTML content (TipTap is HTML-native)
+    /// Column name is body_markdown for historical reasons
+    #[sea_orm(column_name = "body_markdown")]
+    pub body_html: String,
     
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,

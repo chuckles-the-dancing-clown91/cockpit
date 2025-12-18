@@ -1,25 +1,14 @@
 import { Dialog, Flex, Text, Button, TextField, TextArea, Select } from '@radix-ui/themes';
-import { X, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import type { IdeaStatus, IdeaPriority } from '@/shared/types';
+import { IDEA_STATUSES, IDEA_PRIORITIES } from '@/shared/constants';
 import { useCreateIdea } from '../hooks/useIdeas';
 
 interface NewIdeaDialogProps {
   open: boolean;
   onClose: () => void;
 }
-
-const STATUS_OPTIONS: { value: IdeaStatus; label: string }[] = [
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'stalled', label: 'Stalled' },
-  { value: 'complete', label: 'Complete' },
-];
-
-const PRIORITY_OPTIONS: { value: IdeaPriority; label: string }[] = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-];
 
 /**
  * NewIdeaDialog - Modal for creating new ideas
@@ -69,7 +58,7 @@ export function NewIdeaDialog({ open, onClose }: NewIdeaDialogProps) {
     <Dialog.Root open={open} onOpenChange={handleClose}>
       <Dialog.Content maxWidth="600px">
         <Dialog.Title>New Idea</Dialog.Title>
-        <Dialog.Description size="2" mb="4">
+        <Dialog.Description size="2" mb="4" style={{ color: 'var(--color-text-soft)' }}>
           Create a new idea to track your thoughts and projects.
         </Dialog.Description>
         
@@ -107,7 +96,7 @@ export function NewIdeaDialog({ open, onClose }: NewIdeaDialogProps) {
                 <Select.Root value={status} onValueChange={(v) => setStatus(v as IdeaStatus)}>
                   <Select.Trigger style={{ width: '100%' }} />
                   <Select.Content>
-                    {STATUS_OPTIONS.map((opt) => (
+                    {IDEA_STATUSES.map((opt) => (
                       <Select.Item key={opt.value} value={opt.value}>
                         {opt.label}
                       </Select.Item>
@@ -123,7 +112,7 @@ export function NewIdeaDialog({ open, onClose }: NewIdeaDialogProps) {
                 <Select.Root value={priority} onValueChange={(v) => setPriority(v as IdeaPriority)}>
                   <Select.Trigger style={{ width: '100%' }} />
                   <Select.Content>
-                    {PRIORITY_OPTIONS.map((opt) => (
+                    {IDEA_PRIORITIES.map((opt) => (
                       <Select.Item key={opt.value} value={opt.value}>
                         {opt.label}
                       </Select.Item>

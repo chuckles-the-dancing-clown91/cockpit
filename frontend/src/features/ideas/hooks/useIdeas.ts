@@ -11,7 +11,8 @@ import {
 } from '@/core/api/tauri';
 import { toast } from '@/core/lib/toast';
 import { queryKeys } from '@/shared/queryKeys';
-import type { Idea } from '@/shared/types';
+import type { Idea, IdeaStatus, IdeaPriority } from '@/shared/types';
+import { priorityToNumber } from '@/shared/types';
 
 /**
  * Hook for fetching all ideas
@@ -45,10 +46,14 @@ export function useCreateIdea() {
   return useMutation({
     mutationFn: (input: {
       title: string;
-      summary: string;
-      status: string;
-      priority: string;
-    }) => createIdea(input),
+      summary?: string;
+      status?: IdeaStatus;
+      priority?: IdeaPriority;
+      target?: string;
+    }) => createIdea({
+      ...input,
+      priority: input.priority ? priorityToNumber(input.priority) : undefined,
+    }),
     onSuccess: (newIdea) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.ideas.all() });
       toast.success(`Created: ${newIdea.title}`);
@@ -70,9 +75,13 @@ export function useUpdateIdea() {
       id: number;
       title?: string;
       summary?: string;
-      status?: string;
-      priority?: string;
-    }) => updateIdeaMetadata(input),
+      status?: IdeaStatus;
+      priority?: IdeaPriority;
+      target?: string;
+    }) => updateIdeaMetadata({
+      ...input,
+      priority: input.priority ? priorityToNumber(input.priority) : undefined,
+    }),
     onSuccess: (updatedIdea) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.ideas.all() });
       queryClient.invalidateQueries({ queryKey: queryKeys.ideas.detail(updatedIdea.id) });

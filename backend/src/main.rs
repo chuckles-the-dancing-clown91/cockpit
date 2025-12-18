@@ -2,6 +2,7 @@
 mod core;
 
 // Domain modules
+mod notes;
 mod research;
 mod system;
 mod writing;
@@ -36,6 +37,9 @@ use writing::commands::{
     kg_link_idea_reference, kg_unlink_idea_reference, kg_list_references_for_idea, kg_list_ideas_for_reference,
     kg_link_writing_idea, kg_unlink_writing_idea, kg_list_ideas_for_writing, kg_list_writings_for_idea,
     kg_list_notes_for_entity, kg_get_note, kg_create_note, kg_update_note, kg_delete_note,
+    // Writing System (TipTap JSON + Draft Management)
+    writing_create, writing_get, writing_list, writing_update_meta, writing_save_draft,
+    writing_publish, writing_link_idea, writing_unlink_idea, writing_list_linked_ideas,
 };
 use research::commands::{
     get_news_settings, save_news_settings, list_news_articles, get_news_article,
@@ -50,6 +54,9 @@ use system::commands::{get_task_history, list_system_tasks, run_system_task_now,
 use util::commands::{
     get_system_user, log_frontend_error, get_mixed_feed, get_upcoming_events,
     list_scheduled_jobs, sync_calendar,
+};
+use notes::commands::{
+    notes_get_or_create, notes_upsert, notes_append_snippet,
 };
 
 // Import scheduler start function
@@ -246,7 +253,21 @@ fn main() {
             kg_get_note,
             kg_create_note,
             kg_update_note,
-            kg_delete_note
+            kg_delete_note,
+            // Notes Feature
+            notes_get_or_create,
+            notes_upsert,
+            notes_append_snippet,
+            // Writing System (TipTap JSON + Draft Management)
+            writing_create,
+            writing_get,
+            writing_list,
+            writing_update_meta,
+            writing_save_draft,
+            writing_publish,
+            writing_link_idea,
+            writing_unlink_idea,
+            writing_list_linked_ideas
         ])
         .run(tauri::generate_context!())
         .expect("error while running Architect Cockpit backend");

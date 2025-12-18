@@ -1,0 +1,236 @@
+// src/features/webview/components/WebviewModal.tsx
+import { Dialog, Flex, Text, Button, Badge } from '@radix-ui/themes';
+import { X, ExternalLink, Copy, FileText } from 'lucide-react';
+import { useWebviewStore } from "../store";
+import { buildWebviewMenu } from "../contextMenu/buildMenu";
+import { dispatchWebviewAction } from "../contextMenu/actions";
+import { EntityNotesPanel } from '@/features/notes';
+import { useState } from "react";
+
+export function WebviewModal() {
+  const session = useWebviewStore((s) => s.session);
+  const close = useWebviewStore((s) => s.close);
+
+  // This will come from the webview selection bridge later
+  const [selectionText, setSelectionText] = useState<string>("");
+
+  if (!session?.isOpen) return null;
+
+  const menu = buildWebviewMenu({
+    context: session.context,
+    selection: selectionText
+      ? { text: selectionText, pageUrl: session.context.url }
+      : null,
+  });
+
+  async function onAction(id: any) {
+    console.log('[WebviewModal] onAction called', { 
+      id, 
+      selectionText, 
+      hasSelection: !!selectionText,
+      context: session.context 
+    });
+    
+    const result = await dispatchWebviewAction({
+      type: id,
+      context: session.context,
+      selection: selectionText
+        ? { text: selectionText, pageUrl: session.context.url }
+        : undefined,
+    });
+    
+    console.log('[WebviewModal] action result', result);
+  }
+
+  return (
+    <Dialog.Root open onOpenChange={(o) => (!o ? close() : null)}>
+      <Dialog.Content 
+        maxWidth="92vw" 
+        style={{ 
+          width: '92vw',
+          maxWidth: '1400px',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: 0,
+        }}
+      >
+        {/* Header */}
+        <Flex
+          justify="between"
+          align="center"
+          p="4"
+          style={{
+            borderBottom: '1px solid var(--color-border)',
+            backgroundColor: 'var(--color-surface)',
+          }}
+        >
+          <Flex direction="column" gap="1" style={{ minWidth: 0, flex: 1 }}>
+            <Text size="1" style={{ color: 'var(--color-text-muted)' }}>
+              Article Viewer
+            </Text>
+            <Text 
+              size="3" 
+              weight="bold" 
+              style={{ 
+                color: 'var(--color-text-primary)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {session.context.title ?? session.context.url}
+            </Text>
+          </Flex>
+          
+          <Flex align="center" gap="2">
+            {menu.slice(0, -1).map((m) => (
+              <Button
+                key={m.id}
+                size="2"
+                variant="soft"
+                disabled={!m.enabled}
+                onClick={() => onAction(m.id)}
+              >
+                {m.id === 'COPY_TO_NOTES' && <FileText className="w-4 h-4" />}
+                {m.id === 'COPY_LINK' && <Copy className="w-4 h-4" />}
+                {m.id === 'OPEN_EXTERNAL' && <ExternalLink className="w-4 h-4" />}
+                {m.label}
+              </Button>
+            ))}
+            <Dialog.Close>
+              <Button variant="ghost" size="2">
+                <X className="w-4 h-4" />
+              </Button>
+            </Dialog.Close>
+          </Flex>
+        </Flex>
+
+        {/* Content - Grid layout */}
+        <div 
+          style={{ 
+            display: 'grid',
+            gridTemplateColumns: '1fr 360px',
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
+          }}
+        >
+          {/* Left: Webview */}
+          <div 
+            style={{ 
+              backgroundColor: 'var(--color-bg)',
+              overflow: 'auto',
+            }}
+          >
+            <div style={{ padding: '1.5rem' }}>
+              <Badge color="orange" size="2" mb="3">
+                <Text>Coming Soon: Embedded Webview</Text>
+              </Badge>
+              
+              <Flex direction="column" gap="3">
+                <Text size="2" style={{ color: 'var(--color-text-soft)' }}>
+                  This will be a fully embedded browser view powered by Tauri's WebviewWindow.
+                  You'll be able to:
+                </Text>
+                
+                <ul style={{ paddingLeft: '1.5rem', color: 'var(--color-text-soft)', fontSize: '14px' }}>
+                  <li>View articles and web pages directly in the app</li>
+                  <li>Select text and copy to notes with --- dividers</li>
+                  <li>Navigate with back/forward buttons</li>
+                  <li>Open in external browser when needed</li>
+                </ul>
+                
+                <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-3)', border: '1px solid var(--color-border)' }}>
+                  <Text size="2" weight="medium" mb="2" style={{ display: 'block' }}>
+                    Current URL:
+                  </Text>
+                  <Text size="2" style={{ color: 'var(--color-primary)', wordBreak: 'break-all' }}>
+                    {session.context.url}
+                  </Text>
+                </div>
+
+                {/* Temporary selection input for testing */}
+                <div style={{ marginTop: '1rem' }}>
+                  <Flex justify="between" align="center" mb="2">
+                    <Text size="2" weight="medium">
+                      Temporary: Simulate text selection
+                    </Text>
+                    <Badge color={selectionText.trim() ? 'green' : 'gray'} size="1">
+                      {selectionText.trim() ? 'Text selected - Copy to Notes enabled' : 'No selection - type to enable'}
+                    </Badge>
+                  </Flex>
+                  <textarea
+                    value={selectionText}
+                    onChange={(e) => setSelectionText(e.target.value)}
+                    placeholder="Type or paste text here, then click 'Copy to Notes' button above to test the append functionality..."
+                    style={{
+                      width: '100%',
+                      minHeight: '120px',
+                      padding: '0.75rem',
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-2)',
+                      color: 'var(--color-text-primary)',
+                      fontFamily: 'inherit',
+                      fontSize: '14px',
+                      resize: 'vertical',
+                    }}
+                  />
+                </div>
+              </Flex>
+            </div>
+          </div>
+
+          {/* Right: Notes Panel */}
+          <div 
+            style={{ 
+              borderLeft: '1px solid var(--color-border)',
+              backgroundColor: 'var(--color-surface)',
+              padding: '1.5rem',
+              overflow: 'auto',
+            }}
+          >
+            <Text size="3" weight="bold" mb="2" style={{ display: 'block' }}>
+              Notes
+            </Text>
+            
+            {session.context.noteTarget ? (
+              <Flex direction="column" gap="2">
+                <Badge color="blue" size="1">
+                  Target: {session.context.noteTarget.kind}
+                </Badge>
+                
+                {session.context.noteTarget.kind === 'reference_note' && session.context.noteTarget.referenceId && (
+                  <EntityNotesPanel
+                    entityType="reference"
+                    entityId={session.context.noteTarget.referenceId}
+                    noteType="main"
+                    title=""
+                    placeholder="Write your notes, thoughts, and annotations about this reference..."
+                    minHeight="300px"
+                  />
+                )}
+                
+                {session.context.noteTarget.kind === 'idea_note' && session.context.noteTarget.ideaId && (
+                  <EntityNotesPanel
+                    entityType="idea"
+                    entityId={session.context.noteTarget.ideaId}
+                    noteType="main"
+                    title=""
+                    placeholder="Write your thoughts, research, outlines..."
+                    minHeight="300px"
+                  />
+                )}
+              </Flex>
+            ) : (
+              <Text size="2" style={{ color: 'var(--color-text-muted)' }}>
+                No note target configured
+              </Text>
+            )}
+          </div>
+        </div>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+}

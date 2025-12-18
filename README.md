@@ -13,9 +13,18 @@ Built with **Tauri 2.5** (Rust backend) + **React 19** (TypeScript frontend), Co
 
 Cockpit is organized into three specialized modes:
 
-- **📝 Writing Mode**: Markdown editor with LaTeX support, idea management, and archive
-- **📰 Research Mode**: News aggregation, article management, and source configuration
-- **⚙️ System Mode**: Settings, database management, logs, and task scheduler
+- **📝 Writing Mode**: Rich text editor with TipTap, polymorphic notes system, idea management, references with embedded browser, and archive
+- **📰 Research Mode**: News aggregation, article management, source configuration, and feed plugins (NewsData.io)
+- **⚙️ System Mode**: Settings, database management, logs viewer, and task scheduler
+
+### 🌟 Key Features
+
+- **Polymorphic Notes**: Rich text notes on any entity (ideas/references/writings) with TipTap editor
+- **Embedded Webview**: Real browser integration with text selection → add to notes workflow
+- **Knowledge Graph**: Many-to-many relationships between ideas ↔ references ↔ writings
+- **Plugin Architecture**: Extensible feed sources (NewsData.io, future: RSS, Reddit, etc.)
+- **Type-Safe**: Full TypeScript + Rust with shared type definitions
+- **Offline-First**: SQLite database with encrypted settings storage
 
 ## 🚀 Quick Start
 

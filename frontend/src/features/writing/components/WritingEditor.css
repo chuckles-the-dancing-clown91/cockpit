@@ -1,0 +1,129 @@
+/* WritingEditor styles */
+
+.writing-editor-wrapper {
+  width: 100%;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-card);
+  padding: 1rem;
+  background: var(--color-surface);
+}
+
+.writing-editor-content {
+  min-height: inherit;
+  color: var(--color-text-primary);
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.writing-editor-content h1 {
+  font-size: 2.5em;
+  font-weight: bold;
+  margin: 1.5em 0 0.5em;
+  color: var(--color-text-primary);
+}
+
+.writing-editor-content h2 {
+  font-size: 2em;
+  font-weight: bold;
+  margin: 1.3em 0 0.5em;
+  color: var(--color-text-primary);
+}
+
+.writing-editor-content h3 {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin: 1.2em 0 0.4em;
+  color: var(--color-text-primary);
+}
+
+.writing-editor-content h4 {
+  font-size: 1.25em;
+  font-weight: bold;
+  margin: 1em 0 0.4em;
+  color: var(--color-text-primary);
+}
+
+.writing-editor-content p {
+  margin: 0.75em 0;
+}
+
+.writing-editor-content ul,
+.writing-editor-content ol {
+  padding-left: 2em;
+  margin: 0.75em 0;
+}
+
+.writing-editor-content ul {
+  list-style-type: disc;
+}
+
+.writing-editor-content ol {
+  list-style-type: decimal;
+}
+
+.writing-editor-content li {
+  margin: 0.5em 0;
+}
+
+.writing-editor-content pre {
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  padding: 1em;
+  overflow-x: auto;
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 14px;
+}
+
+.writing-editor-content code {
+  background: var(--color-surface-soft);
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 14px;
+}
+
+.writing-editor-content pre code {
+  background: none;
+  padding: 0;
+}
+
+.writing-editor-content blockquote {
+  border-left: 3px solid var(--color-primary);
+  padding-left: 1em;
+  margin-left: 0;
+  font-style: italic;
+  color: var(--color-text-soft);
+}
+
+.writing-editor-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-card);
+  margin: 1em 0;
+}
+
+.writing-editor-content a {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.writing-editor-content a:hover {
+  color: var(--color-primary-hover);
+}
+
+/* Placeholder */
+.writing-editor-content .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--color-text-muted);
+  pointer-events: none;
+  height: 0;
+}
+
+.writing-editor-loading {
+  padding: 2rem;
+  text-align: center;
+  color: var(--color-text-soft);
+}

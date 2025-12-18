@@ -462,3 +462,226 @@ pub async fn kg_delete_note(
         .await
         .map_err(|e| e.to_string())
 }
+
+// Writing System Commands (TipTap JSON Content + Draft Management)
+// ============================================================================
+
+use crate::writing::dto::{
+    WritingDraftDto, CreateWritingDraftInput, SaveDraftInput, UpdateWritingDraftMetaInput,
+    PublishWritingInput, LinkIdeaInput, ListWritingsQuery,
+};
+use crate::writing::service;
+
+/// Helper to convert Writing entity to DTO
+fn writing_draft_to_dto(w: crate::writing::components::knowledge_graph::entities::writings::Model) -> WritingDraftDto {
+    // Parse stored JSON string back to JsonValue
+    let content_json = serde_json::from_str(&w.content_markdown)
+        .unwrap_or(serde_json::json!({"type": "doc", "content": []}));
+    
+    let content_text = crate::writing::text::extract_plain_text(&content_json);
+    
+    WritingDraftDto {
+        id: w.id,
+        title: w.title,
+        slug: w.slug,
+        writing_type: w.r#type.to_string(),
+        status: w.status.to_string(),
+        content_json,
+        content_text,
+        excerpt: w.excerpt,
+        tags: w.tags,
+        word_count: w.word_count,
+        series_name: w.series_name,
+        series_part: w.series_part,
+        is_pinned: w.is_pinned == 1,
+        is_featured: w.is_featured == 1,
+        created_at: w.created_at.to_rfc3339(),
+        updated_at: w.updated_at.to_rfc3339(),
+        published_at: w.published_at.map(|dt| dt.to_rfc3339()),
+    }
+}
+
+/// Create a new writing with TipTap JSON content
+#[tauri::command]
+pub async fn writing_create(
+    input: CreateWritingDraftInput,
+    state: State<'_, AppState>,
+) -> Result<WritingDraftDto, String> {
+    use crate::writing::components::knowledge_graph::entities::writings::WritingType;
+    
+    let writing_type = match input.writing_type.as_str() {
+        "article" => WritingType::Article,
+        "chapter" => WritingType::Chapter,
+        "book" => WritingType::Book,
+        _ => return Err(format!("Invalid writing type: {}", input.writing_type)),
+    };
+    
+    let w = service::create_writing(
+        &state.db,
+        input.title,
+        input.slug,
+        writing_type,
+        input.link_idea_ids,
+        input.initial_content_json,
+        input.excerpt,
+        input.tags,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    
+    Ok(writing_draft_to_dto(w))
+}
+
+/// Get writing by ID
+#[tauri::command]
+pub async fn writing_get(
+    writing_id: i64,
+    state: State<'_, AppState>,
+) -> Result<WritingDraftDto, String> {
+    let w = service::get_writing(&state.db, writing_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(writing_draft_to_dto(w))
+}
+
+/// List writings with filters
+#[tauri::command]
+pub async fn writing_list(
+    query: ListWritingsQuery,
+    state: State<'_, AppState>,
+) -> Result<Vec<WritingDraftDto>, String> {
+    use crate::writing::components::knowledge_graph::entities::writings::{WritingType, WritingStatus};
+    
+    let status = query.status.and_then(|s| match s.as_str() {
+        "draft" => Some(WritingStatus::Draft),
+        "in_progress" => Some(WritingStatus::InProgress),
+        "review" => Some(WritingStatus::Review),
+        "published" => Some(WritingStatus::Published),
+        "archived" => Some(WritingStatus::Archived),
+        _ => None,
+    });
+    
+    let writing_type = query.writing_type.and_then(|t| match t.as_str() {
+        "article" => Some(WritingType::Article),
+        "chapter" => Some(WritingType::Chapter),
+        "book" => Some(WritingType::Book),
+        _ => None,
+    });
+    
+    let writings = service::list_writings(
+        &state.db,
+        status,
+        writing_type,
+        query.series_name,
+        query.is_pinned,
+        query.is_featured,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    
+    Ok(writings.into_iter().map(writing_draft_to_dto).collect())
+}
+
+/// Update writing metadata (title, status, tags, etc.)
+#[tauri::command]
+pub async fn writing_update_meta(
+    input: UpdateWritingDraftMetaInput,
+    state: State<'_, AppState>,
+) -> Result<WritingDraftDto, String> {
+    use crate::writing::components::knowledge_graph::entities::writings::{WritingType, WritingStatus};
+    
+    let writing_type = input.writing_type.and_then(|t| match t.as_str() {
+        "article" => Some(WritingType::Article),
+        "chapter" => Some(WritingType::Chapter),
+        "book" => Some(WritingType::Book),
+        _ => None,
+    });
+    
+    let status = input.status.and_then(|s| match s.as_str() {
+        "draft" => Some(WritingStatus::Draft),
+        "in_progress" => Some(WritingStatus::InProgress),
+        "review" => Some(WritingStatus::Review),
+        "published" => Some(WritingStatus::Published),
+        "archived" => Some(WritingStatus::Archived),
+        _ => None,
+    });
+    
+    let w = service::update_writing_meta(
+        &state.db,
+        input.writing_id,
+        input.title,
+        input.slug,
+        writing_type,
+        status,
+        input.excerpt,
+        input.tags,
+        input.series_name,
+        input.series_part,
+        input.is_pinned,
+        input.is_featured,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    
+    Ok(writing_draft_to_dto(w))
+}
+
+/// Save draft content (TipTap JSON)
+#[tauri::command]
+pub async fn writing_save_draft(
+    input: SaveDraftInput,
+    state: State<'_, AppState>,
+) -> Result<WritingDraftDto, String> {
+    let w = service::save_draft(&state.db, input.writing_id, input.content_json)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(writing_draft_to_dto(w))
+}
+
+/// Publish a writing (set status to published, set published_at)
+#[tauri::command]
+pub async fn writing_publish(
+    input: PublishWritingInput,
+    state: State<'_, AppState>,
+) -> Result<WritingDraftDto, String> {
+    let w = service::publish_writing(&state.db, input.writing_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(writing_draft_to_dto(w))
+}
+
+/// Link an idea to a writing
+#[tauri::command]
+pub async fn writing_link_idea(
+    input: LinkIdeaInput,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    use crate::writing::components::knowledge_graph::entities::writing_idea_links::WritingPurpose;
+    
+    service::link_idea(&state.db, input.writing_id, input.idea_id, WritingPurpose::Primary)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Unlink an idea from a writing
+#[tauri::command]
+pub async fn writing_unlink_idea(
+    input: LinkIdeaInput,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    service::unlink_idea(&state.db, input.writing_id, input.idea_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// List ideas linked to a writing
+#[tauri::command]
+pub async fn writing_list_linked_ideas(
+    writing_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<i64>, String> {
+    let links = service::list_linked_ideas(&state.db, writing_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(links.into_iter().map(|link| link.idea_id).collect())
+}

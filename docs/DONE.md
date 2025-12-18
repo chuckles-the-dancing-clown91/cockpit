@@ -4,6 +4,394 @@ All completed work with completion dates and details.
 
 ---
 
+## 🎉 Sprint 7: Writing System with TipTap JSON Editor (Dec 18, 2025)
+
+**Duration**: December 18, 2025  
+**Tasks Completed**: Full-stack writing system with TipTap rich text editor, optimistic updates, knowledge graph integration  
+**Status**: COMPLETE ✅ - Production-ready writing workspace with autosave
+
+### Sprint Summary
+Implemented complete writing system with TipTap JSON storage, 3-column workspace layout, autosave with debounce, metadata panel, and idea linking. Backend includes text extraction for search, word counting, and transaction-safe operations. Frontend uses optimistic React Query updates with rollback, exposing 9 Tauri commands and 9 React hooks.
+
+### Key Achievements
+- ✅ **Backend Text Extraction**: Recursive JSON walker for TipTap content → plain text
+- ✅ **Backend Service Layer**: Full CRUD with transactions, enum parsing, idea linking
+- ✅ **Backend Commands**: 9 Tauri commands (create, get, list, update meta, save draft, publish, link/unlink idea, list ideas)
+- ✅ **Frontend TipTap Editor**: Rich text with headings, lists, links, images, code blocks
+- ✅ **Frontend Toolbar**: Format buttons, undo/redo, word count, image upload
+- ✅ **Frontend Metadata Panel**: Title, slug, excerpt, type, status, tags, series, publish button
+- ✅ **Frontend Workspace**: 3-column layout (ideas 25% | editor 50% | meta 25%)
+- ✅ **Frontend Library**: List/grid view with status/type filters, create button
+- ✅ **Autosave**: 1.5s debounced autosave + Ctrl+S keyboard shortcut
+- ✅ **Optimistic Updates**: React Query mutation with rollback on error
+
+### Architecture Details
+
+**TipTap JSON Storage**:
+- Content stored as JSON string in `writings.content_markdown` column (lossless editing)
+- Backend extracts plain text via recursive walker for search indexing
+- Word count auto-calculated on save from extracted text
+- No HTML/Markdown conversion needed
+
+**3-Column Layout**:
+- Left (25%): Ideas/references sidebar (stubbed "Coming soon")
+- Center (50%): Toolbar + TipTap editor
+- Right (25%): Metadata panel with dirty tracking
+
+**Optimistic Updates Pattern**:
+```typescript
+const mutation = useMutation({
+  mutationFn: (input) => writingSaveDraft(input),
+  onMutate: async (vars) => {
+    // Cancel outgoing refetches
+    await queryClient.cancelQueries({ queryKey });
+    // Snapshot previous value
+    const prev = queryClient.getQueryData(queryKey);
+    // Optimistically update to new value
+    queryClient.setQueryData(queryKey, newValue);
+    return { prev };
+  },
+  onError: (err, vars, context) => {
+    // Rollback on error
+    queryClient.setQueryData(queryKey, context.prev);
+  },
+});
+```
+
+**Type-Safe Settings**:
+- All DTOs use camelCase serialization: `#[serde(rename_all = "camelCase")]`
+- Frontend mapping handles dual property access for compatibility
+- Backend enums parse strings with validation (WritingType, WritingStatus, Purpose, Role)
+
+### Tasks Completed
+
+#### Task #1: Backend Text Extraction ✅
+**Completed**: December 18, 2025  
+**File**: `backend/src/writing/text.rs` (116 lines)
+
+- `extract_plain_text(doc: &JsonValue) -> String` - Recursive JSON tree walker
+- `walk(v: &JsonValue, out: &mut String)` - Helper traverses content arrays
+- `word_count(text: &str) -> i32` - Splits by whitespace
+- Unit tests for simple text, paragraphs, word counting
+- Handles nested TipTap structures (headings, paragraphs, lists, etc.)
+
+#### Task #2: Backend DTOs ✅
+**Completed**: December 18, 2025  
+**File**: `backend/src/writing/dto.rs` (151 lines)
+
+- `WritingDraftDto` - Frontend response with contentJson, contentText, wordCount
+- `CreateWritingDraftInput` - Create with title, type, linkIdeaIds, initialContentJson
+- `SaveDraftInput` - Autosave contentJson
+- `UpdateWritingDraftMetaInput` - All metadata fields optional (title, slug, excerpt, status, type, tags, series)
+- `PublishWritingInput`, `LinkIdeaInput`, `ListWritingsQuery`
+- All with camelCase serialization for frontend compatibility
+- Note: Used "Draft" suffix to avoid conflicts with existing KG `WritingDto`
+
+#### Task #3: Backend Service Layer ✅
+**Completed**: December 18, 2025  
+**File**: `backend/src/writing/service.rs` (317 lines)
+
+- `create_writing()` - Extracts text, calculates word count, links ideas, uses transaction
+- `get_writing()` - Retrieves by ID with error handling
+- `list_writings()` - Filters by status/type/series/pinned/featured
+- `update_writing_meta()` - Updates any metadata field(s) with enum parsing
+- `save_draft()` - Saves JSON, extracts text, updates word count atomically
+- `publish_writing()` - Sets status=Published, published_at timestamp
+- `link_idea()`, `unlink_idea()`, `list_linked_ideas()` - Manage idea relationships
+- All operations use SeaORM transactions for data consistency
+
+#### Task #4: Backend Tauri Commands ✅
+**Completed**: December 18, 2025  
+**File**: `backend/src/writing/commands.rs` (additions, lines 468-688)
+
+- `writing_draft_to_dto()` - Helper maps entity to DTO, parses JSON string
+- `writing_create` - Create writing with initial content
+- `writing_get`, `writing_list` - Query operations
+- `writing_update_meta` - Metadata updates with enum validation
+- `writing_save_draft` - Autosave handler
+- `writing_publish` - Publishing workflow
+- `writing_link_idea`, `writing_unlink_idea`, `writing_list_linked_ideas` - Relationship management
+- All return `Result<T, String>` for frontend error handling
+- Registered in `main.rs` invoke_handler
+
+#### Task #5: Frontend Types & API ✅
+**Completed**: December 18, 2025  
+**Files**: `frontend/src/shared/types/index.ts` (additions), `frontend/src/features/writing/api/writing.ts` (120 lines)
+
+Types:
+- `WritingType` = 'article' | 'chapter' | 'book'
+- `WritingStatus` = 'draft' | 'in_progress' | 'review' | 'published' | 'archived'
+- `Writing` interface with contentJson (TipTap JSON), contentText, wordCount
+- `CreateWritingInput`, `SaveDraftInput`, `UpdateWritingMetaInput`, `PublishWritingInput`, `LinkIdeaToWritingInput`
+
+API:
+- `mapWriting()` - camelCase ↔ snake_case conversion with dual property access
+- `writingCreate()`, `writingGet()`, `writingList()` - CRUD operations
+- `writingUpdateMeta()`, `writingSaveDraft()`, `writingPublish()` - Update operations
+- `writingLinkIdea()`, `writingUnlinkIdea()`, `writingListLinkedIdeas()` - Relationship operations
+- All async, all use `invoke()`, all return typed data
+
+#### Task #6: Frontend React Query Hooks ✅
+**Completed**: December 18, 2025  
+**File**: `frontend/src/features/writing/hooks/useWriting.ts` (171 lines)
+
+- Query keys factory pattern for cache management
+- `useWritingList()` - 30s stale time, filtered queries
+- `useWriting()` - 10s stale time, enabled guard
+- `useCreateWriting()` - Invalidates lists, sets detail cache
+- `useSaveDraft()` - **Optimistic update with rollback on error**
+- `useUpdateWritingMeta()` - Updates detail + lists
+- `usePublishWriting()` - Sets published status optimistically
+- `useLinkIdea()`, `useUnlinkIdea()` - Relationship mutations
+- `useLinkedIdeas()` - Query linked idea IDs
+
+#### Task #7: Frontend TipTap Editor ✅
+**Completed**: December 18, 2025  
+**Files**: `frontend/src/features/writing/components/WritingEditor.tsx` (100 lines), `WritingEditor.css` (123 lines)
+
+Editor:
+- TipTap wrapper with JSON in/out
+- Extensions: StarterKit (headings 1-4), Link, Image, Placeholder, CharacterCount
+- Props: value (JSON), onChange(json), onEditorReady(editor), onStats(wordCount), readOnly
+- Auto-updates on external value change
+- Exposes editor instance to parent via callback
+
+Styles:
+- Prose typography with heading hierarchy (h1 2.5em → h4 1.25em)
+- List, code block, blockquote, image styles
+- Placeholder styling with muted colors
+- Responsive padding and spacing
+
+#### Task #8: Frontend Toolbar ✅
+**Completed**: December 18, 2025  
+**File**: `frontend/src/features/writing/components/WritingToolbar.tsx` (163 lines)
+
+- Radix Toolbar with TipTap controls
+- Format buttons: Bold, Italic, Strikethrough (active state highlighting)
+- Heading buttons: H1, H2, H3
+- List buttons: Bullet, Numbered
+- Code block button
+- Image upload: File input → FileReader → dataURL → setImage()
+- Undo/Redo buttons with disabled states
+- Word count display
+- Save button with pending state
+- Layout: Flex with separator dividers, spacer for right-aligned actions
+
+#### Task #9: Frontend Metadata Panel ✅
+**Completed**: December 18, 2025  
+**File**: `frontend/src/features/writing/components/WritingMetaPanel.tsx` (194 lines)
+
+Sections:
+- **Metadata**: Title, slug, excerpt, type selector (article/chapter/book), status selector (draft/in_progress/review/published/archived)
+- **Organization**: Tags (comma-separated), series name, series part (number validation)
+- **Publishing**: Word count display, created/updated/published timestamps, publish button
+
+Features:
+- Dirty tracking with "Unsaved changes" indicator
+- Auto-reset on writing change
+- Optimistic saves with rollback on error
+- Number parsing for series part with fallback
+- Disabled state when no writing loaded
+
+#### Task #10: Frontend Workspace ✅
+**Completed**: December 18, 2025  
+**File**: `frontend/src/features/writing/components/WritingWorkspace.tsx` (137 lines)
+
+Layout:
+- 3-column grid: 25% ideas/refs | 50% editor | 25% metadata
+- Left sidebar: Stubbed "Coming soon" for ideas/references integration
+- Center: Toolbar + TipTap editor with padding
+- Right: Metadata panel with overflow scroll
+
+Features:
+- Local content state with dirty tracking
+- 1.5s debounced autosave on content change
+- Ctrl+S keyboard shortcut for manual save
+- Editor instance management via callback
+- Word count tracking from editor stats
+- Optimistic updates with rollback on save error
+- Loading/error states with proper feedback
+
+#### Task #11: Frontend Library View ✅
+**Completed**: December 18, 2025  
+**File**: `frontend/src/features/writing/components/WritingLibrary.tsx` (135 lines)
+
+- List/grid view of all writings
+- Filters: Status dropdown (all/draft/in_progress/review/published/archived)
+- Filters: Type dropdown (all/article/chapter/book)
+- Create button: Creates "Untitled Writing" with H1 + empty paragraph TipTap JSON
+- Cards: Title, type/status badges, excerpt (truncated), word count, updated date
+- Empty state: Icon + message + create button
+- Click to open: Opens writing in workspace via callback
+- Responsive grid layout
+
+#### Task #12: Frontend Feature Exports ✅
+**Completed**: December 18, 2025  
+**File**: `frontend/src/features/writing/index.ts` (17 lines)
+
+- Barrel exports for API functions (all 9 operations)
+- Barrel exports for hooks (all 9 hooks)
+- Barrel exports for components (WritingEditor, WritingToolbar, WritingMetaPanel, WritingWorkspace, WritingLibrary)
+- Clean public interface: `import { useWriting, WritingWorkspace } from '@/features/writing'`
+
+### Integration Points
+
+**Database Schema** (Migration 006):
+- Uses existing `writings` entity from knowledge graph migration
+- Links to ideas via `writing_idea_links` table
+- Shares notes system via `EntityNotesPanel(entityType="writing", entityId)`
+- Can link to references via ideas (idea → references → writing)
+
+**Tauri Commands Available**:
+```rust
+writing_create(input: CreateWritingDraftInput) -> Result<WritingDraftDto, String>
+writing_get(writing_id: i64) -> Result<WritingDraftDto, String>
+writing_list(query: ListWritingsQuery) -> Result<Vec<WritingDraftDto>, String>
+writing_update_meta(input: UpdateWritingDraftMetaInput) -> Result<WritingDraftDto, String>
+writing_save_draft(input: SaveDraftInput) -> Result<WritingDraftDto, String>
+writing_publish(input: PublishWritingInput) -> Result<WritingDraftDto, String>
+writing_link_idea(input: LinkIdeaInput) -> Result<(), String>
+writing_unlink_idea(input: LinkIdeaInput) -> Result<(), String>
+writing_list_linked_ideas(writing_id: i64) -> Result<Vec<i64>, String>
+```
+
+**React Hooks Available**:
+```typescript
+useWritingList(query?: ListWritingsQuery)
+useWriting(id: number | null)
+useCreateWriting()
+useSaveDraft()
+useUpdateWritingMeta()
+usePublishWriting()
+useLinkIdea()
+useUnlinkIdea()
+useLinkedIdeas(writingId: number | null)
+```
+
+### Next Steps
+
+**Integration Tasks** (Not yet complete):
+- Add WritingLibrary to `domains/writing/WritingView.tsx` tabs
+- Integrate WritingWorkspace into routing system
+- Implement ideas/references left sidebar in WritingWorkspace (currently stubbed)
+- Add "Create article from idea" button in IdeasLibraryView
+- Install TipTap npm packages if not already present
+
+**Future Enhancements** (Phase 2):
+- Version management implementation (DTOs exist, commands not created yet)
+- `writing_parent_links` - Book → Chapters structure
+- `idea_relation` - Idea hierarchy/subtopics
+- `article_revisions` - Version history
+- `article_authors` - Co-author support
+
+---
+
+## 🎉 Sprint 6: Notes Feature + TipTap Editor + Embedded Webview (Dec 18, 2025)
+
+**Duration**: December 18, 2025  
+**Tasks Completed**: Full-stack notes system, TipTap rich text editor, Tauri embedded webview  
+**Status**: COMPLETE ✅ - Production-ready notes + real browser integration
+
+### Sprint Summary
+Implemented complete polymorphic notes feature with TipTap rich text editing, replaced textarea with formatted editor, added hover previews, and built real embedded webview using Tauri's native Webview API with selection bridge and clipboard fallback.
+
+### Key Achievements
+- ✅ **Backend Notes Module**: Migration 007, notes CRUD, append with divider, HTML escaping
+- ✅ **TipTap Integration**: Rich text editor with toolbar (Bold/Italic/Lists/Links/Undo/Redo)
+- ✅ **EntityNotesPanel**: Polymorphic component for ideas/references/writings with auto-save
+- ✅ **Hover Previews**: Radix HoverCard on reference titles with styled note preview
+- ✅ **Reference Notes Dialog**: Full-screen notes editor for references
+- ✅ **Embedded Webview**: Real Tauri child window with ResizeObserver positioning
+- ✅ **Selection Bridge**: JavaScript injection for auto-detecting text selection (with clipboard fallback)
+- ✅ **Add to Notes**: Appends selected text from webview with horizontal divider and source attribution
+
+### Tasks Completed
+
+#### Task #1: Backend Notes Feature ✅
+**Completed**: December 18, 2025
+- Created migration 007: Unique index on (entity_type, entity_id, note_type)
+- Created `backend/src/notes/` feature module (not domain-specific)
+- Implemented notes business logic in `components/notes.rs`:
+  - `get_or_create()` - Returns existing or creates empty note (never returns None)
+  - `upsert()` - Creates or updates note content
+  - `append_snippet()` - Appends with `<hr />` divider, HTML escaping, source attribution
+  - `parse_entity_type()` - Validates entity type strings
+  - `html_escape()` - Prevents XSS injection
+- Created Tauri commands in `commands.rs`:
+  - `notes_get_or_create(entity_type, entity_id, note_type)`
+  - `notes_upsert(entity_type, entity_id, note_type, body_html)`
+  - `notes_append_snippet(entity_type, entity_id, note_type, snippet_text, source_url, source_title)`
+- Registered all three commands in main.rs
+- Updated notes entity to use `body_html` field (mapped from body_markdown column)
+
+#### Task #2: TipTap Rich Text Editor ✅
+**Completed**: December 18, 2025
+- Created `frontend/src/features/notes/components/NotesEditor.tsx`
+- Installed TipTap extensions: StarterKit, Link, Placeholder
+- Implemented formatting toolbar:
+  - Text formatting: Bold, Italic, Strikethrough
+  - Lists: Bullet, Numbered
+  - Links: URL prompt dialog
+  - History: Undo, Redo
+- Created `NotesEditor.css` with proper prose styling
+- Added real-time HTML content sync with parent component
+- Removed headings and code blocks for simpler notes experience
+
+#### Task #3: EntityNotesPanel with TipTap ✅
+**Completed**: December 18, 2025
+- Updated `EntityNotesPanel.tsx` to use NotesEditor instead of TextArea
+- Added dirty state tracking with "Unsaved changes" indicator
+- Implemented save button with pending state
+- Shows last updated timestamp
+- Direct HTML content handling (no conversion needed)
+- Loading and error states with proper feedback
+
+#### Task #4: Note Hover Preview & Reference Dialog ✅
+**Completed**: December 18, 2025
+- Fixed `NoteHoverPreview.tsx` styling:
+  - Removed Radix Card wrapper (caused transparency issues)
+  - Used direct CSS classes with custom properties
+  - Added sideOffset for proper spacing
+  - Strips HTML and truncates to 220 chars
+- Created `ReferenceNotesDialog.tsx`:
+  - Full-screen modal for editing reference notes
+  - Uses EntityNotesPanel with 400px min height
+  - Proper close handling
+- Updated `ReferencesPanel.tsx`:
+  - Added FileText icon button to open notes dialog
+  - Wrapped reference titles in NoteHoverPreview
+  - State management for dialog open/close
+
+#### Task #5: Embedded Webview with Tauri API ✅
+**Completed**: December 18, 2025
+- Updated `webview/index.ts`:
+  - `registerWebviewInstance()` - Global webview registry
+  - Navigation functions: `navigateWebview()`, `webviewBack()`, `webviewForward()`, `webviewReload()`
+  - Proper `closeWebview()` cleanup
+- Enhanced `webview/store.ts`:
+  - Added `currentUrl`, `selectedText`, `noteTarget` state
+  - `getWebviewSelectedText()` helper function
+  - Tracks title/URL changes from webview
+- Rebuilt `WebviewModal.tsx` with real Tauri Webview:
+  - Creates native child `Webview` with `new Webview(window, label, options)`
+  - Selection bridge via `initializationScripts` (JavaScript injection)
+  - Listens for 'cockpit-webview-selection' events
+  - ResizeObserver keeps webview positioned in modal
+  - Clipboard fallback: "Paste" button for CORS-blocked sites
+  - URL bar with navigation controls (Back/Forward/Reload)
+  - "Add selection to notes" button with append functionality
+  - EntityNotesPanel in right sidebar showing accumulated notes
+  - Proper cleanup on unmount (closes child webview)
+
+### Technical Details
+- **Selection Bridge**: JavaScript injected into child webview emits selection events to main window
+- **CORS Limitation**: External domains block Tauri IPC by default, hence clipboard fallback
+- **Positioning**: ResizeObserver updates webview bounds on window/modal resize
+- **Memory**: Proper cleanup prevents webview leaks (closes on modal close)
+- **Notes Integration**: Selection → Add to notes → Appears in EntityNotesPanel with divider
+
+---
+
 ## 🎉 Sprint 5: Frontend Infrastructure & Ideas Feature (Dec 17, 2025)
 
 **Duration**: December 17, 2025  

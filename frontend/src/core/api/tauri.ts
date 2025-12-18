@@ -1,28 +1,41 @@
 import { invoke as tauriInvoke } from '@tauri-apps/api/core';
-import type { Idea, NewsArticle, FeedSource, AppSettings } from '@/shared/types';
+import type { Idea, NewsArticle, FeedSource, AppSettings, Reference } from '@/shared/types';
+import { priorityFromNumber } from '@/shared/types';
 
 /**
  * Typed wrappers for Tauri backend commands
  * This provides type safety and a single source of truth for API calls
  */
 
+// Transform backend idea (with numeric priority) to frontend Idea type
+function transformIdea(idea: any): Idea {
+  return {
+    ...idea,
+    priority: priorityFromNumber(idea.priority),
+  };
+}
+
 // ========== Ideas/Writing Commands ==========
 
 export async function listIdeas(): Promise<Idea[]> {
-  return tauriInvoke('list_ideas');
+  const ideas = await tauriInvoke<any[]>('list_ideas');
+  return ideas.map(transformIdea);
 }
 
 export async function getIdea(id: number): Promise<Idea> {
-  return tauriInvoke('get_idea', { id });
+  const idea = await tauriInvoke<any>('get_idea', { id });
+  return transformIdea(idea);
 }
 
 export async function createIdea(input: {
   title: string;
-  summary: string;
-  status: string;
-  priority: string;
+  summary?: string;
+  status?: string;
+  priority?: number;
+  target?: string;
 }): Promise<Idea> {
-  return tauriInvoke('create_idea', { input });
+  const idea = await tauriInvoke<any>('create_idea', { input });
+  return transformIdea(idea);
 }
 
 export async function updateIdeaMetadata(input: {
@@ -30,13 +43,17 @@ export async function updateIdeaMetadata(input: {
   title?: string;
   summary?: string;
   status?: string;
-  priority?: string;
+  priority?: number;
+  target?: string;
 }): Promise<Idea> {
-  return tauriInvoke('update_idea_metadata', { input });
+  const { id, ...rest } = input;
+  const idea = await tauriInvoke<any>('update_idea_metadata', { id, input: rest });
+  return transformIdea(idea);
 }
 
 export async function updateIdeaNotes(id: number, notesMarkdown: string): Promise<Idea> {
-  return tauriInvoke('update_idea_notes', { id, input: { notesMarkdown } });
+  const idea = await tauriInvoke<any>('update_idea_notes', { id, input: { notesMarkdown } });
+  return transformIdea(idea);
 }
 
 export async function archiveIdea(id: number): Promise<void> {
@@ -53,6 +70,32 @@ export async function bulkArchiveIdeas(ids: number[]): Promise<void> {
 
 export async function deleteIdea(id: number): Promise<void> {
   return tauriInvoke('delete_idea', { id });
+}
+
+// ========== References Commands ==========
+
+export async function listIdeaReferences(ideaId: number): Promise<Reference[]> {
+  return tauriInvoke('list_idea_references', { ideaId });
+}
+
+export async function addReferenceToIdea(input: {
+  ideaId: number;
+  referenceType: string;
+  newsArticleId?: number;
+  title?: string;
+  url?: string;
+  description?: string;
+  sourceId?: number;
+}): Promise<Reference> {
+  return tauriInvoke('add_reference_to_idea', { input });
+}
+
+export async function removeReference(referenceId: number): Promise<void> {
+  return tauriInvoke('remove_reference', { referenceId });
+}
+
+export async function updateReferenceNotes(referenceId: number, notesMarkdown: string): Promise<Reference> {
+  return tauriInvoke('update_reference_notes', { referenceId, input: { notesMarkdown } });
 }
 
 // ========== Research/News Commands ==========

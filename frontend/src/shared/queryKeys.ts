@@ -37,6 +37,15 @@ export const queryKeys = {
     detail: (id: number) => [...queryKeys.ideas.details(), id] as const,
   },
 
+  references: {
+    _def: ['references'] as const,
+    all: () => [...queryKeys.references._def] as const,
+    lists: () => [...queryKeys.references._def, 'list'] as const,
+    list: (ideaId: number) => [...queryKeys.references.lists(), ideaId] as const,
+    details: () => [...queryKeys.references._def, 'detail'] as const,
+    detail: (id: number) => [...queryKeys.references.details(), id] as const,
+  },
+
   // ========== Research Domain ==========
 
   articles: {

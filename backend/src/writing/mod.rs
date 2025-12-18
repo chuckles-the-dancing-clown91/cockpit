@@ -5,6 +5,9 @@
 
 pub mod components;
 pub mod commands;
+pub mod dto;
+pub mod text;
+pub mod service;
 
 // Re-export commonly used types
 // Re-export components when needed

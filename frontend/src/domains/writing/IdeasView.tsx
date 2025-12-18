@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { Flex, Text, Button, TextField, Select, Grid } from '@radix-ui/themes';
-import { Plus, Search, Lightbulb } from 'lucide-react';
+import { Flex, Text, Button, TextField, Select, Grid, Badge } from '@radix-ui/themes';
+import { Plus, Search, Lightbulb, Archive } from 'lucide-react';
 import { LoadingState, ErrorState, EmptyState } from '@/core/components/ui';
 import { IdeaCard } from '@/features/ideas/components/IdeaCard';
 import { IdeaDetailDialog } from '@/features/ideas/components/IdeaDetailDialog';
 import { NewIdeaDialog } from '@/features/ideas/components/NewIdeaDialog';
-import { useIdeas, useDeleteIdea, useArchiveIdea } from '@/features/ideas/hooks/useIdeas';
+import { useIdeas, useArchiveIdea, useUpdateIdea } from '@/features/ideas/hooks/useIdeas';
 import { useDialog } from '@/core/providers/DialogProvider';
 import type { Idea, IdeaStatus, IdeaPriority } from '@/shared/types';
+import { toast } from '@/core/lib/toast';
 
 type SortOption = 'dateAdded' | 'dateUpdated' | 'title';
 
@@ -16,10 +17,11 @@ type SortOption = 'dateAdded' | 'dateUpdated' | 'title';
  * 
  * Features:
  * - Grid layout with IdeaCard components
+ * - Multi-select with bulk operations
  * - Filters: status, priority, search
  * - Sort options
  * - Create new idea
- * - Delete and archive actions
+ * - Archive actions (single and bulk)
  * - Detail dialog for editing
  */
 export function IdeasView() {
@@ -29,10 +31,11 @@ export function IdeasView() {
   const [priorityFilter, setPriorityFilter] = useState<IdeaPriority | 'all'>('all');
   const [sortBy, setSortBy] = useState<SortOption>('dateAdded');
   const [showNewDialog, setShowNewDialog] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   
   const { data: ideas, isLoading, error, refetch } = useIdeas();
-  const deleteIdea = useDeleteIdea();
   const archiveIdea = useArchiveIdea();
+  const updateIdea = useUpdateIdea();
   const dialog = useDialog();
   
   if (isLoading) return <LoadingState />;
@@ -72,17 +75,6 @@ export function IdeasView() {
     }
   });
   
-  const handleDelete = async (id: number) => {
-    const confirmed = await dialog.confirm({
-      title: 'Delete Idea',
-      description: 'Are you sure you want to delete this idea? This action cannot be undone.',
-    });
-    
-    if (confirmed) {
-      await deleteIdea.mutateAsync(id);
-    }
-  };
-  
   const handleArchive = async (id: number) => {
     const confirmed = await dialog.confirm({
       title: 'Archive Idea',
@@ -94,23 +86,90 @@ export function IdeasView() {
     }
   };
   
+  const toggleSelectIdea = (id: number) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(selectedId => selectedId !== id) : [...prev, id]
+    );
+  };
+  
+  const selectAll = () => {
+    setSelectedIds(filteredIdeas.map(idea => idea.id));
+  };
+  
+  const clearSelection = () => {
+    setSelectedIds([]);
+  };
+  
+  const handleBulkArchive = async () => {
+    if (selectedIds.length === 0) return;
+    
+    const confirmed = await dialog.confirm({
+      title: 'Archive Selected Ideas',
+      description: `Archive ${selectedIds.length} idea${selectedIds.length > 1 ? 's' : ''}? You can restore them later from archived ideas.`,
+    });
+    
+    if (confirmed) {
+      try {
+        await Promise.all(selectedIds.map(id => archiveIdea.mutateAsync(id)));
+        toast.success(`${selectedIds.length} idea${selectedIds.length > 1 ? 's' : ''} archived`);
+        setSelectedIds([]);
+      } catch (error) {
+        toast.error('Failed to archive some ideas');
+      }
+    }
+  };
+  
+  const handleStatusChange = async (id: number, status: IdeaStatus) => {
+    await updateIdea.mutateAsync({
+      id,
+      status,
+    });
+  };
+  
   return (
     <>
       <Flex direction="column" gap="4" style={{ height: '100%' }}>
         {/* Header */}
         <Flex justify="between" align="center">
-          <div>
-            <Text size="6" weight="bold" style={{ color: 'var(--color-text-primary)' }}>
-              Ideas Library
-            </Text>
-            <Text size="2" style={{ color: 'var(--color-text-soft)', display: 'block', marginTop: '0.25rem' }}>
-              {filteredIdeas.length} {filteredIdeas.length === 1 ? 'idea' : 'ideas'}
-            </Text>
-          </div>
-          <Button onClick={() => setShowNewDialog(true)}>
-            <Plus className="w-4 h-4" />
-            New Idea
-          </Button>
+          <Flex align="center" gap="3">
+            <div>
+              <Text size="6" weight="bold" style={{ color: 'var(--color-text-primary)' }}>
+                Ideas Library
+              </Text>
+              <Text size="2" style={{ color: 'var(--color-text-soft)', display: 'block', marginTop: '0.25rem' }}>
+                {filteredIdeas.length} {filteredIdeas.length === 1 ? 'idea' : 'ideas'}
+              </Text>
+            </div>
+            {selectedIds.length > 0 && (
+              <Flex align="center" gap="2" p="2" style={{ backgroundColor: 'var(--color-primary-alpha)', borderRadius: 'var(--radius-2)' }}>
+                <Badge size="2" color="blue">
+                  {selectedIds.length} selected
+                </Badge>
+                <Button size="1" variant="ghost" onClick={handleBulkArchive}>
+                  <Archive className="w-3 h-3" />
+                  Archive
+                </Button>
+                <Button size="1" variant="ghost" onClick={clearSelection}>
+                  Clear
+                </Button>
+              </Flex>
+            )}
+          </Flex>
+          <Flex align="center" gap="2">
+            {filteredIdeas.length > 0 && (
+              <Button
+                size="2"
+                variant="ghost"
+                onClick={selectedIds.length === filteredIdeas.length ? clearSelection : selectAll}
+              >
+                {selectedIds.length === filteredIdeas.length ? 'Deselect All' : 'Select All'}
+              </Button>
+            )}
+            <Button onClick={() => setShowNewDialog(true)}>
+              <Plus className="w-4 h-4" />
+              New Idea
+            </Button>
+          </Flex>
         </Flex>
         
         {/* Filters */}
@@ -177,13 +236,18 @@ export function IdeasView() {
             }
           />
         ) : (
-          <Grid columns={{ initial: '1', sm: '2', lg: '3' }} gap="4" style={{ flex: 1, overflow: 'auto' }}>
+          <Grid columns={{ initial: '1', sm: '2', lg: '3' }} gap="4">
             {filteredIdeas.map((idea) => (
               <IdeaCard
                 key={idea.id}
                 idea={idea}
-                onClick={() => setSelectedIdea(idea)}
-                onDelete={() => handleDelete(idea.id)}
+                selected={selectedIds.includes(idea.id)}
+                onToggleSelect={(id) => toggleSelectIdea(id)}
+                onStatusChange={handleStatusChange}
+                onClick={() => {
+                  console.log('Setting selected idea:', idea.title);
+                  setSelectedIdea(idea);
+                }}
                 onArchive={() => handleArchive(idea.id)}
               />
             ))}

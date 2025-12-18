@@ -16,6 +16,7 @@ import { ComingSoonPage } from './core/components/ui/ComingSoonPage';
 import { Toaster } from './core/components/ui/Toaster';
 import { DialogProvider } from './core/providers/DialogProvider';
 import { ErrorBoundary } from './core/components/ErrorBoundary';
+import { WebviewModal } from './features/webview/components/WebviewModal';
 
 // Configure TanStack Query
 const queryClient = new QueryClient({
@@ -81,6 +82,7 @@ createRoot(document.getElementById('root')!).render(
         </Routes>
             </BrowserRouter>
             <Toaster />
+            <WebviewModal />
           </DialogProvider>
         </ThemeProvider>
       </QueryClientProvider>

@@ -95,28 +95,32 @@ src/
    - Settings registry, query keys, feature flags
    - Standard Loading/Error/Empty components
    
-2. **Day 2 (Dec 18)**: Writing Knowledge Graph Schema 🚧
-   - Migration 006: Core tables (references, writings, links, notes)
-   - Rust entities + handlers
-   - Tauri commands registration
+2. **Day 2 (Dec 18)**: Writing System Complete ✅
+   - Migration 006: Core tables (reference_items, writings, links, notes)
+   - Backend: Text extraction, DTOs, service layer, 9 Tauri commands
+   - Frontend: TipTap editor, toolbar, metadata panel, workspace, library
+   - Optimistic updates, autosave (1.5s debounce + Ctrl+S)
+   - Production-ready with 16 files created (6 backend, 10 frontend)
 
-3. **Days 3-4 (Dec 19-20)**: Ideas Feature MVP
-   - Zustand stores (ideas, references, writings)
-   - Ideas list + detail views
-   - Reference management UI
-   - Notes editor (TipTap)
+3. **Days 3-4 (Dec 19-20)**: Integration & Polish ⏳
+   - Add WritingLibrary to WritingView tabs
+   - Integrate WritingWorkspace into routing
+   - Implement ideas/references left sidebar (currently stubbed)
+   - Add "Create article from idea" button in IdeasLibraryView
+   - Install TipTap npm packages if needed
+   - End-to-end workflow testing
 
-4. **Days 5-7 (Dec 21-23)**: Writing Feature
-   - Article editor with markdown
-   - Linked ideas sidebar
-   - References panel
-   - Series management
+4. **Days 5-7 (Dec 21-23)**: Research Domain ⏳
+   - Stream view improvements
+   - Feed management refinements
+   - Article detail modal
+   - "Add to Idea" flow from research articles
 
-5. **Week 2 (Dec 24-31)**: Research + System Domains
-   - Build Research domain (Stream, Feed Sources)
+5. **Week 2 (Dec 24-31)**: System Domain & Testing ⏳
    - Build System domain (Settings, Logs, Tasks, Storage)
    - Integration testing across all domains
-   - Documentation (ARCHITECTURE.md)
+   - Performance optimization
+   - Documentation (ARCHITECTURE.md, WRITING_SYSTEM.md)
 
 **Approach**:
 - Start with empty src/, salvage working code from src-old incrementally
