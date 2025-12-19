@@ -5,7 +5,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Text, Flex } from '@radix-ui/themes';
+import { Text, Flex, Button } from '@radix-ui/themes';
+import { X } from 'lucide-react';
 import type { Editor } from '@tiptap/react';
 import { WritingEditor } from '../editor/WritingEditor';
 import { WritingToolbar } from '../editor/WritingToolbar';
@@ -15,9 +16,10 @@ import { useWriting, useSaveDraft } from '../../hooks/useWriting';
 
 interface WritingWorkspaceProps {
   writingId: number;
+  onClose?: () => void;
 }
 
-export function WritingWorkspace({ writingId }: WritingWorkspaceProps) {
+export function WritingWorkspace({ writingId, onClose }: WritingWorkspaceProps) {
   const { data: writing, isLoading, error } = useWriting(writingId);
   const saveDraft = useSaveDraft(writingId);
 
@@ -29,14 +31,14 @@ export function WritingWorkspace({ writingId }: WritingWorkspaceProps) {
   // Autosave timer
   const saveTimer = useRef<number | null>(null);
 
-  // Load content when writing loads
+  // Load content when writing loads (only on ID change, not on every update)
   useEffect(() => {
-    if (writing) {
+    if (writing && !localContent) {
       setLocalContent(writing.contentJson);
       setWordCount(writing.wordCount);
       setDirty(false);
     }
-  }, [writing?.id, writing?.updatedAt]);
+  }, [writing?.id]);
 
   // Ctrl+S shortcut
   useEffect(() => {
@@ -111,13 +113,37 @@ export function WritingWorkspace({ writingId }: WritingWorkspaceProps) {
       style={{
         height: '100%',
         minHeight: 0,
-        display: 'grid',
-        gridTemplateColumns: '1fr 2fr 1fr', // 25% | 50% | 25%
-        gap: 12,
-        padding: 12,
+        display: 'flex',
+        flexDirection: 'column',
         background: 'var(--color-surface-soft)',
       }}
     >
+      {/* Close button bar */}
+      {onClose && (
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--color-border)' }}>
+          <Button
+            variant="ghost"
+            size="2"
+            onClick={onClose}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <X size={16} />
+            Close Writing
+          </Button>
+        </div>
+      )}
+
+      {/* Main workspace */}
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: 'grid',
+          gridTemplateColumns: '1fr 2fr 1fr', // 25% | 50% | 25%
+          gap: 12,
+          padding: 12,
+        }}
+      >
       {/* LEFT: Ideas & References */}
       <div
         style={{
@@ -135,6 +161,7 @@ export function WritingWorkspace({ writingId }: WritingWorkspaceProps) {
       <div
         style={{
           minHeight: 0,
+          height: '100%',
           display: 'flex',
           flexDirection: 'column',
           background: 'var(--color-surface)',
@@ -151,14 +178,14 @@ export function WritingWorkspace({ writingId }: WritingWorkspaceProps) {
           onSave={handleSave}
         />
 
-        <div style={{ flex: 1, overflow: 'auto', padding: '20px 40px' }}>
+        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '20px 40px' }}>
           <WritingEditor
             value={localContent || writing.contentJson}
             onChange={handleContentChange}
             onEditorReady={setEditor}
             onStats={handleStats}
             placeholder="Start writing your masterpiece..."
-            minHeight="600px"
+            minHeight="100%"
           />
         </div>
       </div>
@@ -173,7 +200,8 @@ export function WritingWorkspace({ writingId }: WritingWorkspaceProps) {
           border: '1px solid var(--color-border)',
         }}
       >
-        <WritingMetaPanel writing={writing} />
+        <WritingMetaPanel writing={writing} liveWordCount={wordCount} />
+      </div>
       </div>
     </div>
   );

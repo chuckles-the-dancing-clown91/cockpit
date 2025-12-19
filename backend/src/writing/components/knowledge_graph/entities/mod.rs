@@ -25,5 +25,4 @@ pub use notes::Entity as Notes;
 pub use reference_items::ReferenceType;
 pub use writings::{WritingType, WritingStatus};
 pub use idea_reference_links::ReferenceRole;
-pub use writing_idea_links::WritingPurpose;
 pub use notes::{EntityType, NoteType};

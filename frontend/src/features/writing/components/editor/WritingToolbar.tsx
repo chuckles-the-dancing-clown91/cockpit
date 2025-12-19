@@ -3,12 +3,13 @@
  */
 
 import * as Toolbar from '@radix-ui/react-toolbar';
-import { Button, Text } from '@radix-ui/themes';
+import { Button, Text, Dialog, Flex, TextField } from '@radix-ui/themes';
 import {
   Bold, Italic, Strikethrough, List, ListOrdered,
   Code, Image as ImageIcon, Heading1, Heading2, Heading3,
-  Save, Undo, Redo,
+  Link as LinkIcon, Save, Undo, Redo,
 } from 'lucide-react';
+import { useState } from 'react';
 import type { Editor } from '@tiptap/react';
 
 interface WritingToolbarProps {
@@ -26,6 +27,9 @@ export function WritingToolbar({
   wordCount,
   onSave,
 }: WritingToolbarProps) {
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+
   if (!editor) {
     return null;
   }
@@ -48,7 +52,30 @@ export function WritingToolbar({
     input.click();
   };
 
+  const handleOpenLinkDialog = () => {
+    const previousUrl = editor.getAttributes('link').href || '';
+    setLinkUrl(previousUrl);
+    setLinkDialogOpen(true);
+  };
+
+  const handleSaveLink = () => {
+    if (linkUrl === '') {
+      editor.chain().focus().extendMarkRange('link').unsetLink().run();
+    } else {
+      editor.chain().focus().extendMarkRange('link').setLink({ href: linkUrl }).run();
+    }
+    setLinkDialogOpen(false);
+    setLinkUrl('');
+  };
+
+  const handleRemoveLink = () => {
+    editor.chain().focus().extendMarkRange('link').unsetLink().run();
+    setLinkDialogOpen(false);
+    setLinkUrl('');
+  };
+
   return (
+    <>
     <div
       style={{
         borderBottom: '1px solid var(--color-border)',
@@ -168,7 +195,7 @@ export function WritingToolbar({
 
         <Toolbar.Separator style={{ width: 1, height: 24, background: 'var(--color-border)' }} />
 
-        {/* Code & Image */}
+        {/* Code, Link & Image */}
         <Toolbar.Button asChild>
           <Button
             variant={editor.isActive('codeBlock') ? 'solid' : 'soft'}
@@ -176,6 +203,15 @@ export function WritingToolbar({
             title="Code block"
           >
             <Code width={16} height={16} />
+          </Button>
+        </Toolbar.Button>OpenLinkDialog
+        <Toolbar.Button asChild>
+          <Button
+            variant={editor.isActive('link') ? 'solid' : 'soft'}
+            onClick={handleOpenLinkDialog}
+            title="Insert/edit link"
+          >
+            <LinkIcon width={16} height={16} />
           </Button>
         </Toolbar.Button>
         <Toolbar.Button asChild>
@@ -205,6 +241,52 @@ export function WritingToolbar({
           {isSaving ? 'Saving…' : 'Save'}
         </Button>
       </Toolbar.Root>
+
+      {/* Link Dialog */}
+      <Dialog.Root open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+        <Dialog.Content style={{ maxWidth: 450 }}>
+          <Dialog.Title>Insert Link</Dialog.Title>
+          <Dialog.Description size="2" mb="4">
+            Enter the URL for the link
+          </Dialog.Description>
+
+          <Flex direction="column" gap="3">
+            <label>
+              <Text as="div" size="2" mb="1" weight="bold">
+                URL
+              </Text>
+              <TextField.Root
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                placeholder="https://example.com"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSaveLink();
+                  }
+                }}
+              />
+            </label>
+          </Flex>
+
+          <Flex gap="3" mt="4" justify="end">
+            {editor.isActive('link') && (
+              <Button variant="soft" color="red" onClick={handleRemoveLink}>
+                Remove Link
+              </Button>
+            )}
+            <Dialog.Close>
+              <Button variant="soft" color="gray">
+                Cancel
+              </Button>
+            </Dialog.Close>
+            <Button onClick={handleSaveLink}>
+              Save Link
+            </Button>
+          </Flex>
+        </Dialog.Content>
+      </Dialog.Root>
     </div>
+    </>
   );
 }

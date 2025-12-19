@@ -7,6 +7,7 @@ mod m004_feed_sources;
 mod m005_idea_references;
 mod m006_writing_knowledge_graph;
 mod m007_notes_unique_main;
+mod m008_fix_writing_idea_links;
 
 pub struct Migrator;
 
@@ -21,6 +22,7 @@ impl MigratorTrait for Migrator {
             Box::new(m005_idea_references::Migration),
             Box::new(m006_writing_knowledge_graph::Migration),
             Box::new(m007_notes_unique_main::Migration),
+            Box::new(m008_fix_writing_idea_links::Migration),
         ]
     }
 }

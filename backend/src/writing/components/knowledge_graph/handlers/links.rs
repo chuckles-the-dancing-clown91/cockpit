@@ -162,8 +162,8 @@ fn writing_idea_link_to_dto(model: writing_idea_links::Model) -> WritingIdeaLink
         id: model.id,
         writing_id: model.writing_id,
         idea_id: model.idea_id,
-        purpose: model.purpose.to_string(),
-        notes: model.notes,
+        purpose: model.purpose.unwrap_or_else(|| "secondary".to_string()),
+        notes: None,
         link_order: model.link_order,
         created_at: model.created_at.to_rfc3339(),
     }
@@ -177,11 +177,12 @@ pub async fn link_writing_idea(
 ) -> AppResult<WritingIdeaLinkDto> {
     use writing_idea_links::*;
 
-    // Parse purpose
+    // Parse purpose - validate and default to "secondary"
     let purpose = match input.purpose.as_deref() {
-        Some("primary") => WritingPurpose::Primary,
-        Some("secondary") | None => WritingPurpose::Secondary,
-        Some("mention") => WritingPurpose::Mention,
+        Some("primary") => Some("primary".to_string()),
+        Some("secondary") => Some("secondary".to_string()),
+        Some("mention") => Some("mention".to_string()),
+        None => Some("secondary".to_string()),
         Some(p) => return Err(AppError::other(format!("Invalid purpose: {}", p))),
     };
 
@@ -189,7 +190,6 @@ pub async fn link_writing_idea(
         writing_id: Set(input.writing_id),
         idea_id: Set(input.idea_id),
         purpose: Set(purpose),
-        notes: Set(None),
         link_order: Set(input.link_order.unwrap_or(0)),
         created_at: Set(Utc::now()),
         ..Default::default()

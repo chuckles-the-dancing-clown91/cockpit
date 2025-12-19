@@ -2,14 +2,25 @@
 
 .writing-editor-wrapper {
   width: 100%;
+  min-height: 100%;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-card);
   padding: 1rem;
   background: var(--color-surface);
 }
 
+/* TipTap's EditorContent wrapper */
+.writing-editor-wrapper > div {
+  min-height: 100%;
+}
+
+/* ProseMirror editor */
+.writing-editor-wrapper .ProseMirror {
+  min-height: 100%;
+  outline: none;
+}
+
 .writing-editor-content {
-  min-height: inherit;
   color: var(--color-text-primary);
   font-family: 'Georgia', 'Times New Roman', serif;
   font-size: 16px;
@@ -67,26 +78,55 @@
 }
 
 .writing-editor-content pre {
-  background: var(--color-surface-soft);
-  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid var(--gray-6);
   border-radius: var(--radius-input);
   padding: 1em;
+  margin: 1em 0;
   overflow-x: auto;
   font-family: 'Monaco', 'Courier New', monospace;
   font-size: 14px;
+  position: relative;
 }
 
-.writing-editor-content code {
-  background: var(--color-surface-soft);
-  padding: 0.2em 0.4em;
-  border-radius: 3px;
-  font-family: 'Monaco', 'Courier New', monospace;
-  font-size: 14px;
+/* Light theme adjustment */
+:root.light .writing-editor-content pre {
+  background: rgba(0, 0, 0, 0.05);
+  border: 2px solid var(--gray-6);
 }
 
 .writing-editor-content pre code {
   background: none;
   padding: 0;
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 14px;
+  display: block;
+  color: #abb2bf;
+}
+
+/* Syntax highlighting colors */
+.writing-editor-content pre .hljs-keyword { color: #c678dd; }
+.writing-editor-content pre .hljs-string { color: #98c379; }
+.writing-editor-content pre .hljs-number { color: #d19a66; }
+.writing-editor-content pre .hljs-comment { color: #5c6370; font-style: italic; }
+.writing-editor-content pre .hljs-function { color: #61afef; }
+.writing-editor-content pre .hljs-title { color: #61afef; font-weight: bold; }
+.writing-editor-content pre .hljs-params { color: #abb2bf; }
+.writing-editor-content pre .hljs-built_in { color: #e5c07b; }
+.writing-editor-content pre .hljs-literal { color: #56b6c2; }
+.writing-editor-content pre .hljs-attr { color: #d19a66; }
+.writing-editor-content pre .hljs-variable { color: #e06c75; }
+.writing-editor-content pre .hljs-tag { color: #e06c75; }
+.writing-editor-content pre .hljs-name { color: #e06c75; }
+
+/* Inline code styling */
+.writing-editor-content code:not(pre code) {
+  background: var(--color-surface-soft);
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 14px;
+  border: 1px solid var(--color-border-subtle);
 }
 
 .writing-editor-content blockquote {

@@ -1,21 +1,167 @@
 /**
  * LinkedIdeasPanel - Shows ideas linked to a writing
  * 
- * Simple sidebar showing linked ideas with unlink capability.
- * Reuses IdeaCard component from ideas feature.
+ * Sidebar showing linked ideas with notes and references accordion.
+ * Uses existing hooks from notes and references features.
  */
 
 import { useState } from 'react';
-import { Flex, Text, Button, Card, Box } from '@radix-ui/themes';
-import { Plus, X, Lightbulb } from 'lucide-react';
+import { Flex, Text, Button, Card, Box, Separator } from '@radix-ui/themes';
+import * as Accordion from '@radix-ui/react-accordion';
+import { Plus, X, Lightbulb, ChevronDown, FileText, Link as LinkIcon, Edit } from 'lucide-react';
 import { useLinkedIdeas, useUnlinkIdea } from '../../hooks/useWriting';
 import { useIdeas } from '@/features/ideas/hooks/useIdeas';
+import { useNote } from '@/features/notes/hooks/useNotes';
+import { useIdeaReferences } from '@/features/references/hooks/useReferences';
 import { LinkIdeaDialog } from './LinkIdeaDialog';
 import { toast } from '@/core/lib/toast';
 import type { Idea } from '@/shared/types';
 
 interface LinkedIdeasPanelProps {
   writingId: number;
+}
+
+/**
+ * Strip HTML tags for plain text preview, preserving line breaks
+ */
+function stripHtml(html: string): string {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<\/h[1-6]>/gi, '\n\n');
+  return (tmp.textContent || tmp.innerText || '').trim();
+}
+
+/**
+ * Component to show notes and references for a single linked idea
+ */
+function IdeaDetailsAccordion({ idea }: { idea: Idea }) {
+  const { data: note, isLoading: loadingNote } = useNote('idea', idea.id, 'main');
+  const { data: references, isLoading: loadingRefs } = useIdeaReferences(idea.id);
+
+  const hasNotes = note && note.bodyHtml && note.bodyHtml.trim().length > 0;
+  const hasReferences = references && references.length > 0;
+
+  // Don't show accordion if no content
+  if (!hasNotes && !hasReferences && !loadingNote && !loadingRefs) {
+    return null;
+  }
+
+  return (
+    <Accordion.Root type="single" collapsible>
+      <Accordion.Item value="details">
+        <Accordion.Trigger asChild>
+          <Button
+            variant="ghost"
+            size="1"
+            style={{
+              width: '100%',
+              justifyContent: 'space-between',
+              padding: '4px 8px',
+              marginTop: '4px',
+            }}
+          >
+            <Flex align="center" gap="2">
+              <Text size="1" color="gray">
+                {loadingNote || loadingRefs ? 'Loading...' : 'Show details'}
+              </Text>
+            </Flex>
+            <ChevronDown size={14} style={{ transition: 'transform 150ms' }} />
+          </Button>
+        </Accordion.Trigger>
+        
+        <Accordion.Content style={{ padding: '8px 0' }}>
+          <Flex direction="column" gap="2">
+            {/* Notes section */}
+            {hasNotes && (
+              <Box>
+                <Flex align="center" gap="1" mb="1">
+                  <FileText size={12} />
+                  <Text size="1" weight="medium">Notes</Text>
+                </Flex>
+                <Text 
+                  size="1" 
+                  color="gray" 
+                  style={{ 
+                    lineHeight: 1.4,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  {(() => {
+                    const plainText = stripHtml(note.bodyHtml);
+                    return plainText.length > 150 
+                      ? `${plainText.substring(0, 150)}...`
+                      : plainText;
+                  })()}
+                </Text>
+              </Box>
+            )}
+
+            {/* References section */}
+            {hasReferences && (
+              <Box>
+                <Flex align="center" gap="1" mb="1">
+                  <LinkIcon size={12} />
+                  <Text size="1" weight="medium">
+                    References ({references.length})
+                  </Text>
+                </Flex>
+                <Flex direction="column" gap="2">
+                  {references.slice(0, 3).map((ref) => (
+                    <Box key={ref.id}>
+                      <Text 
+                        size="1" 
+                        color="gray"
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        • {ref.title || ref.url}
+                      </Text>
+                      {ref.notesMarkdown && ref.notesMarkdown.trim().length > 0 && (
+                        <Text 
+                          size="1" 
+                          color="gray"
+                          style={{ 
+                            marginLeft: '12px',
+                            lineHeight: 1.3,
+                            fontStyle: 'italic',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {ref.notesMarkdown.length > 100 
+                            ? `${ref.notesMarkdown.substring(0, 100)}...`
+                            : ref.notesMarkdown
+                          }
+                        </Text>
+                      )}
+                    </Box>
+                  ))}
+                  {references.length > 3 && (
+                    <Text size="1" color="gray">
+                      +{references.length - 3} more
+                    </Text>
+                  )}
+                </Flex>
+              </Box>
+            )}
+          </Flex>
+        </Accordion.Content>
+      </Accordion.Item>
+    </Accordion.Root>
+  );
 }
 
 export function LinkedIdeasPanel({ writingId }: LinkedIdeasPanelProps) {
@@ -128,7 +274,6 @@ export function LinkedIdeasPanel({ writingId }: LinkedIdeasPanelProps) {
               key={idea.id}
               style={{ 
                 position: 'relative',
-                cursor: 'pointer',
                 padding: 'var(--space-3)',
               }}
             >
@@ -189,6 +334,9 @@ export function LinkedIdeasPanel({ writingId }: LinkedIdeasPanelProps) {
                     {idea.priority}
                   </Text>
                 </Flex>
+                
+                {/* Notes and References Accordion */}
+                <IdeaDetailsAccordion idea={idea} />
               </Flex>
             </Card>
           ))}

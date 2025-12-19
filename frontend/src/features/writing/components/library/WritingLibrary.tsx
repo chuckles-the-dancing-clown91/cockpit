@@ -2,9 +2,9 @@
  * WritingLibrary - List/grid view of all writings
  */
 
-import { useState } from 'react';
-import { Card, Flex, Text, Button, Select } from '@radix-ui/themes';
-import { Plus, FileText } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Card, Flex, Text, Button, Select, TextField, Badge } from '@radix-ui/themes';
+import { Plus, FileText, Search, Tag } from 'lucide-react';
 import { useWritingList, useCreateWriting } from '../../hooks/useWriting';
 import type { WritingType, WritingStatus } from '../../types';
 
@@ -15,6 +15,8 @@ interface WritingLibraryProps {
 export function WritingLibrary({ onOpenWriting }: WritingLibraryProps) {
   const [statusFilter, setStatusFilter] = useState<WritingStatus | undefined>(undefined);
   const [typeFilter, setTypeFilter] = useState<WritingType | undefined>(undefined);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [tagFilter, setTagFilter] = useState('');
 
   const { data: writings, isLoading } = useWritingList({
     status: statusFilter,
@@ -22,6 +24,21 @@ export function WritingLibrary({ onOpenWriting }: WritingLibraryProps) {
   });
 
   const createWriting = useCreateWriting();
+
+  const filteredWritings = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const tag = tagFilter.trim().toLowerCase();
+
+    return (writings || []).filter((w) => {
+      const matchesTitle = query ? w.title?.toLowerCase().includes(query) : true;
+      const tagList = (w.tags || '')
+        .split(',')
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean);
+      const matchesTag = tag ? tagList.some((t) => t.includes(tag)) : true;
+      return matchesTitle && matchesTag;
+    });
+  }, [writings, searchQuery, tagFilter]);
 
   const handleCreate = async () => {
     const newWriting = await createWriting.mutateAsync({
@@ -57,8 +74,33 @@ export function WritingLibrary({ onOpenWriting }: WritingLibraryProps) {
         </Button>
       </Flex>
 
+      {/* Search */}
+      <Flex gap="2" wrap="wrap" style={{ marginBottom: 8 }}>
+        <TextField.Root
+          placeholder="Search by title..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{ minWidth: 220, flex: 1 }}
+        >
+          <TextField.Slot>
+            <Search size={16} />
+          </TextField.Slot>
+        </TextField.Root>
+
+        <TextField.Root
+          placeholder="Filter by tag..."
+          value={tagFilter}
+          onChange={(e) => setTagFilter(e.target.value)}
+          style={{ minWidth: 200 }}
+        >
+          <TextField.Slot>
+            <Tag size={16} />
+          </TextField.Slot>
+        </TextField.Root>
+      </Flex>
+
       {/* Filters */}
-      <Flex gap="2">
+      <Flex gap="2" wrap="wrap">
         <Select.Root
           value={statusFilter || 'all'}
           onValueChange={(v) => setStatusFilter(v === 'all' ? undefined : (v as WritingStatus))}
@@ -92,7 +134,7 @@ export function WritingLibrary({ onOpenWriting }: WritingLibraryProps) {
       <div style={{ flex: 1, overflow: 'auto' }}>
         {isLoading ? (
           <Text>Loading...</Text>
-        ) : !writings || writings.length === 0 ? (
+        ) : !filteredWritings || filteredWritings.length === 0 ? (
           <Flex
             direction="column"
             align="center"
@@ -111,7 +153,7 @@ export function WritingLibrary({ onOpenWriting }: WritingLibraryProps) {
           </Flex>
         ) : (
           <Flex direction="column" gap="2">
-            {writings.map((writing) => (
+            {filteredWritings.map((writing) => (
               <Card
                 key={writing.id}
                 style={{ cursor: 'pointer' }}
@@ -119,14 +161,14 @@ export function WritingLibrary({ onOpenWriting }: WritingLibraryProps) {
               >
                 <Flex direction="column" gap="2">
                   <Flex justify="between" align="start">
-                    <Text size="4" weight="bold">{writing.title}</Text>
+                    <Text size="4" weight="bold">{writing.title || 'Untitled'}</Text>
                     <Flex gap="2">
-                      <Text size="1" style={{ color: 'var(--color-text-soft)' }}>
+                      <Badge size="1" color="gray">
                         {writing.writingType}
-                      </Text>
-                      <Text size="1" style={{ color: 'var(--color-text-soft)' }}>
-                        {writing.status}
-                      </Text>
+                      </Badge>
+                      <Badge size="1" color={writing.status === 'published' ? 'green' : 'gray'}>
+                        {writing.status.replace('_', ' ')}
+                      </Badge>
                     </Flex>
                   </Flex>
 
@@ -144,6 +186,20 @@ export function WritingLibrary({ onOpenWriting }: WritingLibraryProps) {
                       Updated {new Date(writing.updatedAt).toLocaleDateString()}
                     </Text>
                   </Flex>
+
+                  {writing.tags && (
+                    <Flex gap="2" wrap="wrap">
+                      {writing.tags.split(',').map((tag) => {
+                        const trimmed = tag.trim();
+                        if (!trimmed) return null;
+                        return (
+                          <Badge key={trimmed} size="1" color="blue" variant="soft">
+                            #{trimmed}
+                          </Badge>
+                        );
+                      })}
+                    </Flex>
+                  )}
                 </Flex>
               </Card>
             ))}

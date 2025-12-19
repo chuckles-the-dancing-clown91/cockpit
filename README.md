@@ -26,42 +26,84 @@ Cockpit is organized into three specialized modes:
 - **Type-Safe**: Full TypeScript + Rust with shared type definitions
 - **Offline-First**: SQLite database with encrypted settings storage
 
+## Tech stack
+
+- **Desktop:** Tauri 2.x
+- **Backend:** Rust, SeaORM, SQLite, Tokio
+- **Migrations:** `backend/migration` (SeaORM Migration crate) — **no raw SQL migration files**
+- **Frontend:** React 19, TypeScript, Vite
+- **UI:** Radix Themes + Radix Primitives
+- **Data fetching:** TanStack Query (React Query)
+
+
 ## 🚀 Quick Start
 
-### For Users
+### Prereqs
 
-**Debian/Ubuntu:**
+- Rust (stable) + `cargo`
+- Node.js (LTS recommended)
+- Tauri prerequisites for your OS (WebView2 on Windows, etc.)
+
+### Install frontend deps
+
 ```bash
-sudo dpkg -i Cockpit_0.1.0_amd64.deb
-cockpit
+cd frontend
+npm install
 ```
 
-**Fedora/RHEL:**
-```bash
-sudo rpm -i Cockpit-0.1.0-1.x86_64.rpm
-cockpit
-```
-
-See [INSTALLATION.md](docs/INSTALLATION.md) for detailed instructions.
-
-### For Developers
+### Run in dev (Tauri)
 
 ```bash
-# Clone and setup
-git clone <repo-url>
-cd cockpit
-
-# Install frontend dependencies
-cd frontend && npm install
-
-# Create backend/.env (see Configuration section below)
-cd ../backend
-cp .env.example .env
-# Edit .env with your settings
-
-# Run development server
+cd backend
 cargo tauri dev
 ```
+
+#### Important: `tauri.conf.json` path
+
+`backend/tauri.conf.json` contains `build.beforeDevCommand` / `beforeBuildCommand`. Ensure these commands use **relative** paths (not a machine-specific absolute path), e.g.:
+
+```json
+"beforeDevCommand": "npm --prefix ../frontend run dev"
+```
+
+## Database + migrations
+
+- Cockpit uses **SQLite**.
+- On startup, the backend runs **SeaORM migrations automatically**.
+- You can override the DB location via `DB_URL` (SQLite URL).
+
+If you need to create a migration:
+
+```bash
+cd backend/migration
+cargo run -- generate <name>
+```
+
+Then add your migration to `migration/src/lib.rs` (the `Migrator` list).
+
+## Documentation
+
+Start here:
+
+- `docs/Frontend_Development.md`
+- `docs/Backend_Development.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DB_SCHEMA.md`
+- `docs/TAURI_COMMANDS.md`
+- `docs/TROUBLESHOOTING.md`
+
+## Development rules (to prevent Copilot drift)
+
+- **Do not add new code under `frontend/src/domains/`**.
+- Prefer **feature modules** (`frontend/src/features/<feature>/...`).
+- Reuse existing components/hooks before creating new versions.
+- Any new backend capability = **1 command + 1 service function + DTOs** (keep layers clean).
+- Any schema change = **SeaORM migration** (never raw `.sql` files).
+- 
+
+---
+
+If you’re working with an AI assistant/Copilot, read: `docs/AI_ASSISTANT_RULES.md`.
 
 ## ✨ Features
 
@@ -236,22 +278,6 @@ cargo test core::
 - **[DONE.md](docs/DONE.md)** - Completed work archive
 - **[ROADMAP.md](docs/ROADMAP.md)** - Long-term planning
 
-### Build & Deployment
-- **[BUILD_GUIDE.md](docs/BUILD_GUIDE.md)** - Complete build instructions
-- **[BUILD_PACKAGE_GUIDE.md](docs/BUILD_PACKAGE_GUIDE.md)** - Creating distribution packages
-- **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Production deployment guide
-
-### Installation & Setup
-- **[INSTALLATION.md](docs/INSTALLATION.md)** - User installation guide
-- **[INSTALL.md](docs/INSTALL.md)** - Alternative installation methods
-
-### Troubleshooting
-- **[ICON_TROUBLESHOOTING.md](docs/ICON_TROUBLESHOOTING.md)** - Icon display issues (COSMIC DE)
-
-### Technical Reference
-- **[PERMISSIONS.md](docs/PERMISSIONS.md)** - Security model and ACL permissions
-- **[Archive](docs/archive/)** - Historical documentation
-
 ## 🐛 Common Issues
 
 **Icons don't show (COSMIC desktop):**
@@ -284,15 +310,6 @@ See [PERMISSIONS.md](docs/PERMISSIONS.md) for complete security documentation.
 ## 📦 Data Management
 
 ### Storage Locations
-
-**Development:**
-```
-backend/storage/
-  ├── data/db.sql       # SQLite database
-  ├── logs/             # Application logs
-  ├── backups/          # Database backups
-  └── exports/          # Data exports
-```
 
 **Production (after install):**
 ```
@@ -332,7 +349,6 @@ Restore from backup via: **System → Storage → Restore Backup**
 
 **Planned:**
 - 🔜 Cloud sync capabilities
-- 🔜 Mobile companion app
 - 🔜 Custom themes
 - 🔜 Export/import enhancements
 

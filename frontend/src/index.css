@@ -86,3 +86,8 @@ body {
 .sidebar-item:hover {
   background-color: var(--gray-a3) !important;
 }
+
+/* Accordion chevron rotation */
+[data-state="open"] > button svg {
+  transform: rotate(180deg);
+}

@@ -656,9 +656,7 @@ pub async fn writing_link_idea(
     input: LinkIdeaInput,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    use crate::writing::components::knowledge_graph::entities::writing_idea_links::WritingPurpose;
-    
-    service::link_idea(&state.db, input.writing_id, input.idea_id, WritingPurpose::Primary)
+    service::link_idea(&state.db, input.writing_id, input.idea_id, Some("primary".to_string()))
         .await
         .map_err(|e| e.to_string())
 }

@@ -1,14 +1,32 @@
-import { useSearchParams } from 'react-router-dom';
-import { Flex, Box } from '@radix-ui/themes';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Flex, Box, Button } from '@radix-ui/themes';
 import { BookOpen } from 'lucide-react';
 import { WritingWorkspace } from '@/features/writing';
+import { useWritingStore } from '@/features/writing/store';
 
 export function EditorView() {
-  const [searchParams] = useSearchParams();
-  const writingId = searchParams.get('id');
-  const parsedId = writingId ? Number.parseInt(writingId, 10) : NaN;
+  const navigate = useNavigate();
+  const { activeWritingId, setActiveWriting, clearActiveWriting } = useWritingStore();
 
-  if (!writingId || !Number.isFinite(parsedId)) {
+  // Check for writing ID in URL on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const writingId = params.get('id');
+    if (writingId) {
+      const parsedId = Number.parseInt(writingId, 10);
+      if (Number.isFinite(parsedId)) {
+        setActiveWriting(parsedId);
+      }
+    }
+  }, [setActiveWriting]);
+
+  const handleCloseWriting = () => {
+    clearActiveWriting();
+    navigate('/writing');
+  };
+
+  if (!activeWritingId) {
     return (
       <Flex 
         align="center" 
@@ -29,9 +47,12 @@ export function EditorView() {
             Select a writing from the Library to start editing
           </p>
         </Box>
+        <Button onClick={() => navigate('/writing')}>
+          Go to Library
+        </Button>
       </Flex>
     );
   }
 
-  return <WritingWorkspace writingId={parsedId} />;
+  return <WritingWorkspace writingId={activeWritingId} onClose={handleCloseWriting} />;
 }

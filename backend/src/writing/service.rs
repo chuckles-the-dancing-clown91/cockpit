@@ -74,8 +74,7 @@ pub async fn create_writing(
         let _ = writing_idea_links::ActiveModel {
             writing_id: Set(writing.id),
             idea_id: Set(idea_id),
-            purpose: Set(writing_idea_links::WritingPurpose::Primary),
-            notes: Set(None),
+            purpose: Set(Some("primary".to_string())),
             link_order: Set(0),
             created_at: Set(now),
             ..Default::default()
@@ -253,13 +252,12 @@ pub async fn link_idea(
     db: &DatabaseConnection,
     writing_id: i64,
     idea_id: i64,
-    purpose: writing_idea_links::WritingPurpose,
+    purpose: Option<String>,
 ) -> Result<(), DbErr> {
     let _ = writing_idea_links::ActiveModel {
         writing_id: Set(writing_id),
         idea_id: Set(idea_id),
         purpose: Set(purpose),
-        notes: Set(None),
         link_order: Set(0),
         created_at: Set(Utc::now()),
         ..Default::default()

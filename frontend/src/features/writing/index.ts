@@ -13,6 +13,7 @@ export * from './types';
 
 // Components
 export { WritingWorkspace } from './components/workspace/WritingWorkspace';
+export { useWritingStore } from './store';
 export { WritingLibrary } from './components/library/WritingLibrary';
 export { WritingEditor } from './components/editor/WritingEditor';
 export { WritingToolbar } from './components/editor/WritingToolbar';

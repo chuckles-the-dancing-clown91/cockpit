@@ -1,30 +1,10 @@
 //! Writing ↔ Idea Links Entity
 //!
-//! Many-to-many join table with purpose enum
+//! Many-to-many join table with purpose field
 
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
-/// Writing purpose enum - how this idea is used in the writing
-#[derive(Clone, Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
-#[sea_orm(rs_type = "String", db_type = "String(StringLen::N(32))")]
-pub enum WritingPurpose {
-    #[sea_orm(string_value = "primary")]
-    Primary,
-    #[sea_orm(string_value = "secondary")]
-    Secondary,
-    #[sea_orm(string_value = "mention")]
-    Mention,
-}
-impl std::fmt::Display for WritingPurpose {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            WritingPurpose::Primary => write!(f, "primary"),
-            WritingPurpose::Secondary => write!(f, "secondary"),
-            WritingPurpose::Mention => write!(f, "mention"),
-        }
-    }
-}
 /// Writing-Idea link model
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "writing_idea_links")]
@@ -35,8 +15,10 @@ pub struct Model {
     pub writing_id: i64,
     pub idea_id: i64,
     
-    pub purpose: WritingPurpose,
-    pub notes: Option<String>,
+    #[sea_orm(column_name = "purpose")]
+    pub purpose: Option<String>,
+    
+    #[sea_orm(column_name = "sort_order")]
     pub link_order: i32,
     
     pub created_at: DateTimeUtc,
