@@ -1474,3 +1474,30 @@ system/components/scheduler/
 ---
 
 **Archive Last Updated**: December 12, 2025
+
+## 🎉 Sprint 8: Notes Feature + Embedded Webview (Dec 18, 2025)
+
+**Status**: COMPLETE ✅  
+**Goal**: Polymorphic notes with TipTap rich text editing and native webview for reference capture.
+
+### Backend
+- Migration 007: Unique index on (entity_type, entity_id, note_type)
+- Notes module: `backend/src/notes/` with HTML-native `body_html`
+- Commands: `notes_get_or_create`, `notes_upsert`, `notes_append_snippet`
+- HTML escaping + divider pattern for safe snippet injection
+
+### Frontend
+- Feature: `frontend/src/features/notes/` (API wrappers, hooks, TipTap NotesEditor, EntityNotesPanel, NoteHoverPreview, ReferenceNotesDialog)
+- TipTap extensions: StarterKit, Link, Placeholder
+- Toolbar: Bold, Italic, Strikethrough, Bullet/Numbered lists, Links, Undo/Redo
+- Notes integrated into ideas/references; hover previews and full-screen dialog
+
+### Embedded Webview
+- Native Tauri child webview with selection bridge, navigation controls, and clipboard fallback
+- ResizeObserver keeps alignment; proper cleanup on close
+- Right sidebar shows EntityNotesPanel; "Add selection to notes" appends with divider
+
+### Architecture
+- Notes are feature-level (not domain-specific), polymorphic across ideas/references/writings
+- 1:1 note per entity per type enforced via DB unique index
+- HTML-native storage for direct TipTap compatibility

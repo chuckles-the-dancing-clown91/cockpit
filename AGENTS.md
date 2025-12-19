@@ -66,6 +66,13 @@ If something is reusable across screens, it belongs in `features/` or `component
 - Dialogs/Overlays: Radix Dialog. Keep focus + scroll lock correct.
 - Toolbar: Radix Toolbar; include headings (H1/H2/H3), word count, version selector.
 
+## Research connectors (ingest + publish)
+- External platform access **only in backend adapters** (no frontend HTTP).
+- Normalize to a single DTO (`ResearchItemDto`) and store in unified table (source_type + external_id unique).
+- Commands: `research_*` accept camelCase `input` DTOs; wrap via `core/api/tauri.ts`.
+- Per-connector capabilities are explicit: support toggles for ingest (read) and publish (write); do not expose UI actions the connector blocks.
+- Publishing uses the same adapter layer; record outbound publish metadata for writings.
+
 ## Writing system content
 - Editor content is **TipTap JSON** (stored as JSON string)
 - Writing metadata: title, subtitle, tags, type (article/book/etc), active_version_id
