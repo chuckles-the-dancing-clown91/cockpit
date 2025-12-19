@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Feed Sources entity model
 //!
 //! Represents feed source plugins (NewsData.io, Reddit, RSS, etc.)

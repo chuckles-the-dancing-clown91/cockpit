@@ -5,8 +5,8 @@
 import { useState } from 'react';
 import { Card, Flex, Text, Button, Select } from '@radix-ui/themes';
 import { Plus, FileText } from 'lucide-react';
-import { useWritingList, useCreateWriting } from '../hooks/useWriting';
-import type { WritingType, WritingStatus } from '@/shared/types';
+import { useWritingList, useCreateWriting } from '../../hooks/useWriting';
+import type { WritingType, WritingStatus } from '../../types';
 
 interface WritingLibraryProps {
   onOpenWriting: (id: number) => void;

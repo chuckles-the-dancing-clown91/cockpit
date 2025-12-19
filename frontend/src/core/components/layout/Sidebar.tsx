@@ -1,6 +1,6 @@
 import { Flex, Box, IconButton, Text, Separator } from '@radix-ui/themes';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, FileEdit, Lightbulb, Archive, Rss, Globe, Newspaper, Settings, Database, FileText, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Library, BookOpen, FileEdit, Lightbulb, Archive, Rss, Globe, Newspaper, Settings, Database, FileText, Calendar } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface SidebarProps {
@@ -28,7 +28,8 @@ export function Sidebar({ domain }: SidebarProps) {
 
   const menuItems = {
     writing: [
-      { path: '/writing/editor', icon: FileEdit, label: 'Editor' },
+      { path: '/writing/library', icon: Library, label: 'Library' },
+      { path: '/writing/editor', icon: BookOpen, label: 'Editor' },
       { path: '/writing/ideas', icon: Lightbulb, label: 'Ideas' },
       { path: '/writing/archive', icon: Archive, label: 'Archive' },
     ],

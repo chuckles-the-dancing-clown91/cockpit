@@ -5,7 +5,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './core/providers/ThemeProvider';
 import { AppShell } from './core/components/layout/AppShell';
 import { WritingView } from './domains/writing/WritingView';
+import { LibraryView } from './domains/writing/LibraryView';
+import { EditorView } from './domains/writing/EditorView';
 import { IdeasView } from './domains/writing/IdeasView';
+import { ArchiveView } from './domains/writing/ArchiveView';
 import { ResearchView } from './domains/research/ResearchView';
 import { SystemView } from './domains/system/SystemView';
 import { Settings } from './domains/system/Settings';
@@ -53,10 +56,11 @@ createRoot(document.getElementById('root')!).render(
 
             {/* Writing Domain */}
             <Route path="writing" element={<WritingView />}>
-              <Route index element={<Navigate to="/writing/ideas" replace />} />
-              <Route path="editor" element={<ComingSoonPage title="Editor" description="Write and edit your articles" />} />
+              <Route index element={<Navigate to="/writing/library" replace />} />
+              <Route path="library" element={<LibraryView />} />
+              <Route path="editor" element={<EditorView />} />
               <Route path="ideas" element={<IdeasView />} />
-              <Route path="archive" element={<ComingSoonPage title="Archive" description="View archived ideas" />} />
+              <Route path="archive" element={<ArchiveView />} />
             </Route>
 
             {/* Research Domain */}

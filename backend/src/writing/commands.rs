@@ -468,7 +468,7 @@ pub async fn kg_delete_note(
 
 use crate::writing::dto::{
     WritingDraftDto, CreateWritingDraftInput, SaveDraftInput, UpdateWritingDraftMetaInput,
-    PublishWritingInput, LinkIdeaInput, ListWritingsQuery,
+    PublishWritingInput, LinkIdeaInput, ListWritingsQuery, GetWritingInput, ListLinkedIdeasInput,
 };
 use crate::writing::service;
 
@@ -535,10 +535,10 @@ pub async fn writing_create(
 /// Get writing by ID
 #[tauri::command]
 pub async fn writing_get(
-    writing_id: i64,
+    input: GetWritingInput,
     state: State<'_, AppState>,
 ) -> Result<WritingDraftDto, String> {
-    let w = service::get_writing(&state.db, writing_id)
+    let w = service::get_writing(&state.db, input.writing_id)
         .await
         .map_err(|e| e.to_string())?;
     Ok(writing_draft_to_dto(w))
@@ -547,12 +547,12 @@ pub async fn writing_get(
 /// List writings with filters
 #[tauri::command]
 pub async fn writing_list(
-    query: ListWritingsQuery,
+    input: ListWritingsQuery,
     state: State<'_, AppState>,
 ) -> Result<Vec<WritingDraftDto>, String> {
     use crate::writing::components::knowledge_graph::entities::writings::{WritingType, WritingStatus};
     
-    let status = query.status.and_then(|s| match s.as_str() {
+    let status = input.status.and_then(|s| match s.as_str() {
         "draft" => Some(WritingStatus::Draft),
         "in_progress" => Some(WritingStatus::InProgress),
         "review" => Some(WritingStatus::Review),
@@ -561,7 +561,7 @@ pub async fn writing_list(
         _ => None,
     });
     
-    let writing_type = query.writing_type.and_then(|t| match t.as_str() {
+    let writing_type = input.writing_type.and_then(|t| match t.as_str() {
         "article" => Some(WritingType::Article),
         "chapter" => Some(WritingType::Chapter),
         "book" => Some(WritingType::Book),
@@ -572,9 +572,9 @@ pub async fn writing_list(
         &state.db,
         status,
         writing_type,
-        query.series_name,
-        query.is_pinned,
-        query.is_featured,
+        input.series_name,
+        input.is_pinned,
+        input.is_featured,
     )
     .await
     .map_err(|e| e.to_string())?;
@@ -677,10 +677,10 @@ pub async fn writing_unlink_idea(
 /// List ideas linked to a writing
 #[tauri::command]
 pub async fn writing_list_linked_ideas(
-    writing_id: i64,
+    input: ListLinkedIdeasInput,
     state: State<'_, AppState>,
 ) -> Result<Vec<i64>, String> {
-    let links = service::list_linked_ideas(&state.db, writing_id)
+    let links = service::list_linked_ideas(&state.db, input.writing_id)
         .await
         .map_err(|e| e.to_string())?;
     Ok(links.into_iter().map(|link| link.idea_id).collect())

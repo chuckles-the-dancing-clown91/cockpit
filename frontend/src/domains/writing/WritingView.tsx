@@ -1,5 +1,5 @@
-import { Flex, Box } from '@radix-ui/themes';
 import { Outlet } from 'react-router-dom';
+import { Flex, Box } from '@radix-ui/themes';
 import { Sidebar } from '@/core/components/layout/Sidebar';
 
 export function WritingView() {
@@ -9,7 +9,7 @@ export function WritingView() {
       <Sidebar domain="writing" />
 
       {/* Main Content */}
-      <Box style={{ flex: 1, overflow: 'auto', padding: 'var(--space-6)' }}>
+      <Box style={{ flex: 1, overflow: 'hidden' }}>
         <Outlet />
       </Box>
     </Flex>

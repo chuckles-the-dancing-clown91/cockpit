@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 //! Knowledge Graph Entities Module
 //!
 //! SeaORM entities for the writing knowledge graph:

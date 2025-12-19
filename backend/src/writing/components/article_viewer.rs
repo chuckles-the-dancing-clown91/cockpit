@@ -1,4 +1,4 @@
-use crate::core::components::errors::{AppError, AppResult};
+use crate::core::components::errors::AppError;
 use crate::AppState;
 use sea_orm::*;
 use tauri::{AppHandle, Emitter, WebviewUrl, WebviewWindowBuilder};
@@ -203,7 +203,7 @@ pub async fn add_highlight(
     idea_id: i64,
     text: String,
 ) -> Result<(), AppError> {
-    use super::ideas::types::{Entity as Ideas, Model as Idea};
+    use super::ideas::types::Entity as Ideas;
 
     info!("Adding highlight to idea {}: {} chars", idea_id, text.len());
 

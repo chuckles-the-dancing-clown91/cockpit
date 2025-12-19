@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Notes Entity
 //!
 //! Polymorphic notes attached to ideas, references, or writings

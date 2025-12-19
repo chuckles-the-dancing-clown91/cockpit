@@ -268,14 +268,25 @@ Current sprint work in progress. For completed work see [DONE.md](./docs/DONE.md
 2. Sets status='published', published_at=NOW()
 3. Updates UI optimistically
 
-### ⏳ Next Steps: Integration Work
+### ✅ Integration Work Complete (December 18, 2025)
 
-- [ ] Add WritingLibrary to domains/writing/WritingView.tsx tabs
-- [ ] Integrate WritingWorkspace into routing system
-- [ ] Implement ideas/references left sidebar in WritingWorkspace
-- [ ] Add "Create article from idea" button in IdeasLibraryView
-- [ ] Version management implementation (DTOs ready, commands not created yet)
-- [ ] Install TipTap npm packages if not already present
+- [x] Add WritingLibrary to domains/writing/WritingView.tsx tabs ✅
+- [x] Integrate WritingWorkspace into routing system ✅
+- [x] Implement ideas/references left sidebar in WritingWorkspace ✅
+- [x] Add "Create article from idea" button in IdeaDetailDialog ✅
+- [x] TipTap npm packages confirmed installed ✅
+- [ ] Version management implementation (DTOs ready, commands not created yet) - Deferred to Phase 2
+
+**Implementation Details**:
+- WritingView now has 3 tabs: Library, Editor, Ideas
+- WritingLibrary lists all writings with filters
+- WritingWorkspace opens when selecting from library
+- LinkedIdeasPanel shows linked ideas in left sidebar
+- IdeaDetailDialog has "Create Article" button that:
+  - Creates writing with title and summary from idea
+  - Links the idea to the new writing
+  - Initializes TipTap JSON with H1 heading
+- Clicking ideas in sidebar shows idea details (TODO: open detail dialog)
 
 ### Phase 2 (Deferred)
 - `writing_parent_links` - Book → Chapters structure
@@ -314,7 +325,7 @@ import { queryKeys } from '@/shared/queryKeys';
 ### Component Patterns
 - **State Components**: `LoadingState`, `ErrorState`, `EmptyState` from `@/core/components/ui`
 - **Dialogs**: Always use Radix Dialog primitives with `useDialog()` for confirmations
-- **Forms**: Radix UI primitives (TextField, Select, Switch, TextArea, Button)
+- **Forms**: Radix Form primitives (`@radix-ui/react-form`) with Radix Themes components (TextField, Select, Switch, TextArea, Button)
 - **Styling**: CSS custom properties (`var(--color-surface)`, `var(--color-text-primary)`)
 
 ### TanStack Query

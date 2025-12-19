@@ -7,10 +7,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Text, Flex } from '@radix-ui/themes';
 import type { Editor } from '@tiptap/react';
-import { WritingEditor } from './WritingEditor';
-import { WritingToolbar } from './WritingToolbar';
-import { WritingMetaPanel } from './WritingMetaPanel';
-import { useWriting, useSaveDraft } from '../hooks/useWriting';
+import { WritingEditor } from '../editor/WritingEditor';
+import { WritingToolbar } from '../editor/WritingToolbar';
+import { WritingMetaPanel } from '../meta/WritingMetaPanel';
+import { LinkedIdeasPanel } from '../ideas/LinkedIdeasPanel';
+import { useWriting, useSaveDraft } from '../../hooks/useWriting';
 
 interface WritingWorkspaceProps {
   writingId: number;
@@ -127,12 +128,7 @@ export function WritingWorkspace({ writingId }: WritingWorkspaceProps) {
           border: '1px solid var(--color-border)',
         }}
       >
-        <Flex direction="column" gap="3" style={{ padding: 12 }}>
-          <Text size="3" weight="bold">Attached Ideas</Text>
-          <Text size="2" style={{ color: 'var(--color-text-soft)' }}>
-            Coming soon: Linked ideas and references will appear here.
-          </Text>
-        </Flex>
+        <LinkedIdeasPanel writingId={writingId} />
       </div>
 
       {/* CENTER: Editor */}

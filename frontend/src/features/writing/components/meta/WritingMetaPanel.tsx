@@ -4,8 +4,8 @@
 
 import { Card, Flex, Text, TextField, Select, Button } from '@radix-ui/themes';
 import { useEffect, useState } from 'react';
-import type { Writing, WritingType, WritingStatus } from '@/shared/types';
-import { useUpdateWritingMeta, usePublishWriting } from '../hooks/useWriting';
+import type { Writing, WritingType, WritingStatus } from '../../types';
+import { useUpdateWritingMeta, usePublishWriting } from '../../hooks/useWriting';
 
 interface WritingMetaPanelProps {
   writing: Writing;
@@ -65,35 +65,29 @@ export function WritingMetaPanel({ writing }: WritingMetaPanelProps) {
 
           <div>
             <Text size="2" style={{ color: 'var(--color-text-soft)' }}>Title</Text>
-            <TextField.Root>
-              <TextField.Input
-                value={title}
-                onChange={(e) => { setTitle(e.target.value); setDirty(true); }}
-                placeholder="Title…"
-              />
-            </TextField.Root>
+            <TextField.Root
+              value={title}
+              onChange={(e) => { setTitle(e.target.value); setDirty(true); }}
+              placeholder="Title…"
+            />
           </div>
 
           <div>
             <Text size="2" style={{ color: 'var(--color-text-soft)' }}>Slug (URL)</Text>
-            <TextField.Root>
-              <TextField.Input
-                value={slug}
-                onChange={(e) => { setSlug(e.target.value); setDirty(true); }}
-                placeholder="my-article-slug"
-              />
-            </TextField.Root>
+            <TextField.Root
+              value={slug}
+              onChange={(e) => { setSlug(e.target.value); setDirty(true); }}
+              placeholder="my-article-slug"
+            />
           </div>
 
           <div>
             <Text size="2" style={{ color: 'var(--color-text-soft)' }}>Excerpt</Text>
-            <TextField.Root>
-              <TextField.Input
-                value={excerpt}
-                onChange={(e) => { setExcerpt(e.target.value); setDirty(true); }}
-                placeholder="Short description…"
-              />
-            </TextField.Root>
+            <TextField.Root
+              value={excerpt}
+              onChange={(e) => { setExcerpt(e.target.value); setDirty(true); }}
+              placeholder="Short description…"
+            />
           </div>
 
           <Flex gap="2">
@@ -146,36 +140,30 @@ export function WritingMetaPanel({ writing }: WritingMetaPanelProps) {
 
           <div>
             <Text size="2" style={{ color: 'var(--color-text-soft)' }}>Tags (comma-separated)</Text>
-            <TextField.Root>
-              <TextField.Input
-                value={tags}
-                onChange={(e) => { setTags(e.target.value); setDirty(true); }}
-                placeholder="war, journalism, analysis"
-              />
-            </TextField.Root>
+            <TextField.Root
+              value={tags}
+              onChange={(e) => { setTags(e.target.value); setDirty(true); }}
+              placeholder="war, journalism, analysis"
+            />
           </div>
 
           <div>
             <Text size="2" style={{ color: 'var(--color-text-soft)' }}>Series name</Text>
-            <TextField.Root>
-              <TextField.Input
-                value={seriesName}
-                onChange={(e) => { setSeriesName(e.target.value); setDirty(true); }}
-                placeholder="My Book Series"
-              />
-            </TextField.Root>
+            <TextField.Root
+              value={seriesName}
+              onChange={(e) => { setSeriesName(e.target.value); setDirty(true); }}
+              placeholder="My Book Series"
+            />
           </div>
 
           <div>
             <Text size="2" style={{ color: 'var(--color-text-soft)' }}>Part number</Text>
-            <TextField.Root>
-              <TextField.Input
-                type="number"
-                value={seriesPart}
-                onChange={(e) => { setSeriesPart(e.target.value); setDirty(true); }}
-                placeholder="1"
-              />
-            </TextField.Root>
+            <TextField.Root
+              type="number"
+              value={seriesPart}
+              onChange={(e) => { setSeriesPart(e.target.value); setDirty(true); }}
+              placeholder="1"
+            />
           </div>
         </Flex>
       </Card>

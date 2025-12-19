@@ -13,7 +13,7 @@ use tracing::{error, info, warn};
 async fn ensure_feed_source_tasks(db: &sea_orm::DatabaseConnection) -> Result<(), String> {
     use crate::research::components::feed::entities::feed_sources::{Entity as FeedSourceEntity, Column as FeedSourceColumn};
     use sea_orm::{EntityTrait, QueryFilter, ColumnTrait};
-    use super::entities::{Entity as TaskEntity, Column as TaskColumn, ActiveModel as TaskActiveModel};
+use super::entities::{Entity as TaskEntity, ActiveModel as TaskActiveModel};
     use sea_orm::{Set, ActiveModelTrait};
     
     // Get all enabled feed sources

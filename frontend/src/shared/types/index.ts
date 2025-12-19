@@ -295,6 +295,25 @@ export interface UpdateWritingMetaInput {
   isFeatured?: boolean;
 }
 
+export interface GetWritingInput {
+  writingId: number;
+}
+
+export interface ListLinkedIdeasInput {
+  writingId: number;
+}
+
+export interface ListWritingsInput {
+  status?: WritingStatus;
+  writingType?: WritingType;
+  search?: string;
+  archived?: boolean;
+  sort?: string;
+  seriesName?: string;
+  isPinned?: boolean;
+  isFeatured?: boolean;
+}
+
 export interface PublishWritingInput {
   writingId: number;
 }

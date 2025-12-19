@@ -38,6 +38,7 @@ pub struct WritingDraftDto {
 
 /// Writing version DTO (for migration 007 when versioning is added)
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 pub struct WritingVersionDto {
     pub id: i64,
@@ -118,6 +119,18 @@ pub struct ListWritingsQuery {
     pub is_featured: Option<bool>,
     pub page: Option<u64>,
     pub per_page: Option<u64>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetWritingInput {
+    pub writing_id: i64,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListLinkedIdeasInput {
+    pub writing_id: i64,
 }
 
 // Future: Version management DTOs for migration 007

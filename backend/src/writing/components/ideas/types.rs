@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Type definitions for ideas management
 //!
 //! Defines the database model, enums, DTOs, and utility functions

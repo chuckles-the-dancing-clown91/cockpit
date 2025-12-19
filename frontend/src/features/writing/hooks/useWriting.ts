@@ -14,7 +14,10 @@ import type {
   LinkIdeaToWritingInput,
   WritingType,
   WritingStatus,
-} from '@/shared/types';
+  GetWritingInput,
+  ListLinkedIdeasInput,
+  ListWritingsInput,
+} from '../types';
 import * as api from '../api/writing';
 
 // Query keys factory
@@ -30,13 +33,7 @@ export const writingKeys = {
 /**
  * List all writings
  */
-export function useWritingList(filters?: {
-  status?: WritingStatus;
-  writingType?: WritingType;
-  seriesName?: string;
-  isPinned?: boolean;
-  isFeatured?: boolean;
-}) {
+export function useWritingList(filters: ListWritingsInput = {}) {
   return useQuery({
     queryKey: writingKeys.list(filters || {}),
     queryFn: () => api.writingList(filters),
@@ -50,7 +47,7 @@ export function useWritingList(filters?: {
 export function useWriting(writingId: number | null) {
   return useQuery({
     queryKey: writingId ? writingKeys.detail(writingId) : ['writings', 'detail', 'null'],
-    queryFn: () => api.writingGet(writingId!),
+    queryFn: () => api.writingGet({ writingId: writingId! } satisfies GetWritingInput),
     enabled: writingId !== null,
     staleTime: 10_000, // 10 seconds
   });
@@ -181,7 +178,7 @@ export function useUnlinkIdea(writingId: number) {
 export function useLinkedIdeas(writingId: number) {
   return useQuery({
     queryKey: writingKeys.linkedIdeas(writingId),
-    queryFn: () => api.writingListLinkedIdeas(writingId),
+    queryFn: () => api.writingListLinkedIdeas({ writingId } satisfies ListLinkedIdeasInput),
     staleTime: 30_000,
   });
 }

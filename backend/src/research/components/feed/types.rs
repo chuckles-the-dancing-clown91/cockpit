@@ -3,7 +3,7 @@
 //! Contains DTOs, API response structures, and utility functions
 //! used across settings, articles, sources, and sync modules.
 
-use super::entities::feed_sources::{SourceConfig, SourceType};
+use super::entities::feed_sources::SourceConfig;
 
 /// Feed source data transfer object
 #[derive(serde::Serialize, serde::Deserialize)]

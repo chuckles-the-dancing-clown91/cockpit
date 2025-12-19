@@ -1,16 +1,19 @@
 import { Dialog, Tabs, Flex, Text, Button, Badge, Select, TextField, TextArea } from '@radix-ui/themes';
-import { X, Save } from 'lucide-react';
+import { X, Save, BookOpen } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import type { Idea, IdeaStatus, IdeaPriority } from '@/shared/types';
 import { IDEA_STATUSES, IDEA_PRIORITIES } from '@/shared/constants';
 import { useUpdateIdea } from '../hooks/useIdeas';
 import { ReferencesPanel } from '@/features/references/components/ReferencesPanel';
 import { EntityNotesPanel } from '@/features/notes';
+import { useCreateWriting } from '@/features/writing/hooks/useWriting';
+import { toast } from '@/core/lib/toast';
 
 interface IdeaDetailDialogProps {
   idea: Idea | null;
   open: boolean;
   onClose: () => void;
+  onOpenWriting?: (writingId: number) => void;
 }
 
 const STATUS_COLORS = {
@@ -25,7 +28,7 @@ const PRIORITY_COLORS = {
   high: 'red',
 } as const;
 
-export function IdeaDetailDialog({ idea, open, onClose }: IdeaDetailDialogProps) {
+export function IdeaDetailDialog({ idea, open, onClose, onOpenWriting }: IdeaDetailDialogProps) {
   const [activeTab, setActiveTab] = useState('details');
   const [title, setTitle] = useState('');
   const [summary, setSummary] = useState('');
@@ -33,6 +36,7 @@ export function IdeaDetailDialog({ idea, open, onClose }: IdeaDetailDialogProps)
   const [priority, setPriority] = useState<IdeaPriority>('medium');
   const [target, setTarget] = useState('');
   const updateIdea = useUpdateIdea();
+  const createWriting = useCreateWriting();
   
   useEffect(() => {
     if (idea) {
@@ -63,6 +67,42 @@ export function IdeaDetailDialog({ idea, open, onClose }: IdeaDetailDialogProps)
     status !== idea.status ||
     priority !== idea.priority ||
     target !== (idea.target || '');
+  const handleCreateArticle = async () => {
+    try {
+      const writing = await createWriting.mutateAsync({
+        title: idea.title,
+        writingType: 'article',
+        linkIdeaIds: [idea.id],
+        initialContentJson: {
+          type: 'doc',
+          content: [
+            {
+              type: 'heading',
+              attrs: { level: 1 },
+              content: [{ type: 'text', text: idea.title }],
+            },
+            {
+              type: 'paragraph',
+              content: idea.summary 
+                ? [{ type: 'text', text: idea.summary }]
+                : undefined,
+            },
+            { type: 'paragraph' },
+          ],
+        },
+      });
+      
+      toast.success('Article created from idea');
+      onClose();
+      
+      if (onOpenWriting) {
+        onOpenWriting(writing.id);
+      }
+    } catch (error) {
+      toast.error('Failed to create article');
+      console.error('Error creating article:', error);
+    }
+  };
   
   return (
     <Dialog.Root open={open} onOpenChange={onClose}>
@@ -72,9 +112,20 @@ export function IdeaDetailDialog({ idea, open, onClose }: IdeaDetailDialogProps)
             <Dialog.Title>
               <Text size="5" weight="bold">{idea.title}</Text>
             </Dialog.Title>
-            <Dialog.Close>
-              <Button variant="ghost" size="2"><X className="w-5 h-5" /></Button>
-            </Dialog.Close>
+            <Flex gap="2">
+              <Button 
+                variant="soft" 
+                size="2"
+                onClick={handleCreateArticle}
+                disabled={createWriting.isPending}
+              >
+                <BookOpen className="w-4 h-4" />
+                {createWriting.isPending ? 'Creating...' : 'Create Article'}
+              </Button>
+              <Dialog.Close>
+                <Button variant="ghost" size="2"><X className="w-5 h-5" /></Button>
+              </Dialog.Close>
+            </Flex>
           </Flex>
           <Dialog.Description>Edit idea details, notes, and references</Dialog.Description>
           <Flex gap="2" align="center">

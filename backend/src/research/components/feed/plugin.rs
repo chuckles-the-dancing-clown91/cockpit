@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Feed Source Plugin System
 //!
 //! Defines the trait interface that all feed source plugins must implement.

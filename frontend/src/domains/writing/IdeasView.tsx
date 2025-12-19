@@ -260,6 +260,12 @@ export function IdeasView() {
         idea={selectedIdea}
         open={!!selectedIdea}
         onClose={() => setSelectedIdea(null)}
+        onOpenWriting={(writingId) => {
+          // TODO: Navigate to writing editor
+          // For now, show success toast
+          toast.success(`Article created! Writing ID: ${writingId}`);
+          console.log('Navigate to writing:', writingId);
+        }}
       />
       
       {/* New Idea Dialog */}

@@ -9,7 +9,7 @@ use crate::research::components::feed::entities::feed_sources::{
     self, ActiveModel as ActiveFeedSource, Entity as FeedSourceEntity,
 };
 use crate::research::components::feed::entities::articles::{
-    self as news_articles, ActiveModel as ActiveNewsArticle, Entity as NewsArticleEntity, Column as NewsArticleColumn,
+    ActiveModel as ActiveNewsArticle, Entity as NewsArticleEntity, Column as NewsArticleColumn,
 };
 use crate::research::components::feed::plugin::FeedSource;
 use crate::research::components::feed::plugins::NewsDataPlugin;
@@ -23,7 +23,7 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, IntoActiveModel, QueryFilter,
     QueryOrder, Set,
 };
-use tracing::{info, instrument, warn};
+use tracing::{info, instrument};
 
 /// List all feed sources with metadata
 #[instrument(skip(db))]

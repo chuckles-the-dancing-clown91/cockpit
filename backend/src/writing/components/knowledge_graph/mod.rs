@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 //! Knowledge Graph Module
 //!
 //! Comprehensive writing workflow support:
