@@ -24,6 +24,24 @@ Keep this lean.
 - Scheduler: only sync when enabled and ReadStream allowed; per-stream schedules
 - Frontend (`features/research/`): accounts/streams UI with ingest/publish toggles + capability checkboxes, sync/test actions; stream list with provider/date/tag/status/search filters; item detail actions (Convert to Reference, Attach to Idea, Append to Notes); hide publish if not allowed
 - Audit: record upstream publish actions linked to writing_id
+- Structure:
+  - Backend: `backend/src/connectors/*` (per-provider) + guards in `research` commands; DTOs in `backend/src/research/dto.rs`
+  - Frontend: `frontend/src/features/research/{api,hooks,components}`; domains compose only
+  - Guard example:
+    ```rust
+    fn require_cap(source: &ResearchAccount, cap: ResearchCapability) -> AppResult<()> {
+        if !source.enabled { bail!("Source disabled"); }
+        if !source.allowed_caps.contains(&cap) { bail!("Capability not allowed"); }
+        Ok(())
+    }
+    ```
+  - Commands shape (camelCase input):
+    `invoke("research_sync_stream_now", { input: { streamId } })`
+    `invoke("research_publish", { input: { accountId, payload } })`
+- Immediate fixups (backend scaffolding):
+  - Convert remaining `Utc::now()` uses to `naive_utc()` in research commands (updated_at/created_at)
+  - Fix NewsData connector partial move: clone fields before `json!(art)`
+  - Remove unused imports (ensure_capability, QuerySelect) once guards wired
 
 ### Immediate steps (research/up/downstream)
 - Finalize Capability enum + adapter trait signature (supported_capabilities, validate_config)

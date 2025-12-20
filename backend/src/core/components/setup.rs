@@ -187,6 +187,8 @@ pub fn get_cockpit_home() -> Result<PathBuf, AppError> {
 }
 
 /// Checks if the app is running in development mode
+// TODO: remove allow(dead_code) once storage is resolved for prod/dev split
+#[allow(dead_code)]
 pub fn is_dev_mode() -> bool {
     // Check if we're running from a development directory structure
     // In dev: binary is in target/debug or target/release within project
@@ -204,6 +206,8 @@ pub fn is_dev_mode() -> bool {
 }
 
 /// Gets the appropriate storage root path (dev vs prod)
+// TODO: remove allow(dead_code) once storage is resolved for prod/dev split
+#[allow(dead_code)]
 pub fn get_storage_root() -> Result<PathBuf, AppError> {
     if is_dev_mode() {
         // Development mode: use project directory

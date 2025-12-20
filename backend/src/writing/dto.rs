@@ -111,6 +111,8 @@ pub struct LinkIdeaInput {
 /// Query filters for listing writings
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+// TODO: remove allow(dead_code) once pagination is implemented for listings
+#[allow(dead_code)]
 pub struct ListWritingsQuery {
     pub status: Option<String>,
     pub writing_type: Option<String>,

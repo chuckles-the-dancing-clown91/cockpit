@@ -16,6 +16,15 @@ Goal: Single ingestion layer with adapter trait; commands accept camelCase `inpu
 - Commands: accounts (`research_list_accounts`, `research_upsert_account`, `research_delete_account`, `research_test_account`, `research_update_permissions`); streams (`research_list_streams`, `research_upsert_stream`, `research_delete_stream`, `research_sync_stream_now`); items (`research_list_items`, `research_set_item_status`); publish (`research_publish`) gated by capabilities.
 - Capabilities: adapter advertises supported_capabilities; per-account allowed_caps_json enforced server-side for ingest/publish; scheduler only runs when enabled and ReadStream is allowed.
 - Frontend: Accounts/streams UI with ingest/publish toggles + capability checkboxes; sync/test actions; stream list with provider/date/tag/status/search filters; item detail actions (Convert to Reference, Attach to Idea, Append to Notes); publish actions hidden when not allowed.
+- Structure: Backend `connectors/` per-provider + guards in `research` commands; DTOs in `backend/src/research/dto.rs`; Frontend feature in `frontend/src/features/research`.
+- Guard pattern:
+  ```rust
+  fn require_cap(source: &ResearchAccount, cap: ResearchCapability) -> AppResult<()> {
+      if !source.enabled { bail!("Source disabled"); }
+      if !source.allowed_caps.contains(&cap) { bail!("Capability not allowed"); }
+      Ok(())
+  }
+  ```
 
 ### Backend Modernization (remaining)
 - Apply sea-orm 1.1 patterns where missing.

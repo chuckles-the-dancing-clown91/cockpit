@@ -116,6 +116,111 @@ export type ThemeMode = "dark" | "light" | "cyberpunk";
 
 export type NotesAppendMode = "append_with_divider" | "append_plain" | "replace";
 
+// ========== Research / Connectors ==========
+
+export type ResearchCapability =
+  | "readStream"
+  | "search"
+  | "publishPost"
+  | "publishReply"
+  | "reactVote";
+
+export interface ResearchAccount {
+  id: number;
+  provider: string;
+  displayName: string;
+  enabled: boolean;
+  allowedCaps: ResearchCapability[];
+  permissions?: unknown;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ResearchStream {
+  id: number;
+  accountId: number;
+  name: string;
+  provider: string;
+  enabled: boolean;
+  config?: unknown;
+  schedule?: unknown;
+  lastSyncAt?: string | null;
+  lastError?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ResearchItem {
+  id: number;
+  accountId?: number | null;
+  streamId?: number | null;
+  sourceType: string;
+  externalId: string;
+  url?: string | null;
+  title: string;
+  excerpt?: string | null;
+  author?: string | null;
+  publishedAt?: string | null;
+  status: string;
+  tags?: unknown;
+  payload?: unknown;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateResearchAccountInput {
+  provider: string;
+  displayName: string;
+  enabled?: boolean;
+  allowedCaps: ResearchCapability[];
+  permissions?: unknown;
+  auth?: unknown;
+}
+
+export interface UpdateResearchAccountInput {
+  id: number;
+  provider?: string;
+  displayName?: string;
+  enabled?: boolean;
+  allowedCaps?: ResearchCapability[];
+  permissions?: unknown;
+  auth?: unknown;
+}
+
+export interface UpsertResearchStreamInput {
+  id?: number;
+  accountId: number;
+  name: string;
+  provider: string;
+  enabled?: boolean;
+  config?: unknown;
+  schedule?: unknown;
+}
+
+export interface ListResearchItemsInput {
+  provider?: string;
+  accountId?: number;
+  streamId?: number;
+  status?: string;
+  search?: string;
+  tags?: string[];
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  offset?: number;
+}
+
+// News sources (NewsData.io) for domain selection
+export interface NewsSource {
+  id: number;
+  sourceId: string;
+  name: string;
+  url?: string | null;
+  category: string[];
+  language?: string | null;
+  country?: string | null;
+}
+
 /**
  * Where should "Copy to Notes" go?
  * Your desired path: notes > references > idea

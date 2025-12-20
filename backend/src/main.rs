@@ -7,6 +7,7 @@ mod research;
 mod system;
 mod writing;
 mod util;
+mod connectors;
 
 use sea_orm::DatabaseConnection;
 use std::collections::HashSet;
@@ -49,6 +50,9 @@ use research::commands::{
     list_feed_sources, get_feed_source, create_feed_source, update_feed_source,
     delete_feed_source, toggle_feed_source, test_feed_source_connection,
     sync_feed_source_now, sync_all_feed_sources,
+    research_list_accounts, research_upsert_account, research_update_account, research_delete_account, research_test_account,
+    research_list_streams, research_upsert_stream, research_delete_stream, research_sync_stream_now,
+    research_list_items, research_set_item_status, research_convert_to_reference, research_publish,
 };
 use system::commands::{get_task_history, list_system_tasks, run_system_task_now, update_system_task};
 use util::commands::{
@@ -212,6 +216,19 @@ fn main() {
             test_feed_source_connection,
             sync_feed_source_now,
             sync_all_feed_sources,
+            research_list_accounts,
+            research_upsert_account,
+            research_update_account,
+            research_delete_account,
+            research_test_account,
+            research_list_streams,
+            research_upsert_stream,
+            research_delete_stream,
+            research_sync_stream_now,
+            research_list_items,
+            research_set_item_status,
+            research_convert_to_reference,
+            research_publish,
             list_ideas,
             get_idea,
             create_idea,

@@ -124,6 +124,7 @@ pub struct NewsSettingsDto {
 
 /// Input for saving news settings
 #[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SaveNewsSettingsInput {
     pub api_key: Option<String>,
     pub language: Option<String>,

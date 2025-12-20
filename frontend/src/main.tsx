@@ -10,6 +10,7 @@ import { EditorView } from './domains/writing/EditorView';
 import { IdeasView } from './domains/writing/IdeasView';
 import { ArchiveView } from './domains/writing/ArchiveView';
 import { ResearchView } from './domains/research/ResearchView';
+import { StreamView } from './domains/research/StreamView';
 import { SystemView } from './domains/system/SystemView';
 import { Settings } from './domains/system/Settings';
 import { Storage } from './domains/system/Storage';
@@ -66,9 +67,9 @@ createRoot(document.getElementById('root')!).render(
             {/* Research Domain */}
             <Route path="research" element={<ResearchView />}>
               <Route index element={<Navigate to="/research/stream" replace />} />
-              <Route path="stream" element={<ComingSoonPage title="Stream" description="View all articles in your feed" />} />
-              <Route path="sources" element={<ComingSoonPage title="Feed Sources" description="Manage your news sources" />} />
-              <Route path="news" element={<ComingSoonPage title="News Feed" description="Browse latest news" />} />
+              <Route path="stream" element={<StreamView />} />
+              <Route path="sources" element={<StreamView />} />
+              <Route path="news" element={<StreamView />} />
             </Route>
 
             {/* System Domain */}

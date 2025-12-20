@@ -8,6 +8,7 @@ use super::sanitize::{sanitize_body, sanitize_url};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
+use tracing::info;
 
 /// Log an external API call with sanitization and rotation
 ///
@@ -34,6 +35,16 @@ pub fn log_api_call(
     {
         let safe_url = sanitize_url(url);
         let safe_body = sanitize_body(body_preview);
+
+        // Mirror API call logs into the main app log stream (sanitized).
+        // This ensures API activity appears in the in-app Logs UI (which skips api_calls.log).
+        info!(
+            api_name = name,
+            http_status = status.as_u16(),
+            url = %safe_url,
+            body_preview = %safe_body.chars().take(256).collect::<String>(),
+            "external_api_call"
+        );
 
         let _ = writeln!(
             f,

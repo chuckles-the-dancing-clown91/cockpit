@@ -49,7 +49,8 @@ struct NewsDataArticle {
     #[serde(default)]
     country: Option<Vec<String>>,
     #[serde(default)]
-    pubDate: Option<String>,
+    #[serde(rename = "pubDate")]
+    pub_date: Option<String>,
 }
 
 /// NewsData.io plugin configuration
@@ -381,7 +382,8 @@ impl FeedSource for NewsDataPlugin {
             
             // Convert NewsData articles to common format
             for article in data.results {
-                let published_at = article.pubDate
+                let published_at = article
+                    .pub_date
                     .and_then(|date_str| chrono::DateTime::parse_from_rfc3339(&date_str).ok())
                     .map(|dt| dt.with_timezone(&chrono::Utc));
                 

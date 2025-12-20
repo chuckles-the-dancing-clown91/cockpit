@@ -103,6 +103,26 @@ export const queryKeys = {
     backups: () => [...queryKeys.storage.all(), 'backups'] as const,
   },
 
+  research: {
+    accounts: {
+      all: () => ['research', 'accounts'] as const,
+      list: () => [...queryKeys.research.accounts.all(), 'list'] as const,
+      detail: (id: number) => [...queryKeys.research.accounts.all(), id] as const,
+    },
+    streams: {
+      all: () => ['research', 'streams'] as const,
+      list: (accountId?: number | null) =>
+        [...queryKeys.research.streams.all(), 'list', accountId ?? 'all'] as const,
+      detail: (id: number) => [...queryKeys.research.streams.all(), id] as const,
+    },
+    items: {
+      all: () => ['research', 'items'] as const,
+      list: (filters?: Record<string, unknown>) =>
+        [...queryKeys.research.items.all(), 'list', filters || {}] as const,
+      detail: (id: number) => [...queryKeys.research.items.all(), id] as const,
+    },
+  },
+
   // ========== User Domain ==========
 
   currentUser: {
@@ -133,6 +153,24 @@ export const invalidation = {
   invalidateTasks: () => ({ queryKey: queryKeys.tasks.all() }),
   invalidateTask: (id: number) => ({ queryKey: queryKeys.tasks.detail(id) }),
   invalidateStorage: () => ({ queryKey: queryKeys.storage.all() }),
+
+  // Research
+  invalidateResearchAccounts: () => ({ queryKey: queryKeys.research.accounts.list() }),
+  invalidateResearchAccount: (id: number) => ({
+    queryKey: queryKeys.research.accounts.detail(id),
+  }),
+  invalidateResearchStreams: (accountId?: number | null) => ({
+    queryKey: queryKeys.research.streams.list(accountId ?? null),
+  }),
+  invalidateResearchStream: (id: number) => ({
+    queryKey: queryKeys.research.streams.detail(id),
+  }),
+  invalidateResearchItems: (filters?: Record<string, unknown>) => ({
+    queryKey: queryKeys.research.items.list(filters || {}),
+  }),
+  invalidateResearchItem: (id: number) => ({
+    queryKey: queryKeys.research.items.detail(id),
+  }),
 
   // User
   invalidateCurrentUser: () => ({ queryKey: queryKeys.currentUser.all() }),
