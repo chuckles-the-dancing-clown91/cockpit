@@ -4,7 +4,10 @@
 //! (starring, dismissing, marking as read).
 
 use tracing::instrument;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect,
+    Set,
+};
 
 use crate::core::components::errors::{AppError, AppResult};
 use super::entities::articles::{self as news_articles, Entity as EntityNewsArticles};
@@ -78,7 +81,12 @@ pub async fn list_news_articles_handler(
     
     // Source filter
     if let Some(sid) = source_id {
-        query = query.filter(news_articles::Column::SourceId.eq(sid.to_string()));
+        let via = format!("feed_source:{sid}");
+        query = query.filter(
+            news_articles::Column::FeedSourceId
+                .eq(sid)
+                .or(news_articles::Column::AddedVia.eq(via)),
+        );
     }
     
     // Starred filter
@@ -110,35 +118,7 @@ pub async fn list_news_articles_handler(
             );
         }
     }
-    // Optimize by excluding heavy content field in list view
-    // Content can be large, only fetch when viewing individual articles
-    let mut items_query = query
-        .select_only()
-        .columns([
-            news_articles::Column::Id,
-            news_articles::Column::UserId,
-            news_articles::Column::Provider,
-            news_articles::Column::ProviderArticleId,
-            news_articles::Column::Title,
-            news_articles::Column::Excerpt,
-            news_articles::Column::Url,
-            news_articles::Column::ImageUrl,
-            news_articles::Column::SourceName,
-            news_articles::Column::SourceDomain,
-            news_articles::Column::SourceId,
-            news_articles::Column::Tags,
-            news_articles::Column::Country,
-            news_articles::Column::Language,
-            news_articles::Column::Category,
-            news_articles::Column::PublishedAt,
-            news_articles::Column::FetchedAt,
-            news_articles::Column::AddedVia,
-            news_articles::Column::IsStarred,
-            news_articles::Column::IsDismissed,
-            news_articles::Column::IsRead,
-            news_articles::Column::AddedToIdeasAt,
-            news_articles::Column::DismissedAt,
-        ]);
+    let mut items_query = query;
     
     // Sorting
     match sort_by.as_deref() {
@@ -164,7 +144,6 @@ pub async fn list_news_articles_handler(
     let items = items_query
         .limit(limit.unwrap_or(100))
         .offset(offset.unwrap_or(0))
-        .into_model::<news_articles::Model>()
         .all(&state.db)
         .await?;
     

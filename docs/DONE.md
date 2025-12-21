@@ -4,6 +4,23 @@ All completed work with completion dates and details.
 
 ---
 
+## 🎉 Sprint 8: Research Mode Restored (Dec 21, 2025)
+
+**Duration**: December 21, 2025  
+**Status**: COMPLETE ✅ - Research Sources + Stream are functional again
+
+### Summary
+- ✅ Restored Research routing: `/research/sources` + `/research/stream` (and `/research/news` as an alias)
+- ✅ Feed Sources UI: CRUD + enable/disable + schedule + “Sync now”
+- ✅ Stream UI: list articles with filters (search, starred, dismissed, per-source) and actions (star/read/dismiss)
+- ✅ Fixed “Failed to load stream / Unknown error” caused by passing `undefined` args to `list_news_articles`
+- ✅ Backend now returns per-source schedule (from linked `system_tasks`) and tags feed-synced articles with `added_via = feed_source:{id}` for filtering
+
+### Follow-ups (tracked in `TODO.md` / `docs/ROADMAP.md`)
+- Add undo for article actions (restore dismissed, mark unread)
+- Replace string-based feed source association with a real `news_articles.feed_source_id` column + migration/backfill
+- Add in-app article viewer + “Convert to Reference” workflow
+
 ## 🎉 Sprint 7: Writing System with TipTap JSON Editor (Dec 18, 2025)
 
 **Duration**: December 18, 2025  

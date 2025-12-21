@@ -27,15 +27,16 @@ Current focus areas (some are still in-progress):
 ## Repository layout
 
 ```
-proj/
+cockpit/
   frontend/   # React app
   backend/    # Tauri app (Rust)
 ```
 
 Frontend conventions:
 
-- `src/features/*` is the **source of truth** for new work.
-- `src/domains/*` is **legacy** and should not receive new code.
+- Domains compose; features implement.
+- Reusable logic/components go in `src/features/*` or `src/components/*`.
+- Screen composition + routing targets live in `src/domains/*`.
 
 Backend conventions:
 
@@ -100,8 +101,8 @@ Start here:
 
 ## Development rules (to prevent Copilot drift)
 
-- **Do not add new code under `frontend/src/domains/`**.
-- Prefer **feature modules** (`frontend/src/features/<feature>/...`).
+- Prefer **feature modules** (`frontend/src/features/<feature>/...`) for reusable logic/components.
+- Keep `frontend/src/domains/` for route composition/layout only.
 - Reuse existing components/hooks before creating new versions.
 - Any new backend capability = **1 command + 1 service function + DTOs** (keep layers clean).
 - Any schema change = **SeaORM migration** (never raw `.sql` files).

@@ -396,6 +396,7 @@ pub async fn run_news_sync_task(state: &crate::AppState) -> TaskRunResult {
                 } else {
                     let active = news_articles::ActiveModel {
                         user_id: Set(1),
+                        feed_source_id: Set(None),
                         provider: Set(provider.clone()),
                         provider_article_id: Set(art.article_id.clone()),
                         source_id: Set(art.source_id.clone()),

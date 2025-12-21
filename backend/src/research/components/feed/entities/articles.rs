@@ -31,6 +31,7 @@ pub struct Model {
     pub is_pinned: i32,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
+    pub feed_source_id: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

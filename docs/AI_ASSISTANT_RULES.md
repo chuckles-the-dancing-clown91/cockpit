@@ -10,7 +10,7 @@ This is not about style. It’s about preventing **structural drift**.
 
    - New frontend code goes in `frontend/src/features/<feature>/...`
    - New backend code goes in `backend/src/<feature>/...`
-   - `frontend/src/domains/*` exists for legacy screens. Don’t add new modules there.
+   - `frontend/src/domains/*` is for routing targets and screen composition (domains compose; features implement).
 
 2) **Reuse before build**
 
@@ -19,7 +19,7 @@ This is not about style. It’s about preventing **structural drift**.
 3) **One command, one wrapper, one hook**
 
    - Backend: add a `#[tauri::command]` function in a feature’s `commands.rs`
-   - Frontend: add a wrapper in the feature’s `api/*` (or `core/api` if truly cross-cutting)
+   - Frontend: add a typed wrapper in `frontend/src/core/api/tauri.ts`
    - Frontend: add a query/mutation hook in the feature’s `hooks/*`
 
 4) **Radix is the design system**
@@ -46,6 +46,6 @@ Tell the assistant **not** to do these:
 
 When you want work done, lead with constraints:
 
-> “Implement X as a feature-first change. Reuse existing components/hooks. Backend: add a Tauri command in `backend/src/<feature>/commands.rs`. Frontend: add a typed wrapper and a TanStack Query hook. Use Radix for UI. Don’t touch `domains/`.”
+> “Implement X as a feature-first change. Reuse existing components/hooks. Backend: add a Tauri command in `backend/src/<feature>/commands.rs`. Frontend: add a typed wrapper in `frontend/src/core/api/tauri.ts` and a TanStack Query hook. Use Radix for UI.”
 
 Then provide: the file(s) to modify, expected UI behavior, and expected command inputs/outputs.

@@ -171,7 +171,7 @@ sudo ./scripts/install/cleanup-old-installs.sh
 
 ## 🔗 Related Documentation
 
-- [BUILD_GUIDE.md](../docs/BUILD_GUIDE.md) - Detailed build instructions
-- [BUILD_PACKAGE_GUIDE.md](../docs/BUILD_PACKAGE_GUIDE.md) - Package creation guide
-- [INSTALLATION.md](../docs/INSTALLATION.md) - User installation guide
-- [ICON_TROUBLESHOOTING.md](../docs/ICON_TROUBLESHOOTING.md) - Icon issue solutions
+- [BUILD_GUIDE.md](../docs/archive/BUILD_GUIDE.md) - Detailed build instructions
+- [BUILD_PACKAGE_GUIDE.md](../docs/archive/BUILD_PACKAGE_GUIDE.md) - Package creation guide
+- [INSTALLATION.md](../docs/archive/INSTALLATION.md) - User installation guide
+- [ICON_TROUBLESHOOTING.md](../docs/archive/ICON_TROUBLESHOOTING.md) - Icon issue solutions

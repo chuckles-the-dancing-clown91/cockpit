@@ -12,3 +12,7 @@
 ## JSON strategy
 - Prefer storing structured blobs as JSON strings (TEXT) with serde serialization.
 - Use explicit DTO structs; don’t leak DB entity structs to the UI.
+
+## Research feed notes
+- Feed sources + news stream live in `backend/src/research/components/feed/`.
+- Article rows are currently associated to a feed source via `news_articles.added_via = feed_source:{id}` for filtering; prefer a real FK column in a future migration.

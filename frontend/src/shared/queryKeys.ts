@@ -51,7 +51,7 @@ export const queryKeys = {
   articles: {
     all: () => ['articles'] as const,
     lists: () => [...queryKeys.articles.all(), 'list'] as const,
-    list: (filters?: { source?: string; category?: string; read?: boolean }) =>
+    list: (filters?: Record<string, unknown>) =>
       [...queryKeys.articles.lists(), filters] as const,
     details: () => [...queryKeys.articles.all(), 'detail'] as const,
     detail: (id: number) => [...queryKeys.articles.details(), id] as const,
@@ -64,6 +64,17 @@ export const queryKeys = {
       [...queryKeys.sources.lists(), filters] as const,
     details: () => [...queryKeys.sources.all(), 'detail'] as const,
     detail: (id: number) => [...queryKeys.sources.details(), id] as const,
+  },
+
+  newsSettings: {
+    all: () => ['newsSettings'] as const,
+  },
+
+  newsSources: {
+    all: () => ['newsSources'] as const,
+    lists: () => [...queryKeys.newsSources.all(), 'list'] as const,
+    list: (filters?: { country?: string; language?: string; search?: string }) =>
+      [...queryKeys.newsSources.lists(), filters] as const,
   },
 
   feeds: {
@@ -145,6 +156,8 @@ export const invalidation = {
   invalidateArticle: (id: number) => ({ queryKey: queryKeys.articles.detail(id) }),
   invalidateSources: () => ({ queryKey: queryKeys.sources.all() }),
   invalidateSource: (id: number) => ({ queryKey: queryKeys.sources.detail(id) }),
+  invalidateNewsSettings: () => ({ queryKey: queryKeys.newsSettings.all() }),
+  invalidateNewsSources: () => ({ queryKey: queryKeys.newsSources.all() }),
   invalidateFeeds: () => ({ queryKey: queryKeys.feeds.all() }),
 
   // System

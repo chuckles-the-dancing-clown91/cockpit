@@ -14,10 +14,9 @@ If Copilot (or a human) starts rebuilding the same list/detail dialogs, query ho
 ## Repository layout
 
 ```
-proj/
+cockpit/
   frontend/        # React app (Vite)
   backend/         # Tauri app (Rust)
-    migration/     # SeaORM migrations (Rust)
   docs/            # Developer docs (this folder)
 ```
 
@@ -29,20 +28,19 @@ New work should live in `frontend/src/features/<feature>`.
 
 ```
 features/<feature>/
-  api/            # Tauri wrapper functions for this feature
   hooks/          # TanStack Query hooks (useQuery/useMutation)
-  components/     # Reusable UI for the feature
-  types.ts        # Public types for the feature
+  components/     # Reusable UI for the feature (optional)
+  types.ts        # Feature-local types (optional)
   index.ts        # Public barrel exports
 ```
 
-There is also a `frontend/src/domains/*` directory in this repo. Treat it as **legacy** (migration in progress). Don’t add new code there unless you’re explicitly moving it into `features/`.
+`frontend/src/domains/*` is used for routing targets and screen composition (domains compose; features implement).
 
 ### Data flow
 
 1. **UI components** call feature **hooks**.
-2. Hooks call feature **API wrappers**.
-3. API wrappers call `invokeTauri()` with a command name + payload.
+2. Hooks call typed **Tauri wrappers** in `frontend/src/core/api/tauri.ts`.
+3. The wrapper calls `tauriInvoke(...)` with a command name + payload.
 4. Backend command returns JSON → TanStack Query caches + normalizes.
 
 ### State boundaries

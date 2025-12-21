@@ -23,7 +23,7 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, IntoActiveModel, QueryFilter,
     QueryOrder, Set,
 };
-use tracing::{info, instrument};
+use tracing::{info, instrument, warn};
 
 /// List all feed sources with metadata
 #[instrument(skip(db))]
@@ -39,15 +39,33 @@ pub async fn list_feed_sources_handler(db: &DatabaseConnection) -> AppResult<Vec
             source: e,
         })?;
 
-    let dtos: Vec<FeedSourceDto> = sources
-        .into_iter()
-        .map(|source| {
+    let mut dtos = Vec::with_capacity(sources.len());
+    for source in sources {
+        let schedule = if let Some(task_id) = source.task_id {
+            match TaskEntity::find_by_id(task_id).one(db).await {
+                Ok(Some(task)) => task.frequency_cron,
+                Ok(None) => {
+                    warn!("feed_sources: missing task_id={} for source_id={}", task_id, source.id);
+                    None
+                }
+                Err(e) => {
+                    warn!(
+                        "feed_sources: failed to fetch task_id={} for source_id={}: {}",
+                        task_id, source.id, e
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
             let config = source
                 .config
                 .as_ref()
                 .and_then(|c| serde_json::from_str(c).ok());
 
-            FeedSourceDto {
+            dtos.push(FeedSourceDto {
                 id: source.id,
                 name: source.name,
                 source_type: source.source_type,
@@ -55,7 +73,7 @@ pub async fn list_feed_sources_handler(db: &DatabaseConnection) -> AppResult<Vec
                 has_api_key: source.api_key_encrypted.is_some(),
                 config,
                 task_id: source.task_id,
-                schedule: None, // TODO: fetch from system_tasks if task_id exists
+                schedule,
                 last_sync_at: source.last_sync_at.map(|dt| dt.format("%Y-%m-%dT%H:%M:%S").to_string()),
                 last_error: source.last_error,
                 article_count: source.article_count,
@@ -64,9 +82,8 @@ pub async fn list_feed_sources_handler(db: &DatabaseConnection) -> AppResult<Vec
                 api_quota_daily: source.api_quota_daily,
                 created_at: source.created_at.format("%Y-%m-%dT%H:%M:%S").to_string(),
                 updated_at: source.updated_at.format("%Y-%m-%dT%H:%M:%S").to_string(),
-            }
-        })
-        .collect();
+            });
+    }
 
     info!("Found {} feed sources", dtos.len());
     Ok(dtos)
@@ -98,6 +115,17 @@ pub async fn get_feed_source_handler(
         .as_ref()
         .and_then(|c| serde_json::from_str(c).ok());
 
+    let schedule = if let Some(task_id) = source.task_id {
+        TaskEntity::find_by_id(task_id)
+            .one(db)
+            .await
+            .ok()
+            .flatten()
+            .and_then(|task| task.frequency_cron)
+    } else {
+        None
+    };
+
     Ok(FeedSourceDto {
         id: source.id,
         name: source.name,
@@ -106,7 +134,7 @@ pub async fn get_feed_source_handler(
         has_api_key: source.api_key_encrypted.is_some(),
         config,
         task_id: source.task_id,
-        schedule: None,
+        schedule,
         last_sync_at: source.last_sync_at.map(|dt| dt.format("%Y-%m-%dT%H:%M:%S").to_string()),
         last_error: source.last_error,
         article_count: source.article_count,
@@ -528,6 +556,34 @@ pub async fn sync_feed_source_now_handler(
 
     info!("Syncing feed source: {} (type: {})", source.name, source.source_type);
 
+    // Backfill linkage for existing articles created via this feed source
+    // (older rows may have `added_via = "feed_source"` or a missing `feed_source_id`).
+    use sea_orm::prelude::Expr;
+    let via = format!("feed_source:{}", source.id);
+    NewsArticleEntity::update_many()
+        .col_expr(NewsArticleColumn::FeedSourceId, Expr::value(source.id))
+        .filter(NewsArticleColumn::FeedSourceId.is_null())
+        .filter(NewsArticleColumn::AddedVia.eq(via.clone()))
+        .exec(db)
+        .await
+        .map_err(|e| AppError::DatabaseQuery {
+            operation: "backfill feed_source_id".to_string(),
+            source: e,
+        })?;
+
+    // Legacy rows (before we encoded the id in `added_via`) are assumed to belong to the source being synced.
+    NewsArticleEntity::update_many()
+        .col_expr(NewsArticleColumn::FeedSourceId, Expr::value(source.id))
+        .col_expr(NewsArticleColumn::AddedVia, Expr::value(via.clone()))
+        .filter(NewsArticleColumn::FeedSourceId.is_null())
+        .filter(NewsArticleColumn::AddedVia.eq("feed_source"))
+        .exec(db)
+        .await
+        .map_err(|e| AppError::DatabaseQuery {
+            operation: "backfill legacy feed_source articles".to_string(),
+            source: e,
+        })?;
+
     // Instantiate plugin and fetch articles
     let last_sync = source.last_sync_at.map(|naive| chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(naive, chrono::Utc));
     let articles = match source.source_type.as_str() {
@@ -574,6 +630,7 @@ pub async fn sync_feed_source_now_handler(
             
             let new_article = ActiveNewsArticle {
                 user_id: Set(1), // TODO: Get from context
+                feed_source_id: Set(Some(source.id)),
                 provider: Set(source.source_type.clone()),
                 provider_article_id: Set(Some(provider_id)),
                 title: Set(article.title),
@@ -590,7 +647,7 @@ pub async fn sync_feed_source_now_handler(
                 country: Set(article.country),
                 published_at: Set(article.published_at),
                 fetched_at: Set(now),
-                added_via: Set("feed_source".to_string()),
+                added_via: Set(via.clone()),
                 is_starred: Set(0),
                 is_dismissed: Set(0),
                 is_read: Set(0),
@@ -612,7 +669,6 @@ pub async fn sync_feed_source_now_handler(
     }
 
     // Update feed source stats
-    use sea_orm::prelude::Expr;
     FeedSourceEntity::update_many()
         .col_expr(feed_sources::Column::ArticleCount, Expr::value(source.article_count + added_count))
         .col_expr(feed_sources::Column::LastSyncAt, Expr::value(chrono::Utc::now()))

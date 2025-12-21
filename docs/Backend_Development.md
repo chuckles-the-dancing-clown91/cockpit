@@ -1,6 +1,6 @@
 # Backend Development
 
-Backend lives in `proj/backend`.
+Backend lives in `backend/`.
 
 The backend is a **Tauri v2** Rust binary that exposes an API surface via `#[tauri::command]` functions. Data is stored locally in **SQLite**, accessed via **SeaORM**, with schema managed by the **SeaORM Migration** crate in `backend/migration`.
 
@@ -58,7 +58,7 @@ pub async fn my_new_command(
 
 2) Register it in `src/main.rs` inside `tauri::generate_handler![ ... ]`.
 
-3) Add a frontend wrapper in `frontend/src/features/<feature>/api.ts`.
+3) Add a typed frontend wrapper in `frontend/src/core/api/tauri.ts`.
 
 ### Error handling conventions
 

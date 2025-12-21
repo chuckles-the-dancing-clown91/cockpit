@@ -3,7 +3,7 @@
 The frontend talks to the backend exclusively through **Tauri commands** (`#[tauri::command]`).
 
 - Commands are registered in `backend/src/main.rs` via `tauri::generate_handler![...]`.
-- Frontend calls them using `invokeTauri()` in `frontend/src/core/api/tauri.ts`.
+- Frontend calls them via typed wrappers in `frontend/src/core/api/tauri.ts` (which uses `@tauri-apps/api/core`).
 
 ## Naming
 
@@ -29,40 +29,13 @@ Example: `backend/src/writing/commands.rs`.
 
 ## Current command surface (registered)
 
-The following commands are currently registered in `backend/src/main.rs`.
+The source of truth is always `backend/src/main.rs` → `tauri::generate_handler![...]`.
 
-### System / settings
+If you need to quickly inspect what’s available:
 
-- `get_settings` / `update_settings`
-- `get_app_version`
-
-### Ideas
-
-- `list_ideas`, `create_idea`, `update_idea`, `delete_idea`
-
-### Research / references
-
-- `list_references_for_idea`, `add_reference`, `update_reference`, `delete_reference`
-
-### Notes
-
-- `create_note`, `update_note`, `delete_note`, `list_notes_for_idea`, `list_notes_for_reference`
-
-### Writing
-
-- `list_writings`, `get_writing`, `create_writing`, `update_writing`, `delete_writing`
-- `list_writing_ideas`, `add_idea_to_writing`, `remove_idea_from_writing`
-
-### Knowledge graph (advanced)
-
-- `kg_create_writing`, `kg_get_writing`
-- `kg_list_writings`, `kg_update_writing`, `kg_delete_writing`
-- `kg_link_writing_idea`, `kg_unlink_writing_idea`
-- `kg_list_writing_ideas`
-- `kg_upsert_reference`, `kg_list_references_for_idea`, `kg_add_reference`, `kg_update_reference`, `kg_delete_reference`
-- `kg_create_note`, `kg_update_note`, `kg_delete_note`, `kg_list_notes_for_idea`, `kg_list_notes_for_reference`
-
-> Note: there is some intentional overlap between the “simple” commands and the `kg_*` commands while the UI migrates. New UI code should prefer one path consistently (recommended: the non-`kg_*` set unless you specifically need KG behavior).
+```bash
+rg -n "generate_handler!\\[" backend/src/main.rs
+```
 
 ## Adding a new command
 
@@ -82,8 +55,7 @@ pub async fn your_new_command(
 
 3) Add a typed frontend wrapper:
 
-- Add a function in `frontend/src/features/<feature>/api.ts` (preferred) or `frontend/src/core/api/index.ts`.
-- Call it via `invokeTauri<Out>("your_new_command", { ... })`.
+- Add a function in `frontend/src/core/api/tauri.ts`.
 
 4) Add a React Query hook (recommended): `useYourThing()` / `useCreateYourThing()` etc.
 
@@ -93,3 +65,9 @@ Backend commands return `Result<T, String>`. The frontend should treat failures 
 
 - show a toast (or inline error)
 - avoid swallowing exceptions silently
+
+## Common gotcha: `undefined` invoke args
+
+Tauri command argument deserialization is strict; avoid passing `{ someKey: undefined }`.
+
+- Prefer building args objects conditionally and omitting keys entirely when a value is not provided.

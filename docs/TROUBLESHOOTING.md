@@ -11,8 +11,8 @@ If you see an absolute path (e.g. `/home/.../proj/frontend`) replace it with a r
 ```json
 {
   "build": {
-    "beforeDevCommand": "pnpm -C ../frontend dev",
-    "beforeBuildCommand": "pnpm -C ../frontend build",
+    "beforeDevCommand": "npm --prefix ../frontend run dev",
+    "beforeBuildCommand": "npm --prefix ../frontend run build",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../frontend/dist"
   }
@@ -34,12 +34,20 @@ Checklist:
 
    ```ts
    try {
-     await invokeTauri('kg_link_writing_idea', { writingId, ideaId });
+     // Prefer calling a typed wrapper in `frontend/src/core/api/tauri.ts`,
+     // but if you need to debug raw invocations:
+     await tauriInvoke('kg_link_writing_idea', { writingId, ideaId });
    } catch (e) {
      console.error('link failed', e);
      throw e;
    }
    ```
+
+## Research Stream shows “Failed to load stream / Unknown error”
+
+This can happen when the frontend passes `undefined` keys into a Tauri invoke payload.
+
+- Fix: ensure API wrappers omit keys entirely when a value is `undefined` (build args objects conditionally).
 
 ## UI becomes unclickable after opening/closing dialogs
 

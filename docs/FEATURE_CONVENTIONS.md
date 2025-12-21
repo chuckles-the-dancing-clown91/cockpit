@@ -14,12 +14,7 @@ backend/src/<feature>/...
 ```
 
 🚫 Avoid adding new top-level categories (`domains2/`, `shared2/`, `utils2/`, etc.). If you need a shared utility, put it in `frontend/src/core/...`.
-
-### Legacy `domains/`
-
-This repo still contains `frontend/src/domains/*`. Treat it as **legacy UI** that should be migrated into `features/` over time.
-
-**Do not** add new screens/components under `domains/`.
+`frontend/src/domains/*` is used for routing targets and screen composition (domains compose; features implement).
 
 ## 2) Standard feature module shape
 
@@ -27,7 +22,6 @@ For most features, prefer this layout:
 
 ```
 features/<feature>/
-  api/            # small wrappers around `invokeTauri`
   hooks/          # react-query queries + mutations
   components/     # UI
   types.ts
@@ -50,7 +44,7 @@ backend/src/<feature>/
 ## 4) Command naming and "one source of truth"
 
 - Command names are the Rust function names (`writing_create`, `ideas_list`, …).
-- Frontend calls should be centralized in `features/<feature>/api/*`.
+- Frontend calls should be centralized in `frontend/src/core/api/tauri.ts`.
 - UI components should call hooks, not `invoke()` directly.
 
 ## 5) Don’t rebuild existing primitives

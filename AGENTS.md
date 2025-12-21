@@ -67,6 +67,8 @@ If something is reusable across screens, it belongs in `features/` or `component
 - Toolbar: Radix Toolbar; include headings (H1/H2/H3), word count, version selector.
 
 ## Research connectors (ingest + publish)
+- **Current (News feed):** Feed sources + news stream live under `backend/src/research/components/feed/` and are exposed via commands like `list_feed_sources`, `sync_feed_source_now`, `list_news_articles`. Frontend UI lives in `frontend/src/domains/research/ResearchSourcesView.tsx` and `frontend/src/domains/research/ResearchStreamView.tsx`.
+- **Future (connectors/publish):** The capability-gated `research_*` connector pipeline (accounts/streams/items/publish) remains a longer-term initiative; keep it separate from the feed system until it’s ready to replace it end-to-end.
 - External platform access **only in backend adapters** (no frontend HTTP).
 - Normalize to a single DTO (`ResearchItemDto`) and store in unified table (source_type + external_id unique).
 - Commands: `research_*` accept camelCase `input` DTOs; wrap via `core/api/tauri.ts`.
@@ -83,4 +85,4 @@ If something is reusable across screens, it belongs in `features/` or `component
 - Ask: “Where does this already exist?” then reuse it.
 - Keep changes small and composable.
 
-_Last updated: 2025-12-19_
+_Last updated: 2025-12-21_

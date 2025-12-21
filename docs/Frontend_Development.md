@@ -1,6 +1,6 @@
 # Frontend Development
 
-Frontend lives in `proj/frontend`.
+Frontend lives in `frontend/`.
 
 ## Stack
 
@@ -13,19 +13,21 @@ Frontend lives in `proj/frontend`.
 
 ```
 frontend/src/
-  features/          # ✅ Source of truth for new work
+  features/          # reusable feature modules (hooks + UI)
     ideas/
     writing/
     research/
     ...
-  core/              # shared infrastructure (API wrapper, query client, theme, utilities)
-  components/        # shared UI building blocks (should stay small)
-  domains/           # 🚫 Legacy (do not add new code here)
+  core/              # app-wide infrastructure (providers, typed Tauri API, utilities)
+  components/        # shared UI building blocks
+  domains/           # screen composition + routing targets
 ```
 
 ### The rule
 
-If Copilot tries to create `domains/<feature>` or re‑implement a component that already exists, stop it. New work goes in `features/*`.
+- Domains compose; features implement.
+- Screen-specific layout belongs in `domains/`.
+- Reusable logic/components belong in `features/` or `components/`.
 
 ## Feature pattern (copy/paste mental model)
 
@@ -33,29 +35,27 @@ Each feature should own its UI + queries + API wrappers:
 
 ```
 features/<feature>/
-  api.ts             # thin wrappers over Tauri commands
-  keys.ts            # query keys (TanStack Query)
-  hooks/             # useQuery/useMutation hooks
-  components/        # feature UI components
-  types.ts           # DTO shapes used by UI
+  hooks/             # useQuery/useMutation hooks (TanStack Query)
+  components/        # feature UI components (optional)
+  types.ts           # feature-local types (optional)
   index.ts           # barrel exports
 ```
 
 ### API calls (Tauri)
 
-Use the shared invoke helper:
+Use the shared typed wrappers:
 
-- `src/core/api/tauri.ts` — typed `invokeTauri()` wrapper.
-- `src/core/api/index.ts` — shared exports.
+- `frontend/src/core/api/tauri.ts` — typed wrappers around `@tauri-apps/api/core`.
 
 **Conventions:**
 
-- Keep `api.ts` “dumb”: no React state, no caching — just call `invokeTauri`.
+- Keep API wrappers “dumb”: no React state, no caching — just call the Tauri command.
 - Put caching + invalidation in hooks (`hooks/use...`).
+- Don’t include `undefined` keys in command args; omit keys entirely.
 
 ## TanStack Query conventions
 
-- Define stable query keys in `features/<feature>/keys.ts`.
+- Define stable query keys in `frontend/src/shared/queryKeys.ts`.
 - Queries: use `useQuery`.
 - Mutations: use `useMutation` and **invalidate** relevant keys.
 

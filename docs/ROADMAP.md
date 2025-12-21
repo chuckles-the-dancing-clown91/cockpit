@@ -3,28 +3,30 @@
 High-level view of what’s active and what’s next. Completed/obsolete phases are removed.
 
 ## Current Focus
-- **Research Connectors & Stream**: Unified ingestion/publish pipeline with pluggable adapters (RSS, Reddit, X, FB), normalized storage, and per-connector capability toggles.
-- **Backend Modernization (remaining items)**: Medium-priority refactors from the audit (SeaORM patterns, scheduler/http patterns, tracing/thiserror upgrades, column optimizations).
-- **Integration & Testing**: Wire remaining system views to backend, add end-to-end tests across domains.
+- **Research (Feed Sources + Stream)**: Make the new Stream experience reliable (listing + filters + actions) and polish the Sources configuration UI.
+- **Ideas View Port**: Bring Ideas view up to parity with the new app shell + dialogs.
+- **Integration & Testing**: Smoke tests across Writing/Research flows; tighten command/type contracts.
 
 ## Active Initiatives
 
-### Research Connectors & Stream
-Goal: Single ingestion layer with adapter trait; commands accept camelCase `input` DTOs; UI built in `features/research/`.
+### Research — Feed Sources + Stream (now)
+Goal: Stable ingestion + reading loop for news articles using `feed_sources` + `news_articles`.
 
-- Migrations: `research_accounts` (provider/auth/permissions), streams linked to accounts (filters + schedule), `research_items` (source_type/external_id unique, payload_json).
-- Commands: accounts (`research_list_accounts`, `research_upsert_account`, `research_delete_account`, `research_test_account`, `research_update_permissions`); streams (`research_list_streams`, `research_upsert_stream`, `research_delete_stream`, `research_sync_stream_now`); items (`research_list_items`, `research_set_item_status`); publish (`research_publish`) gated by capabilities.
-- Capabilities: adapter advertises supported_capabilities; per-account allowed_caps_json enforced server-side for ingest/publish; scheduler only runs when enabled and ReadStream is allowed.
-- Frontend: Accounts/streams UI with ingest/publish toggles + capability checkboxes; sync/test actions; stream list with provider/date/tag/status/search filters; item detail actions (Convert to Reference, Attach to Idea, Append to Notes); publish actions hidden when not allowed.
-- Structure: Backend `connectors/` per-provider + guards in `research` commands; DTOs in `backend/src/research/dto.rs`; Frontend feature in `frontend/src/features/research`.
-- Guard pattern:
-  ```rust
-  fn require_cap(source: &ResearchAccount, cap: ResearchCapability) -> AppResult<()> {
-      if !source.enabled { bail!("Source disabled"); }
-      if !source.allowed_caps.contains(&cap) { bail!("Capability not allowed"); }
-      Ok(())
-  }
-  ```
+- Sources UI: create/update/delete/toggle + schedules + “Sync now”
+- Stream UI: list articles, filter (search, starred, include dismissed, per-source), and basic actions (star/read/dismiss)
+- Backend: keep plugin system under `backend/src/research/components/feed/` as the single pathway for ingest/sync
+
+Next upgrades:
+- Add undo actions (restore dismissed, mark unread) and wire UI
+- Replace the current “feed source association via `added_via` string” with an explicit column (`news_articles.feed_source_id`) + migration/backfill
+- Add in-app article viewer + “Convert to Reference” flow
+
+### Research — Connectors + Publish (later)
+Goal: Extend beyond NewsData to Reddit/RSS/X/etc. with capability-gated publish and normalized storage.
+
+- Migrations: `research_accounts` + `research_streams` + `research_items`
+- Adapter trait: supported capabilities + config validation + idempotent sync
+- Commands: `research_*` accept camelCase `input` DTOs and enforce allowed capabilities server-side
 
 ### Backend Modernization (remaining)
 - Apply sea-orm 1.1 patterns where missing.
@@ -37,5 +39,5 @@ Goal: Single ingestion layer with adapter trait; commands accept camelCase `inpu
 - Add end-to-end smoke tests across Writing/Ideas/Research flows.
 
 ## Near-Future
-- Publishing expansion: enable outbound publish per connector once ingestion is stable; persist publish metadata linked to writings.
-- DB portability follow-ups (Postgres readiness) after connector work stabilizes.
+- Publish expansion: enable outbound publish per connector once ingestion is stable; persist publish metadata linked to writings.
+- DB portability follow-ups (Postgres readiness) after Research work stabilizes.

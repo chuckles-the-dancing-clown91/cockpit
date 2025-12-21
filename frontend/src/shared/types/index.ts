@@ -70,16 +70,26 @@ export interface Reference {
 // News Article interface
 export interface NewsArticle {
   id: number;
+  articleId: string | null;
   title: string;
-  content: string | null;
   excerpt: string | null;
-  url: string;
+  url: string | null;
   imageUrl: string | null;
-  publishedAt: string;
-  sourceId: number | null;
+  sourceName: string | null;
+  sourceDomain: string | null;
+  sourceId: string | null;
+  tags: string[];
+  country: string[];
+  language: string | null;
+  category: string | null;
+  publishedAt: string | null;
+  fetchedAt: string | null;
+  addedVia: string | null;
   isStarred: boolean;
   isDismissed: boolean;
+  isRead: boolean;
   addedToIdeasAt: string | null;
+  dismissedAt: string | null;
 }
 
 // Feed Source interface
@@ -88,12 +98,45 @@ export interface FeedSource {
   name: string;
   sourceType: string;
   enabled: boolean;
-  apiKey: string | null;
-  config: Record<string, unknown>;
+  hasApiKey: boolean;
+  config: FeedSourceConfig | null;
+  taskId: number | null;
+  schedule: string | null;
   lastSyncAt: string | null;
+  lastError: string | null;
+  articleCount: number;
+  errorCount: number;
+  apiCallsToday: number;
+  apiQuotaDaily: number | null;
   createdAt: string;
   updatedAt: string;
 }
+
+export type FeedSourceConfig = {
+  schedule?: string | null;
+  newsdata?: {
+    language?: string | null;
+    countries?: string[] | null;
+    categories?: string[] | null;
+    domains?: string[] | null;
+    exclude_domains?: string[] | null;
+    query?: string | null;
+    max_pages?: number | null;
+    use_archive?: boolean | null;
+    from_date?: string | null;
+    to_date?: string | null;
+  } | null;
+  reddit?: {
+    subreddits?: string[] | null;
+    sort?: string | null;
+    time_filter?: string | null;
+    limit?: number | null;
+  } | null;
+  rss?: {
+    feed_url?: string | null;
+    update_interval_minutes?: number | null;
+  } | null;
+};
 
 // App Settings interface
 export interface AppSettings {
@@ -210,16 +253,20 @@ export interface ListResearchItemsInput {
   offset?: number;
 }
 
-// News sources (NewsData.io) for domain selection
-export interface NewsSource {
+// News sources (NewsData.io) catalog
+export interface NewsSourceDto {
   id: number;
   sourceId: string;
   name: string;
-  url?: string | null;
+  url: string | null;
+  country: string | null;
+  language: string | null;
   category: string[];
-  language?: string | null;
-  country?: string | null;
+  isActive: boolean;
+  isMuted: boolean;
 }
+
+export type NewsSource = NewsSourceDto;
 
 /**
  * Where should "Copy to Notes" go?

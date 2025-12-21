@@ -1,8 +1,25 @@
 # Research Connectors — Layout, Functionality, Logic
 
-This doc defines how we design the Research feature (UI + backend capabilities) so connectors (X/Reddit/FB/RSS/etc.) stay sane and non-spaghetti.
+This doc covers two tracks:
+
+1) **Current:** Feed Sources + News Stream (NewsData.io) built on the `feed_sources` + `news_articles` tables.
+2) **Future:** “Connectors” pipeline (accounts/streams/items/publish) for Reddit/RSS/X/etc.
 
 ---
+
+## Current: Feed Sources + News Stream
+
+**Backend**
+- Single pathway: `backend/src/research/components/feed/` (plugins + sync + CRUD)
+- Commands: `list_feed_sources`, `create_feed_source`, `update_feed_source`, `toggle_feed_source`, `sync_feed_source_now`, `list_news_articles`, `toggle_star_news_article`, `mark_news_article_read`, `dismiss_news_article`
+
+**Frontend**
+- `frontend/src/domains/research/ResearchSourcesView.tsx` — manage feed sources
+- `frontend/src/domains/research/ResearchStreamView.tsx` — browse articles (filters + actions)
+
+**Known gaps**
+- Article actions are currently one-way (dismiss/read don’t have undo yet).
+- Per-source filtering currently relies on `news_articles.added_via = feed_source:{id}`; plan to replace with a real `feed_source_id` column.
 
 ## Mental Model
 - **Research is an ingestion + routing pipeline**, not “social UI.”
@@ -94,9 +111,8 @@ fn require_cap(source: &ResearchAccount, cap: ResearchCapability) -> AppResult<(
 
 ## Frontend Structure
 - Feature: `frontend/src/features/research/`
-  - `api/research.ts` wraps Tauri commands
-  - `hooks/useResearch.ts` (query keys, queries, mutations)
-  - Components: AccountList, AccountForm (capability toggles), StreamList/StreamForm, ItemList, ItemDetail, Filters bar
+  - Hooks live under `frontend/src/features/research/hooks/*` and call typed wrappers in `frontend/src/core/api/tauri.ts`
+  - Components are optional; prefer shared components in `frontend/src/components/` when truly generic
 - Domain: `frontend/src/domains/research/ResearchView.tsx` composes the feature (tabs: Feed, Integrations, Publish if/when enabled).
 - UI rules: Radix Themes/Primitives; hide publish actions if not allowed; show capability checkboxes based on adapter-supported caps from API.
 
@@ -130,4 +146,3 @@ fn require_cap(source: &ResearchAccount, cap: ResearchCapability) -> AppResult<(
 - Idempotent sync via unique `(source_type, external_id)`.
 - Explicit conversion to Reference; don’t auto-create references for all items.
 - Webview browsing is optional; ingestion-first.
-

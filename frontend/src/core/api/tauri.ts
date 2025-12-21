@@ -1,5 +1,5 @@
 import { invoke as tauriInvoke } from '@tauri-apps/api/core';
-import type { Idea, NewsArticle, FeedSource, AppSettings, Reference } from '@/shared/types';
+import type { FeedSource, FeedSourceConfig, Idea, NewsArticle, NewsSourceDto, Reference } from '@/shared/types';
 import { priorityFromNumber } from '@/shared/types';
 
 /**
@@ -101,15 +101,49 @@ export async function updateReferenceNotes(referenceId: number, notesMarkdown: s
 // ========== Research/News Commands ==========
 
 export async function listNewsArticles(params?: {
-  source?: string;
+  status?: string;
   limit?: number;
   offset?: number;
+  includeDismissed?: boolean;
+  search?: string;
+  sourceId?: number;
+  starred?: boolean;
+  startDate?: string;
+  endDate?: string;
+  sortBy?: string;
 }): Promise<NewsArticle[]> {
-  return tauriInvoke('list_news_articles', params || {});
+  const args: Record<string, unknown> = {};
+  if (params?.status) args.status = params.status;
+  if (typeof params?.limit === 'number') args.limit = params.limit;
+  if (typeof params?.offset === 'number') args.offset = params.offset;
+  if (params?.includeDismissed === true) args.include_dismissed = true;
+  if (params?.search) args.search = params.search;
+  if (typeof params?.sourceId === 'number') args.source_id = params.sourceId;
+  if (typeof params?.starred === 'boolean') args.starred = params.starred;
+  if (params?.startDate) args.start_date = params.startDate;
+  if (params?.endDate) args.end_date = params.endDate;
+  if (params?.sortBy) args.sort_by = params.sortBy;
+  return tauriInvoke('list_news_articles', args);
 }
 
 export async function getNewsArticle(id: number): Promise<NewsArticle> {
   return tauriInvoke('get_news_article', { id });
+}
+
+export async function toggleStarNewsArticle(id: number, starred: boolean): Promise<void> {
+  return tauriInvoke('toggle_star_news_article', { id, starred });
+}
+
+export async function markNewsArticleRead(id: number): Promise<void> {
+  return tauriInvoke('mark_news_article_read', { id });
+}
+
+export async function dismissNewsArticle(id: number): Promise<void> {
+  return tauriInvoke('dismiss_news_article', { id });
+}
+
+export async function syncNewsNow(): Promise<unknown> {
+  return tauriInvoke('sync_news_now');
 }
 
 export async function listFeedSources(): Promise<FeedSource[]> {
@@ -118,29 +152,76 @@ export async function listFeedSources(): Promise<FeedSource[]> {
 
 export async function createFeedSource(input: {
   name: string;
-  source_type: string;
-  url: string;
-  config?: Record<string, unknown>;
+  sourceType: string;
+  apiKey?: string | null;
+  config?: FeedSourceConfig | null;
+  schedule?: string | null;
 }): Promise<FeedSource> {
   return tauriInvoke('create_feed_source', { input });
 }
 
-export async function updateFeedSource(input: {
-  id: number;
-  name?: string;
-  url?: string;
-  enabled?: boolean;
-  config?: Record<string, unknown>;
-}): Promise<FeedSource> {
-  return tauriInvoke('update_feed_source', { input });
+export async function updateFeedSource(
+  sourceId: number,
+  input: {
+    name?: string | null;
+    enabled?: boolean | null;
+    apiKey?: string | null;
+    config?: FeedSourceConfig | null;
+    schedule?: string | null;
+  },
+): Promise<FeedSource> {
+  return tauriInvoke('update_feed_source', { source_id: sourceId, input });
 }
 
-export async function deleteFeedSource(id: number): Promise<void> {
-  return tauriInvoke('delete_feed_source', { id });
+export async function deleteFeedSource(sourceId: number): Promise<void> {
+  return tauriInvoke('delete_feed_source', { source_id: sourceId });
 }
 
-export async function refreshFeedSource(id: number): Promise<void> {
-  return tauriInvoke('refresh_feed_source', { id });
+export async function toggleFeedSource(sourceId: number, enabled: boolean): Promise<FeedSource> {
+  return tauriInvoke('toggle_feed_source', { source_id: sourceId, enabled });
+}
+
+export async function testFeedSourceConnection(sourceId: number): Promise<unknown> {
+  return tauriInvoke('test_feed_source_connection', { source_id: sourceId });
+}
+
+export async function syncFeedSourceNow(sourceId: number): Promise<unknown> {
+  return tauriInvoke('sync_feed_source_now', { source_id: sourceId });
+}
+
+export async function syncAllFeedSources(): Promise<unknown> {
+  return tauriInvoke('sync_all_feed_sources');
+}
+
+// Backwards-compatible alias
+export async function refreshFeedSource(sourceId: number): Promise<unknown> {
+  return syncFeedSourceNow(sourceId);
+}
+
+export async function getNewsSettings(): Promise<{ hasApiKey: boolean }> {
+  const res = await tauriInvoke<any>('get_news_settings');
+  return { hasApiKey: Boolean(res?.hasApiKey) };
+}
+
+export async function saveNewsSettings(input: { apiKey?: string | null }): Promise<{ hasApiKey: boolean }> {
+  const res = await tauriInvoke<any>('save_news_settings', { input });
+  return { hasApiKey: Boolean(res?.hasApiKey) };
+}
+
+export async function syncNewsSourcesNow(): Promise<unknown> {
+  return tauriInvoke('sync_news_sources_now');
+}
+
+export async function listNewsSources(params?: {
+  country?: string;
+  language?: string;
+  search?: string;
+}): Promise<NewsSourceDto[]> {
+  return tauriInvoke('list_news_sources', {
+    country: params?.country,
+    language: params?.language,
+    search: params?.search,
+  });
 }
 
 // ========== System/Settings Commands ==========
@@ -170,7 +251,7 @@ export async function updateAppSettings(input: {
 }
 
 // Legacy single-row settings (kept for compatibility)
-export async function getLegacyAppSettings(): Promise<AppSettings> {
+export async function getLegacyAppSettings(): Promise<any> {
   return tauriInvoke('get_app_settings_legacy');
 }
 

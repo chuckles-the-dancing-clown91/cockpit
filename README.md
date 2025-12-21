@@ -94,12 +94,11 @@ Start here:
 
 ## Development rules (to prevent Copilot drift)
 
-- **Do not add new code under `frontend/src/domains/`**.
-- Prefer **feature modules** (`frontend/src/features/<feature>/...`).
+- Prefer **feature modules** (`frontend/src/features/<feature>/...`) for reusable logic/components.
+- Keep `frontend/src/domains/` for route composition/layout only.
 - Reuse existing components/hooks before creating new versions.
 - Any new backend capability = **1 command + 1 service function + DTOs** (keep layers clean).
 - Any schema change = **SeaORM migration** (never raw `.sql` files).
-- 
 
 ---
 
@@ -120,7 +119,7 @@ If you’re working with an AI assistant/Copilot, read: `docs/AI_ASSISTANT_RULES
   - Individual sync schedules with cron expressions
   - Test connections, sync on-demand, or auto-sync via scheduler
   - Health monitoring with error tracking and rate limit warnings
-- **Stream View**: Unified article feed from all sources (coming soon)
+- **Stream View**: Unified article feed from all sources (filters + actions)
 - **Reddit Integration**: Monitor subreddits, manage mod queue (coming soon)
 
 ### System Mode
@@ -161,23 +160,24 @@ cockpit/
 │   │   ├── system/      # Scheduler & system tasks
 │   │   └── util/        # Cross-domain utilities
 │   ├── storage/         # Runtime data (db, logs, backups)
-│   ├── migrations/      # SQL migration files
+│   ├── migration/       # SeaORM Migration crate (Rust)
 │   ├── icons/           # App icons (multiple sizes)
 │   └── tauri.conf.json  # Tauri configuration
 │
 ├── frontend/            # React frontend
 │   ├── src/
-│   │   ├── components/  # UI components by domain
-│   │   ├── hooks/       # React hooks (queries, mutations)
-│   │   ├── views/       # Page components
-│   │   └── lib/         # Utilities
+│   │   ├── core/        # app-wide providers + typed Tauri API wrappers
+│   │   ├── features/    # reusable feature modules (hooks/components)
+│   │   ├── domains/     # route composition + screen layout
+│   │   ├── components/  # shared UI building blocks
+│   │   └── shared/      # shared types + query keys
 │   └── dist/            # Production build output
 │
 ├── docs/                # Documentation
-│   ├── BUILD_GUIDE.md
-│   ├── DEPLOYMENT.md
-│   ├── ICON_TROUBLESHOOTING.md
-│   └── archive/         # Historical docs
+│   ├── Frontend_Development.md
+│   ├── Backend_Development.md
+│   ├── TROUBLESHOOTING.md
+│   └── archive/         # Packaging/install legacy guides
 │
 ├── build/               # Build artifacts
 │   └── target/release/bundle/  # .deb and .rpm packages
@@ -242,7 +242,7 @@ Creates packages in `build/target/release/bundle/`:
 - `deb/Cockpit_0.1.0_amd64.deb` (Debian/Ubuntu)
 - `rpm/Cockpit-0.1.0-1.x86_64.rpm` (Fedora/RHEL)
 
-See [BUILD_GUIDE.md](docs/BUILD_GUIDE.md) for detailed build instructions.
+See [BUILD_GUIDE.md](docs/archive/BUILD_GUIDE.md) for detailed build/packaging instructions.
 
 ### Architecture
 
