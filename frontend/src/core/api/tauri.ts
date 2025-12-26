@@ -204,9 +204,21 @@ export type ResearchCockpitPane = 'references' | 'notes';
 export async function researchOpenCockpit(input: {
   pane: ResearchCockpitPane;
   url: string;
+  title?: string;
+  referenceId?: number;
+  ideaId?: number;
+  writingId?: number;
   windowLabel?: string;
+  webviewLabel?: string;
 }): Promise<void> {
-  return tauriInvoke('research_open_cockpit', { input });
+  const payload: Record<string, unknown> = { url: input.url };
+  if (input.title !== undefined) payload.title = input.title;
+  if (input.referenceId !== undefined) payload.referenceId = input.referenceId;
+  if (input.ideaId !== undefined) payload.ideaId = input.ideaId;
+  if (input.writingId !== undefined) payload.writingId = input.writingId;
+  if (input.windowLabel !== undefined) payload.windowLabel = input.windowLabel;
+  if (input.webviewLabel !== undefined) payload.webviewLabel = input.webviewLabel;
+  return tauriInvoke('research_open_cockpit', { input: payload });
 }
 
 export async function researchCloseCockpit(): Promise<void> {
@@ -220,8 +232,17 @@ export async function researchSetCockpitBounds(input: {
   width: number;
   height: number;
   windowLabel?: string;
+  webviewLabel?: string;
 }): Promise<void> {
-  return tauriInvoke('research_set_cockpit_bounds', { input });
+  const payload: Record<string, unknown> = {
+    x: input.x,
+    y: input.y,
+    width: input.width,
+    height: input.height,
+  };
+  if (input.windowLabel !== undefined) payload.windowLabel = input.windowLabel;
+  if (input.webviewLabel !== undefined) payload.webviewLabel = input.webviewLabel;
+  return tauriInvoke('research_set_cockpit_bounds', { input: payload });
 }
 
 export async function researchOpenDetachedCockpit(input: {
@@ -231,7 +252,12 @@ export async function researchOpenDetachedCockpit(input: {
   ideaId?: number;
   writingId?: number;
 }): Promise<void> {
-  return tauriInvoke('research_open_detached_cockpit', { input });
+  const payload: Record<string, unknown> = { url: input.url };
+  if (input.title !== undefined) payload.title = input.title;
+  if (input.referenceId !== undefined) payload.referenceId = input.referenceId;
+  if (input.ideaId !== undefined) payload.ideaId = input.ideaId;
+  if (input.writingId !== undefined) payload.writingId = input.writingId;
+  return tauriInvoke('research_open_detached_cockpit', { input: payload });
 }
 
 // Backwards-compatible alias

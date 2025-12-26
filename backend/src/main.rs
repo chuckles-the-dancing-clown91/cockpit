@@ -10,7 +10,7 @@ mod util;
 mod connectors;
 
 use sea_orm::DatabaseConnection;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 use tauri::{async_runtime, Manager, WindowEvent};
@@ -71,7 +71,7 @@ use system::scheduler::start_scheduler;
 #[derive(Clone)]
 pub struct CockpitBoundsState {
     pub window_label: String,
-    pub bounds: (f64, f64, f64, f64),
+    pub panes: HashMap<String, (f64, f64, f64, f64)>,
 }
 
 #[derive(Clone)]
