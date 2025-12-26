@@ -199,7 +199,10 @@ export async function syncAllFeedSources(): Promise<unknown> {
   return tauriInvoke('sync_all_feed_sources');
 }
 
+export type ResearchCockpitPane = 'references' | 'notes';
+
 export async function researchOpenCockpit(input: {
+  pane: ResearchCockpitPane;
   url: string;
   windowLabel?: string;
 }): Promise<void> {
@@ -211,6 +214,7 @@ export async function researchCloseCockpit(): Promise<void> {
 }
 
 export async function researchSetCockpitBounds(input: {
+  pane: ResearchCockpitPane;
   x: number;
   y: number;
   width: number;
