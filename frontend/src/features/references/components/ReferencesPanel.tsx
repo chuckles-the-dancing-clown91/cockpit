@@ -2,8 +2,9 @@ import { Flex, Text, Button, Badge, Card, TextField, TextArea } from '@radix-ui/
 import { Plus, ExternalLink, Trash2, Eye, FileText } from 'lucide-react';
 import { useState } from 'react';
 import { useIdeaReferences, useAddReference, useRemoveReference } from '../hooks/useReferences';
-import { openWebview } from '@/features/webview';
 import { NoteHoverPreview, ReferenceNotesDialog } from '@/features/notes';
+import { researchOpenDetachedCockpit } from '@/core/api/tauri';
+import { toast } from '@/core/lib/toast';
 
 interface ReferencesPanelProps {
   ideaId: number;
@@ -172,18 +173,16 @@ export function ReferencesPanel({ ideaId }: ReferencesPanelProps) {
                       variant="ghost"
                       size="1"
                       color="blue"
-                      onClick={() => openWebview({
-                        url: ref.url!,
-                        title: ref.title ?? undefined,
-                        referenceId: ref.id,
-                        ideaId,
-                        noteTarget: {
-                          kind: 'reference_note',
+                      onClick={() =>
+                        researchOpenDetachedCockpit({
+                          url: ref.url!,
+                          title: ref.title ?? undefined,
                           referenceId: ref.id,
                           ideaId,
-                        },
-                        sourceFeature: 'ideas',
-                      })}
+                        }).catch((err) => {
+                          toast.error('Failed to open research cockpit', String(err));
+                        })
+                      }
                       title="View in embedded browser"
                     >
                       <Eye className="w-4 h-4" />

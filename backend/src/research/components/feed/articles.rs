@@ -8,9 +8,11 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect,
     Set,
 };
+use sea_orm::prelude::Expr;
 
 use crate::core::components::errors::{AppError, AppResult};
 use super::entities::articles::{self as news_articles, Entity as EntityNewsArticles};
+use super::entities::feed_sources::{self as feed_sources, Entity as FeedSourceEntity};
 
 use super::types::{NewsArticleDto, parse_vec};
 
@@ -148,6 +150,23 @@ pub async fn list_news_articles_handler(
         .await?;
     
     Ok(items.into_iter().map(article_to_dto).collect())
+}
+
+/// Delete all news articles for the current user and reset feed source counters.
+pub async fn clear_news_articles_handler(
+    state: &crate::AppState,
+) -> AppResult<u64> {
+    let result = EntityNewsArticles::delete_many()
+        .filter(news_articles::Column::UserId.eq(1))
+        .exec(&state.db)
+        .await?;
+
+    FeedSourceEntity::update_many()
+        .col_expr(feed_sources::Column::ArticleCount, Expr::value(0))
+        .exec(&state.db)
+        .await?;
+
+    Ok(result.rows_affected)
 }
 
 /// Get single news article by ID

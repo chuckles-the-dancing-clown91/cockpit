@@ -1,5 +1,5 @@
 // src/features/webview/components/WebviewModal.tsx
-import { Box, Card, Dialog, Button, Flex, Text, TextArea, TextField } from "@radix-ui/themes";
+import { Dialog, Button, Flex, Text, TextField } from "@radix-ui/themes";
 import { ExternalLink, X, RefreshCcw, ArrowLeft, ArrowRight, ClipboardPaste } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
@@ -9,7 +9,7 @@ import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
 
 import { useWebviewStore, getWebviewSelectedText } from "../store";
 import { registerWebviewInstance, closeWebview, navigateWebview, webviewBack, webviewForward, webviewReload } from "../index";
-import { notesAppendSnippet, EntityNotesPanel } from "@/features/notes";
+import { notesAppendSnippet, notesGetOrCreate, notesUpsert, NotesEditor } from "@/features/notes";
 import { toast } from "@/core/lib/toast";
 
 const WEBVIEW_LABEL = "cockpit/reference-webview";
@@ -56,6 +56,16 @@ async function openExternal(url: string) {
   window.open(url, "_blank");
 }
 
+type NoteDto = {
+  id: string;
+  entityType: string;
+  entityId: string;
+  noteType: string;
+  bodyHtml: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export function WebviewModal() {
   const isOpen = useWebviewStore((s) => s.isOpen);
   const title = useWebviewStore((s) => s.title);
@@ -68,11 +78,16 @@ export function WebviewModal() {
   const setTitle = useWebviewStore((s) => s.setTitle);
   const setCurrentUrl = useWebviewStore((s) => s.setCurrentUrl);
 
-  const [hostEl, setHostEl] = useState<HTMLDivElement | null>(null);
+  const hostRef = useRef<HTMLDivElement | null>(null);
   const webviewRef = useRef<Webview | null>(null);
 
   const [urlInput, setUrlInput] = useState("");
-  const [isAppending, setIsAppending] = useState(false);
+
+  // Notes state (stored via Notes feature, scoped by noteTarget).
+  const [note, setNote] = useState<NoteDto | null>(null);
+  const [notesDraft, setNotesDraft] = useState<string>("");
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) setUrlInput(currentUrl ?? initialUrl ?? "");
@@ -111,13 +126,13 @@ export function WebviewModal() {
   // Simpler test effect first
   useEffect(() => {
     console.log('[WebviewModal] Basic effect running!', { isOpen, initialUrl, currentUrl });
-  }, [isOpen, initialUrl, currentUrl]);
+  }, [isOpen, initialUrl]);
 
   // Create/attach the child webview when modal opens.
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!isOpen) return;
 
-    const host = hostEl;
+    const host = hostRef.current;
     console.log('[WebviewModal] Effect running', { isOpen, initialUrl, currentUrl, hasHost: !!host });
 
     if (!host) {
@@ -132,35 +147,16 @@ export function WebviewModal() {
 
     let ro: ResizeObserver | null = null;
     let alive = true;
-    let tries = 0;
-    let raf: number | null = null;
-    let positionRaf: number | null = null;
 
-    const syncBounds = async (wv: Webview) => {
-      const rect = host.getBoundingClientRect();
-      const x = Math.round(rect.left);
-      const y = Math.round(rect.top);
-      const width = Math.max(1, Math.round(rect.width));
-      const height = Math.max(1, Math.round(rect.height));
-      await wv.setPosition(new LogicalPosition(x, y));
-      await wv.setSize(new LogicalSize(width, height));
-    };
-
-    const attachWebview = async () => {
-      if (!alive) return;
-      const r = host.getBoundingClientRect();
-      const width = Math.max(1, Math.round(r.width));
-      const height = Math.max(1, Math.round(r.height));
-
-      if ((width <= 1 || height <= 1) && tries < 60) {
-        tries += 1;
-        raf = requestAnimationFrame(attachWebview);
-        return;
-      }
-
+    (async () => {
       const win = getCurrentWindow();
+        // The Dialog/grid sometimes reports 0x0 during the first tick; wait one paint.
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        const r = host.getBoundingClientRect();
       const x = Math.round(r.left);
       const y = Math.round(r.top);
+      const width = Math.max(1, Math.round(r.width));
+      const height = Math.max(1, Math.round(r.height));
 
       console.log('[WebviewModal] Creating webview with bounds:', { x, y, width, height });
 
@@ -171,7 +167,7 @@ export function WebviewModal() {
       }
 
       console.log('[WebviewModal] Final URL:', webviewUrl);
-      
+
       // Check if webview already exists
       let wv = await Webview.getByLabel(WEBVIEW_LABEL);
       console.log('[WebviewModal] Existing webview?', !!wv);
@@ -180,42 +176,42 @@ export function WebviewModal() {
         // Create new webview
         try {
           console.log('[WebviewModal] Calling Webview constructor...');
+
+          // NOTE: the constructor bounds are not reliable across platforms.
+          // Always set bounds explicitly after construction.
           wv = new Webview(win, WEBVIEW_LABEL, {
             url: webviewUrl,
-            x,
-            y,
-            width,
-            height,
-            // initializationScripts: [INIT_SCRIPT],
+            initializationScripts: [INIT_SCRIPT],
           });
 
-          wv.once("tauri://created", async () => {
+          // Register immediately so toolbar actions can target it.
+          webviewRef.current = wv;
+          registerWebviewInstance(wv);
+
+          wv.once('tauri://created', () => {
             console.log('[WebviewModal] ✓ Webview created successfully');
-            webviewRef.current = wv;
-            registerWebviewInstance(wv);
-            
-            try {
-              await syncBounds(wv);
-              await wv.show();
-              await wv.setFocus();
-              console.log('[WebviewModal] ✓ Webview shown');
-            } catch (e) {
-              console.error('[WebviewModal] ✗ Failed to show webview:', e);
-            }
           });
-
-          wv.once("tauri://error", (err) => {
+          wv.once('tauri://error', (err) => {
             console.error('[WebviewModal] ✗ Webview creation error:', err);
           });
+
+          // Position + show now (don't depend on the created event firing).
+          await wv.setPosition(new LogicalPosition(x, y));
+          await wv.setSize(new LogicalSize(width, height));
+          await wv.show();
+          await wv.setFocus();
+          console.log('[WebviewModal] ✓ Webview positioned and shown');
         } catch (e) {
-          console.error('[WebviewModal] ✗ Webview constructor threw:', e);
+          console.error('[WebviewModal] ✗ Webview create/show failed:', e);
+          setWebviewError(String(e));
           return;
         }
       } else {
         // Position existing webview
         console.log('[WebviewModal] Repositioning existing webview');
         try {
-          await syncBounds(wv);
+          await wv.setPosition(new LogicalPosition(x, y));
+          await wv.setSize(new LogicalSize(width, height));
           await wv.show();
           await wv.setFocus();
           webviewRef.current = wv;
@@ -229,50 +225,41 @@ export function WebviewModal() {
       // Keep webview positioned with ResizeObserver
       ro = new ResizeObserver(async () => {
         if (!alive) return;
-        if (!host) return;
+        const host2 = hostRef.current;
+        if (!host2) return;
         const wv2 = await Webview.getByLabel(WEBVIEW_LABEL);
         if (!wv2) return;
 
-        await syncBounds(wv2);
+        const r2 = host2.getBoundingClientRect();
+        const x2 = Math.round(r2.left);
+        const y2 = Math.round(r2.top);
+        const w2 = Math.max(1, Math.round(r2.width));
+        const h2 = Math.max(1, Math.round(r2.height));
+
+        await wv2.setPosition(new LogicalPosition(x2, y2));
+        await wv2.setSize(new LogicalSize(w2, h2));
       });
       ro.observe(host);
-
-      const updateForAnimation = async () => {
-        if (!alive) return;
-        const wv2 = await Webview.getByLabel(WEBVIEW_LABEL);
-        if (wv2) {
-          try {
-            await syncBounds(wv2);
-          } catch {}
-        }
-      };
-
-      let frames = 0;
-      const tick = async () => {
-        if (!alive) return;
-        await updateForAnimation();
-        frames += 1;
-        if (frames < 40) {
-          positionRaf = requestAnimationFrame(tick);
-        }
-      };
-      positionRaf = requestAnimationFrame(tick);
-    };
-
-    raf = requestAnimationFrame(attachWebview);
+    })();
 
     return () => {
       alive = false;
-      if (raf !== null) cancelAnimationFrame(raf);
-      if (positionRaf !== null) cancelAnimationFrame(positionRaf);
       ro?.disconnect();
       
-      // Optionally hide webview on close
-      Webview.getByLabel(WEBVIEW_LABEL).then(wv => wv?.close());
+      // Hide instead of close to avoid recreate races when currentUrl changes.
+      // If hide isn't supported on the current platform, fall back to close.
+      Webview.getByLabel(WEBVIEW_LABEL).then(async (wv) => {
+        if (!wv) return;
+        try {
+          await wv.hide();
+        } catch {
+          await wv.close();
+        }
+      });
       webviewRef.current = null;
       registerWebviewInstance(null);
     };
-  }, [isOpen, initialUrl, currentUrl, hostEl]);
+  }, [isOpen, initialUrl]);
 
   // Navigate when the user submits the URL bar
   const onSubmitUrl = async () => {
@@ -294,6 +281,54 @@ export function WebviewModal() {
       const t = await navigator.clipboard.readText();
       if (t?.trim()) setSelectedText(t.trim());
     } catch {}
+  };
+
+  // Load the note for the current target when the modal opens (and when the target changes).
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!isOpen || !noteTarget) {
+      setNote(null);
+      setNotesDraft("");
+      setLastSavedAt(null);
+      return;
+    }
+
+    (async () => {
+      try {
+        // notesGetOrCreate expects the exact same target shape used across features.
+        const n = (await notesGetOrCreate(noteTarget as any)) as unknown as NoteDto;
+        if (cancelled) return;
+        setNote(n);
+        setNotesDraft(n.bodyHtml || "");
+        setLastSavedAt(n.updatedAt || null);
+      } catch (e) {
+        if (cancelled) return;
+        // Don't hard-fail the modal if notes can't be loaded.
+        console.warn("[WebviewModal] Failed to load notes", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, noteTarget]);
+
+  const saveNotes = async () => {
+    if (!noteTarget) return;
+
+    setIsSavingNotes(true);
+    try {
+      const saved = (await notesUpsert({ ...(noteTarget as any), bodyHtml: notesDraft } as any)) as unknown as NoteDto;
+      setNote(saved);
+      setLastSavedAt(saved.updatedAt || null);
+      toast.success("Saved");
+    } catch (e) {
+      console.error("[WebviewModal] Failed to save notes", e);
+      toast.error("Failed to save notes");
+    } finally {
+      setIsSavingNotes(false);
+    }
   };
 
   // Add selection to notes
@@ -417,93 +452,35 @@ export function WebviewModal() {
           </Flex>
 
           {/* Body */}
-          <Flex style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-            <div
-              ref={setHostEl}
-              style={{
-                flex: 1,
-                minHeight: 0,
-                width: "100%",
-                height: "100%",
-                position: "relative",
-                background: "var(--color-surface)",
-              }}
-            />
-
-            <Box
-              style={{
-                width: 360,
-                borderLeft: "1px solid var(--color-border)",
-                background: "var(--color-surface)",
-                padding: 12,
-                overflow: "auto",
-              }}
-            >
-              <Flex direction="column" gap="3">
-                <Card>
-                  <Flex direction="column" gap="2">
-                    <Text size="2" weight="medium">
-                      Selection
-                    </Text>
-                    <TextArea
-                      value={selectedText}
-                      onChange={(e) => setSelectedText(e.target.value)}
-                      placeholder="Select text in the webview or paste from clipboard..."
-                      rows={6}
-                    />
-                    <Flex gap="2" justify="between">
-                      <Button variant="soft" onClick={pasteFromClipboard}>
-                        <ClipboardPaste width={16} height={16} />
-                        Paste
-                      </Button>
-                      <Button
-                        onClick={async () => {
-                          if (isAppending) return;
-                          setIsAppending(true);
-                          await addSelectionToNotes();
-                          setIsAppending(false);
-                        }}
-                        disabled={!selectedText.trim() || !noteTarget || isAppending}
-                      >
-                        Add to notes
-                      </Button>
-                    </Flex>
-                    {!noteTarget && (
-                      <Text size="1" style={{ color: "var(--color-text-soft)" }}>
-                        No note target configured for this reference.
-                      </Text>
-                    )}
-                  </Flex>
-                </Card>
-
-                {noteTarget?.kind === "reference_note" ? (
-                  <EntityNotesPanel
-                    entityType="reference"
-                    entityId={noteTarget.referenceId}
-                    noteType="main"
-                    title="Reference Notes"
-                    minHeight="240px"
-                  />
-                ) : noteTarget?.kind === "idea_note" ? (
-                  <EntityNotesPanel
-                    entityType="idea"
-                    entityId={noteTarget.ideaId}
-                    noteType="main"
-                    title="Idea Notes"
-                    minHeight="240px"
-                  />
-                ) : noteTarget?.kind === "writing_note" ? (
-                  <EntityNotesPanel
-                    entityType="writing"
-                    entityId={noteTarget.writingId}
-                    noteType="main"
-                    title="Writing Notes"
-                    minHeight="240px"
-                  />
-                ) : null}
-              </Flex>
-            </Box>
-          </Flex>
+          <div style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center", 
+            height: "100%", 
+            minHeight: 0,
+            background: "var(--color-surface)"
+          }}>
+            <Flex direction="column" align="center" gap="4" style={{ textAlign: "center" }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--color-text-soft)", opacity: 0.5 }}>
+                <rect width="18" height="18" x="3" y="3" rx="2"></rect>
+                <path d="M7 7h10"></path>
+                <path d="M7 12h10"></path>
+                <path d="M7 17h10"></path>
+              </svg>
+              <div>
+                <Text size="6" weight="bold" style={{ color: "var(--color-text-primary)", display: "block", marginBottom: "0.5rem" }}>
+                  Coming Soon
+                </Text>
+                <Text size="3" style={{ color: "var(--color-text-soft)", display: "block" }}>
+                  Embedded browser with text selection and notes
+                </Text>
+              </div>
+              <Button variant="soft" onClick={() => currentUrl && openExternal(currentUrl)}>
+                <ExternalLink width={16} height={16} />
+                Open in Browser
+              </Button>
+            </Flex>
+          </div>
         </Dialog.Content>
     </Dialog.Root>
   );

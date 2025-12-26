@@ -40,6 +40,7 @@ pub use articles::{
     dismiss_news_article_handler,
     toggle_star_news_article_handler,
     mark_news_article_read_handler,
+    clear_news_articles_handler,
 };
 
 pub use sources::{

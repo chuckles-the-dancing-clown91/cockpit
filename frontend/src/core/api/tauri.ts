@@ -116,18 +116,24 @@ export async function listNewsArticles(params?: {
   if (params?.status) args.status = params.status;
   if (typeof params?.limit === 'number') args.limit = params.limit;
   if (typeof params?.offset === 'number') args.offset = params.offset;
-  if (params?.includeDismissed === true) args.include_dismissed = true;
+  if (params?.includeDismissed === true) args.includeDismissed = true;
   if (params?.search) args.search = params.search;
-  if (typeof params?.sourceId === 'number') args.source_id = params.sourceId;
+  if (typeof params?.sourceId === 'number' && !Number.isNaN(params.sourceId)) {
+    args.sourceId = params.sourceId;
+  }
   if (typeof params?.starred === 'boolean') args.starred = params.starred;
-  if (params?.startDate) args.start_date = params.startDate;
-  if (params?.endDate) args.end_date = params.endDate;
-  if (params?.sortBy) args.sort_by = params.sortBy;
+  if (params?.startDate) args.startDate = params.startDate;
+  if (params?.endDate) args.endDate = params.endDate;
+  if (params?.sortBy) args.sortBy = params.sortBy;
   return tauriInvoke('list_news_articles', args);
 }
 
 export async function getNewsArticle(id: number): Promise<NewsArticle> {
   return tauriInvoke('get_news_article', { id });
+}
+
+export async function clearNewsArticles(): Promise<number> {
+  return tauriInvoke('clear_news_articles');
 }
 
 export async function toggleStarNewsArticle(id: number, starred: boolean): Promise<void> {
@@ -170,27 +176,58 @@ export async function updateFeedSource(
     schedule?: string | null;
   },
 ): Promise<FeedSource> {
-  return tauriInvoke('update_feed_source', { source_id: sourceId, input });
+  return tauriInvoke('update_feed_source', { sourceId, input });
 }
 
 export async function deleteFeedSource(sourceId: number): Promise<void> {
-  return tauriInvoke('delete_feed_source', { source_id: sourceId });
+  return tauriInvoke('delete_feed_source', { sourceId });
 }
 
 export async function toggleFeedSource(sourceId: number, enabled: boolean): Promise<FeedSource> {
-  return tauriInvoke('toggle_feed_source', { source_id: sourceId, enabled });
+  return tauriInvoke('toggle_feed_source', { sourceId, enabled });
 }
 
 export async function testFeedSourceConnection(sourceId: number): Promise<unknown> {
-  return tauriInvoke('test_feed_source_connection', { source_id: sourceId });
+  return tauriInvoke('test_feed_source_connection', { sourceId });
 }
 
 export async function syncFeedSourceNow(sourceId: number): Promise<unknown> {
-  return tauriInvoke('sync_feed_source_now', { source_id: sourceId });
+  return tauriInvoke('sync_feed_source_now', { sourceId });
 }
 
 export async function syncAllFeedSources(): Promise<unknown> {
   return tauriInvoke('sync_all_feed_sources');
+}
+
+export async function researchOpenCockpit(input: {
+  url: string;
+  windowLabel?: string;
+}): Promise<void> {
+  return tauriInvoke('research_open_cockpit', { input });
+}
+
+export async function researchCloseCockpit(): Promise<void> {
+  return tauriInvoke('research_close_cockpit');
+}
+
+export async function researchSetCockpitBounds(input: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  windowLabel?: string;
+}): Promise<void> {
+  return tauriInvoke('research_set_cockpit_bounds', { input });
+}
+
+export async function researchOpenDetachedCockpit(input: {
+  url: string;
+  title?: string;
+  referenceId?: number;
+  ideaId?: number;
+  writingId?: number;
+}): Promise<void> {
+  return tauriInvoke('research_open_detached_cockpit', { input });
 }
 
 // Backwards-compatible alias

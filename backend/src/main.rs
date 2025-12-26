@@ -11,9 +11,9 @@ mod connectors;
 
 use sea_orm::DatabaseConnection;
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
-use tauri::{async_runtime, Manager};
+use tauri::{async_runtime, Manager, WindowEvent};
 use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 use reqwest::Client;
@@ -43,7 +43,7 @@ use writing::commands::{
     writing_publish, writing_link_idea, writing_unlink_idea, writing_list_linked_ideas,
 };
 use research::commands::{
-    get_news_settings, save_news_settings, list_news_articles, get_news_article,
+    get_news_settings, save_news_settings, list_news_articles, get_news_article, clear_news_articles,
     dismiss_news_article, toggle_star_news_article, mark_news_article_read,
     sync_news_now, sync_news_sources_now, list_news_sources,
     // Feed source management
@@ -53,6 +53,8 @@ use research::commands::{
     research_list_accounts, research_upsert_account, research_update_account, research_delete_account, research_test_account,
     research_list_streams, research_upsert_stream, research_delete_stream, research_sync_stream_now,
     research_list_items, research_set_item_status, research_convert_to_reference, research_publish,
+    research_open_cockpit, research_close_cockpit, research_open_detached_cockpit,
+    research_set_cockpit_bounds, resize_research_cockpit,
 };
 use system::commands::{get_task_history, list_system_tasks, run_system_task_now, update_system_task};
 use util::commands::{
@@ -67,11 +69,18 @@ use notes::commands::{
 use system::scheduler::start_scheduler;
 
 #[derive(Clone)]
+pub struct CockpitBoundsState {
+    pub window_label: String,
+    pub bounds: (f64, f64, f64, f64),
+}
+
+#[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
     pub running: Arc<Mutex<HashSet<i64>>>,
     pub config: Arc<core::config::AppConfig>,
     pub http_client: Client,
+    pub cockpit_bounds: Arc<StdMutex<Option<CockpitBoundsState>>>,
 }
 
 // ========== Main Application Setup ==========
@@ -155,8 +164,22 @@ fn main() {
                 running: Arc::new(Mutex::new(HashSet::new())),
                 config: config_arc.clone(),
                 http_client,
+                cockpit_bounds: Arc::new(StdMutex::new(None)),
             };
             app.manage(state);
+            if let Some(window) = app.get_window("main") {
+                let handle = app.handle().clone();
+                window.on_window_event(move |event| {
+                    if matches!(
+                        event,
+                        WindowEvent::Resized(_)
+                            | WindowEvent::ScaleFactorChanged { .. }
+                            | WindowEvent::Moved(_)
+                    ) {
+                        let _ = resize_research_cockpit(&handle);
+                    }
+                });
+            }
             let handle = app.handle().clone();
             async_runtime::spawn(async move {
                 if let Err(err) = start_scheduler(handle.clone()).await {
@@ -200,6 +223,7 @@ fn main() {
             save_news_settings,
             list_news_articles,
             get_news_article,
+            clear_news_articles,
             dismiss_news_article,
             toggle_star_news_article,
             mark_news_article_read,
@@ -229,6 +253,10 @@ fn main() {
             research_set_item_status,
             research_convert_to_reference,
             research_publish,
+            research_open_cockpit,
+            research_close_cockpit,
+            research_open_detached_cockpit,
+            research_set_cockpit_bounds,
             list_ideas,
             get_idea,
             create_idea,

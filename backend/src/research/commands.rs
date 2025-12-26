@@ -1,7 +1,15 @@
 //! Research domain Tauri commands
 
-use tauri::State;
-use crate::AppState;
+use tauri::{
+    async_runtime, AppHandle, Manager, Rect, State, Url, WebviewUrl,
+    WebviewWindowBuilder, PhysicalPosition, PhysicalSize,
+};
+use tauri::webview::WebviewBuilder;
+use crate::{AppState, CockpitBoundsState};
+use super::{
+    RESEARCH_COCKPIT_SIDEBAR_WIDTH, RESEARCH_COCKPIT_SPLIT, RESEARCH_COCKPIT_WEBVIEW_LABEL,
+    RESEARCH_COCKPIT_WINDOW_LABEL,
+};
 use crate::research::dto::{
     ResearchCapability, ResearchAccountDto, ResearchStreamDto, ResearchItemDto,
     CreateResearchAccountInput, UpdateResearchAccountInput, UpsertResearchStreamInput,
@@ -11,14 +19,18 @@ use crate::research::entities::{accounts, streams, items};
 use crate::connectors::{get_connector, NormalizedItem};
 use sea_orm::{EntityTrait, QueryFilter, ColumnTrait, ActiveModelTrait, Set, QuerySelect};
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tauri::Emitter;
+use std::time::Duration;
+use tokio::time::sleep;
 use crate::research::helpers::format_naive;
 use tracing::info;
 use super::components::feed::{
     get_news_settings_handler, save_news_settings_handler,
     list_news_articles_handler, get_news_article_handler,
     dismiss_news_article_handler, toggle_star_news_article_handler,
-    mark_news_article_read_handler, sync_news_now_handler,
+    mark_news_article_read_handler, clear_news_articles_handler, sync_news_now_handler,
     sync_news_sources_now_handler, list_news_sources_handler,
     NewsArticleDto, NewsSettingsDto, SaveNewsSettingsInput, NewsSourceDto,
     // Feed source management
@@ -56,6 +68,386 @@ fn redact_value(value: &serde_json::Value) -> serde_json::Value {
         }
         _ => value.clone(),
     }
+}
+
+const COCKPIT_SELECTION_SCRIPT: &str = r#"
+(() => {
+  const safeEmitToHost = (payload) => {
+    try {
+      const tauri = window.__TAURI__;
+      if (!tauri?.webview) return;
+      const wv = tauri.webview.getCurrentWebview();
+      const target = wv?.window?.label || wv?.label || "main";
+      wv.emitTo(target, "cockpit-webview-selection", payload);
+    } catch (_) {}
+  };
+
+  let last = "";
+  let timer = null;
+
+  const publish = () => {
+    const sel = (window.getSelection?.().toString() || "").trim();
+    if (sel === last) return;
+    last = sel;
+    safeEmitToHost({ selection: sel, title: document.title || "", url: location.href });
+  };
+
+  document.addEventListener("selectionchange", () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(publish, 120);
+  });
+
+  window.addEventListener("mouseup", publish);
+  window.addEventListener("keyup", publish);
+
+  safeEmitToHost({ selection: "", title: document.title || "", url: location.href });
+})();
+"#;
+
+fn normalize_cockpit_url(raw: &str) -> Result<Url, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err("url is required".to_string());
+    }
+    let with_scheme = if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+        trimmed.to_string()
+    } else {
+        format!("https://{}", trimmed)
+    };
+    Url::parse(&with_scheme).map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResearchCockpitOpenInput {
+    pub url: String,
+    pub title: Option<String>,
+    pub reference_id: Option<i64>,
+    pub idea_id: Option<i64>,
+    pub writing_id: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ResearchCockpitOpenPayload {
+    url: String,
+    title: Option<String>,
+    reference_id: Option<i64>,
+    idea_id: Option<i64>,
+    writing_id: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResearchCockpitNavigateInput {
+    pub url: String,
+    pub window_label: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CockpitBoundsInput {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub window_label: Option<String>,
+}
+
+fn normalize_cockpit_bounds(input: &CockpitBoundsInput) -> (f64, f64, f64, f64) {
+    let width = input.width.max(1.0);
+    let height = input.height.max(1.0);
+    let x = input.x.max(0.0);
+    let y = input.y.max(0.0);
+    (x, y, width, height)
+}
+
+fn cockpit_rect(bounds: (f64, f64, f64, f64)) -> Rect {
+    let x = bounds.0.round() as i32;
+    let y = bounds.1.round() as i32;
+    let width = bounds.2.round().max(1.0) as u32;
+    let height = bounds.3.round().max(1.0) as u32;
+    Rect {
+        position: PhysicalPosition::new(x, y).into(),
+        size: PhysicalSize::new(width, height).into(),
+    }
+}
+
+fn cockpit_route(input: &ResearchCockpitOpenInput, url: &Url) -> Result<String, String> {
+    let mut route_url = Url::parse("https://cockpit.local/").map_err(|e| e.to_string())?;
+    route_url.set_path("research/cockpit");
+    {
+        let mut pairs = route_url.query_pairs_mut();
+        pairs.append_pair("url", url.as_str());
+        if let Some(title) = input.title.as_ref() {
+            pairs.append_pair("title", title);
+        }
+        if let Some(reference_id) = input.reference_id {
+            pairs.append_pair("referenceId", &reference_id.to_string());
+        }
+        if let Some(idea_id) = input.idea_id {
+            pairs.append_pair("ideaId", &idea_id.to_string());
+        }
+        if let Some(writing_id) = input.writing_id {
+            pairs.append_pair("writingId", &writing_id.to_string());
+        }
+    }
+    let query = route_url.query().unwrap_or("");
+    let path = route_url.path().trim_start_matches('/');
+    if query.is_empty() {
+        Ok(path.to_string())
+    } else {
+        Ok(format!("{}?{}", path, query))
+    }
+}
+
+fn resolve_cockpit_window(app: &AppHandle) -> Option<tauri::Window> {
+    app.get_window(RESEARCH_COCKPIT_WINDOW_LABEL)
+        .or_else(|| app.get_window("main"))
+}
+
+fn resolve_cockpit_window_for_label(
+    app: &AppHandle,
+    window_label: Option<&str>,
+) -> Option<tauri::Window> {
+    if let Some(label) = window_label {
+        if let Some(window) = app.get_window(label) {
+            return Some(window);
+        }
+    }
+    resolve_cockpit_window(app)
+}
+
+fn cockpit_bounds(window: &tauri::Window) -> Result<Rect, String> {
+    let size = window.inner_size().map_err(|e| e.to_string())?;
+    let scale = window.scale_factor().map_err(|e| e.to_string())?;
+    let width = size.width.max(1);
+    let height = size.height.max(1);
+    let fallback_width = ((width as f64) * RESEARCH_COCKPIT_SPLIT).floor().max(1.0) as u32;
+    let sidebar_physical = (RESEARCH_COCKPIT_SIDEBAR_WIDTH * scale).round() as u32;
+    let tools_width = sidebar_physical.min(fallback_width).min(width.saturating_sub(1));
+    let webview_width = (width.saturating_sub(tools_width)).max(1);
+    Ok(Rect {
+        position: PhysicalPosition::new(tools_width as i32, 0).into(),
+        size: PhysicalSize::new(webview_width, height).into(),
+    })
+}
+
+fn stored_cockpit_bounds(app: &AppHandle, window_label: &str) -> Option<Rect> {
+    let state = app.state::<AppState>();
+    let stored = state.cockpit_bounds.lock().ok()?;
+    let stored = stored.as_ref()?;
+    if stored.window_label != window_label {
+        return None;
+    }
+    Some(cockpit_rect(stored.bounds))
+}
+
+fn schedule_cockpit_reflow(app: AppHandle) {
+    async_runtime::spawn(async move {
+        let delays = [0_u64, 50, 150, 300];
+        for delay in delays {
+            if delay > 0 {
+                sleep(Duration::from_millis(delay)).await;
+            }
+            let _ = resize_research_cockpit(&app);
+        }
+    });
+}
+
+fn ensure_cockpit_webview(app: &AppHandle, window: &tauri::Window, url: Url) -> Result<(), String> {
+    let bounds = if let Some(bounds) = stored_cockpit_bounds(app, window.label()) {
+        bounds
+    } else {
+        cockpit_bounds(window)?
+    };
+    if let Some(existing) = app.get_webview(RESEARCH_COCKPIT_WEBVIEW_LABEL) {
+        if existing.window().label() != window.label() {
+            existing.close().map_err(|e| e.to_string())?;
+        }
+    }
+
+    if let Some(existing) = app.get_webview(RESEARCH_COCKPIT_WEBVIEW_LABEL) {
+        existing.navigate(url).map_err(|e| e.to_string())?;
+        existing.set_bounds(bounds).map_err(|e| e.to_string())?;
+        existing
+            .set_position(bounds.position)
+            .map_err(|e| e.to_string())?;
+        existing.set_size(bounds.size).map_err(|e| e.to_string())?;
+        existing.show().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    let webview_builder = WebviewBuilder::new(
+        RESEARCH_COCKPIT_WEBVIEW_LABEL,
+        WebviewUrl::External(url),
+    )
+    .initialization_script(COCKPIT_SELECTION_SCRIPT);
+
+    let webview = window
+        .add_child(webview_builder, bounds.position, bounds.size)
+        .map_err(|e| e.to_string())?;
+    webview.set_bounds(bounds).map_err(|e| e.to_string())?;
+    webview
+        .set_position(bounds.position)
+        .map_err(|e| e.to_string())?;
+    webview.set_size(bounds.size).map_err(|e| e.to_string())?;
+    webview.show().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub fn resize_research_cockpit(app: &AppHandle) -> Result<(), String> {
+    let window = resolve_cockpit_window(app)
+        .ok_or_else(|| "Cockpit window not found".to_string())?;
+    if app.get_webview(RESEARCH_COCKPIT_WEBVIEW_LABEL).is_none() {
+        return Ok(());
+    }
+    let bounds = if let Some(bounds) = stored_cockpit_bounds(app, window.label()) {
+        bounds
+    } else {
+        cockpit_bounds(&window)?
+    };
+    if let Some(webview) = app.get_webview(RESEARCH_COCKPIT_WEBVIEW_LABEL) {
+        webview.set_bounds(bounds).map_err(|e| e.to_string())?;
+        webview
+            .set_position(bounds.position)
+            .map_err(|e| e.to_string())?;
+        webview.set_size(bounds.size).map_err(|e| e.to_string())?;
+        webview.show().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn research_set_cockpit_bounds(
+    app: AppHandle,
+    input: CockpitBoundsInput,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let window = resolve_cockpit_window_for_label(&app, input.window_label.as_deref())
+        .ok_or_else(|| "Cockpit window not found".to_string())?;
+    let scale = window.scale_factor().map_err(|e| e.to_string())?;
+    let logical = normalize_cockpit_bounds(&input);
+    let bounds = (
+        logical.0 * scale,
+        logical.1 * scale,
+        logical.2 * scale,
+        logical.3 * scale,
+    );
+    {
+        let mut guard = state
+            .cockpit_bounds
+            .lock()
+            .map_err(|_| "Failed to lock cockpit bounds".to_string())?;
+        *guard = Some(CockpitBoundsState {
+            window_label: window.label().to_string(),
+            bounds,
+        });
+    }
+    if let Some(webview) = app.get_webview(RESEARCH_COCKPIT_WEBVIEW_LABEL) {
+        if webview.window().label() != window.label() {
+            return Ok(());
+        }
+        let rect = cockpit_rect(bounds);
+        webview.set_bounds(rect).map_err(|e| e.to_string())?;
+        webview
+            .set_position(rect.position)
+            .map_err(|e| e.to_string())?;
+        webview.set_size(rect.size).map_err(|e| e.to_string())?;
+        webview.show().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn research_open_cockpit(
+    app: AppHandle,
+    input: ResearchCockpitNavigateInput,
+) -> Result<(), String> {
+    let target_url = normalize_cockpit_url(&input.url)?;
+    let window = resolve_cockpit_window_for_label(&app, input.window_label.as_deref())
+        .ok_or_else(|| "Cockpit window not found".to_string())?;
+    ensure_cockpit_webview(&app, &window, target_url)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn research_open_detached_cockpit(
+    app: AppHandle,
+    input: ResearchCockpitOpenInput,
+) -> Result<(), String> {
+    let target_url = normalize_cockpit_url(&input.url)?;
+    let route = cockpit_route(&input, &target_url)?;
+
+    if let Some(window) = app.get_webview_window(RESEARCH_COCKPIT_WINDOW_LABEL) {
+        window
+            .emit(
+                "research-cockpit-open",
+                ResearchCockpitOpenPayload {
+                    url: target_url.as_str().to_string(),
+                    title: input.title.clone(),
+                    reference_id: input.reference_id,
+                    idea_id: input.idea_id,
+                    writing_id: input.writing_id,
+                },
+            )
+            .map_err(|e| e.to_string())?;
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+        schedule_cockpit_reflow(app.clone());
+        if let Some(cockpit_window) = app.get_window(RESEARCH_COCKPIT_WINDOW_LABEL) {
+            ensure_cockpit_webview(&app, &cockpit_window, target_url)?;
+        }
+        return Ok(());
+    }
+
+    let cockpit_window = WebviewWindowBuilder::new(
+        &app,
+        RESEARCH_COCKPIT_WINDOW_LABEL,
+        WebviewUrl::App(route.into()),
+    )
+    .title("Architect Cockpit")
+    .inner_size(1400.0, 900.0)
+    .visible(false)
+    .build()
+    .map_err(|e| e.to_string())?;
+
+    cockpit_window.maximize().map_err(|e| e.to_string())?;
+
+    let handle = app.clone();
+    cockpit_window.on_window_event(move |event| {
+        if matches!(
+            event,
+            tauri::WindowEvent::Resized(_)
+                | tauri::WindowEvent::ScaleFactorChanged { .. }
+                | tauri::WindowEvent::Moved(_)
+        ) {
+            let _ = resize_research_cockpit(&handle);
+        }
+    });
+
+    let cockpit_window_handle = app
+        .get_window(RESEARCH_COCKPIT_WINDOW_LABEL)
+        .ok_or_else(|| "Cockpit window not found".to_string())?;
+    ensure_cockpit_webview(&app, &cockpit_window_handle, target_url)?;
+    cockpit_window.show().map_err(|e| e.to_string())?;
+    cockpit_window.set_focus().map_err(|e| e.to_string())?;
+    schedule_cockpit_reflow(app);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn research_close_cockpit(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    if let Ok(mut guard) = state.cockpit_bounds.lock() {
+        *guard = None;
+    }
+    if let Some(webview) = app.get_webview(RESEARCH_COCKPIT_WEBVIEW_LABEL) {
+        webview.close().map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -120,6 +512,13 @@ pub async fn list_news_articles(
     )
     .await
     .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn clear_news_articles(state: State<'_, AppState>) -> Result<u64, String> {
+    clear_news_articles_handler(&state)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 // --- Research connectors (accounts/streams/items) ---

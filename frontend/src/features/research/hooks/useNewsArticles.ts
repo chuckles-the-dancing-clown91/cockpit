@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
+  clearNewsArticles,
   dismissNewsArticle,
   listNewsArticles,
   markNewsArticleRead,
@@ -71,6 +72,16 @@ export function useNewsArticleActions() {
     onError: (err) => toast.error('Failed to dismiss', errorMessage(err)),
   });
 
+  const clearAll = useMutation({
+    mutationFn: () => clearNewsArticles(),
+    onSuccess: async (count) => {
+      toast.success('Articles cleared', `${count} removed`);
+      await invalidate();
+      await qc.invalidateQueries({ queryKey: queryKeys.sources.all() });
+    },
+    onError: (err) => toast.error('Failed to clear articles', errorMessage(err)),
+  });
+
   const syncNow = useMutation({
     mutationFn: async (sourceId?: number | null) => {
       if (sourceId) {
@@ -85,5 +96,5 @@ export function useNewsArticleActions() {
     onError: (err) => toast.error('Failed to sync', errorMessage(err)),
   });
 
-  return { toggleStar, markRead, dismiss, syncNow };
+  return { toggleStar, markRead, dismiss, clearAll, syncNow };
 }
