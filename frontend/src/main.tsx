@@ -13,6 +13,7 @@ import { ResearchView } from './domains/research/ResearchView';
 import { ResearchSourcesView } from './domains/research/ResearchSourcesView';
 import { ResearchStreamView } from './domains/research/ResearchStreamView';
 import { ResearchCockpitView } from './domains/research/ResearchCockpitView';
+import { NotesCockpitView } from './domains/notes/NotesCockpitView';
 import { SystemView } from './domains/system/SystemView';
 import { Settings } from './domains/system/Settings';
 import { Storage } from './domains/system/Storage';
@@ -54,6 +55,7 @@ createRoot(document.getElementById('root')!).render(
             <BrowserRouter>
         <Routes>
           <Route path="/research/cockpit" element={<ResearchCockpitView />} />
+          <Route path="/notes/cockpit" element={<NotesCockpitView />} />
           <Route path="/" element={<AppShell />}>
             {/* Redirect root to writing */}
             <Route index element={<Navigate to="/writing" replace />} />

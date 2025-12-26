@@ -379,6 +379,11 @@ pub async fn research_open_detached_cockpit(
     let target_url = normalize_cockpit_url(&input.url)?;
     let route = cockpit_route(&input, &target_url)?;
 
+    // Defensive: if an older build created an embedded cockpit webview, close it.
+    if let Some(webview) = app.get_webview(RESEARCH_COCKPIT_WEBVIEW_LABEL) {
+        let _ = webview.close();
+    }
+
     if let Some(window) = app.get_webview_window(RESEARCH_COCKPIT_WINDOW_LABEL) {
         window
             .emit(
@@ -394,10 +399,6 @@ pub async fn research_open_detached_cockpit(
             .map_err(|e| e.to_string())?;
         window.show().map_err(|e| e.to_string())?;
         window.set_focus().map_err(|e| e.to_string())?;
-        schedule_cockpit_reflow(app.clone());
-        if let Some(cockpit_window) = app.get_window(RESEARCH_COCKPIT_WINDOW_LABEL) {
-            ensure_cockpit_webview(&app, &cockpit_window, target_url)?;
-        }
         return Ok(());
     }
 
@@ -413,26 +414,8 @@ pub async fn research_open_detached_cockpit(
     .map_err(|e| e.to_string())?;
 
     cockpit_window.maximize().map_err(|e| e.to_string())?;
-
-    let handle = app.clone();
-    cockpit_window.on_window_event(move |event| {
-        if matches!(
-            event,
-            tauri::WindowEvent::Resized(_)
-                | tauri::WindowEvent::ScaleFactorChanged { .. }
-                | tauri::WindowEvent::Moved(_)
-        ) {
-            let _ = resize_research_cockpit(&handle);
-        }
-    });
-
-    let cockpit_window_handle = app
-        .get_window(RESEARCH_COCKPIT_WINDOW_LABEL)
-        .ok_or_else(|| "Cockpit window not found".to_string())?;
-    ensure_cockpit_webview(&app, &cockpit_window_handle, target_url)?;
     cockpit_window.show().map_err(|e| e.to_string())?;
     cockpit_window.set_focus().map_err(|e| e.to_string())?;
-    schedule_cockpit_reflow(app);
     Ok(())
 }
 
