@@ -201,6 +201,10 @@ export async function syncAllFeedSources(): Promise<unknown> {
 
 export type ResearchCockpitPane = 'references' | 'notes';
 
+function resolveResearchCockpitLabel(pane: ResearchCockpitPane): string {
+  return pane === 'references' ? 'research_cockpit_left' : 'research_cockpit_right';
+}
+
 export async function researchOpenCockpit(input: {
   pane: ResearchCockpitPane;
   url: string;
@@ -217,7 +221,7 @@ export async function researchOpenCockpit(input: {
   if (input.ideaId !== undefined) payload.ideaId = input.ideaId;
   if (input.writingId !== undefined) payload.writingId = input.writingId;
   if (input.windowLabel !== undefined) payload.windowLabel = input.windowLabel;
-  if (input.webviewLabel !== undefined) payload.webviewLabel = input.webviewLabel;
+  payload.webviewLabel = input.webviewLabel ?? resolveResearchCockpitLabel(input.pane);
   return tauriInvoke('research_open_cockpit', { input: payload });
 }
 
@@ -241,7 +245,7 @@ export async function researchSetCockpitBounds(input: {
     height: input.height,
   };
   if (input.windowLabel !== undefined) payload.windowLabel = input.windowLabel;
-  if (input.webviewLabel !== undefined) payload.webviewLabel = input.webviewLabel;
+  payload.webviewLabel = input.webviewLabel ?? resolveResearchCockpitLabel(input.pane);
   return tauriInvoke('research_set_cockpit_bounds', { input: payload });
 }
 

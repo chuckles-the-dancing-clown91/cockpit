@@ -71,7 +71,7 @@ use system::scheduler::start_scheduler;
 #[derive(Clone)]
 pub struct CockpitBoundsState {
     pub window_label: String,
-    pub panes: HashMap<String, (f64, f64, f64, f64)>,
+    pub panes: HashMap<String, (f64, f64, f64, f64)>, // logical px relative to the cockpit window
 }
 
 #[derive(Clone)]

@@ -5,7 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Webview, getCurrentWebview } from "@tauri-apps/api/webview";
-import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
+import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
 
 import { useWebviewStore, getWebviewSelectedText } from "../store";
 import { registerWebviewInstance, closeWebview, navigateWebview, webviewBack, webviewForward, webviewReload } from "../index";
@@ -131,6 +131,9 @@ export function WebviewModal() {
     }
 
     let ro: ResizeObserver | null = null;
+    let unlistenMoved: (() => void) | null = null;
+    let unlistenResized: (() => void) | null = null;
+    let unlistenScale: (() => void) | null = null;
     let alive = true;
     let tries = 0;
     let raf: number | null = null;
@@ -138,29 +141,34 @@ export function WebviewModal() {
 
     const syncBounds = async (wv: Webview) => {
       const rect = host.getBoundingClientRect();
-      const x = Math.round(rect.left);
-      const y = Math.round(rect.top);
-      const width = Math.max(1, Math.round(rect.width));
-      const height = Math.max(1, Math.round(rect.height));
-      await wv.setPosition(new LogicalPosition(x, y));
-      await wv.setSize(new LogicalSize(width, height));
+      const win = getCurrentWindow();
+      const [winPos, scale] = await Promise.all([win.innerPosition(), win.scaleFactor()]);
+      const x = Math.round(winPos.x + rect.left * scale);
+      const y = Math.round(winPos.y + rect.top * scale);
+      const width = Math.max(1, Math.round(rect.width * scale));
+      const height = Math.max(1, Math.round(rect.height * scale));
+      await wv.setPosition(new PhysicalPosition(x, y));
+      await wv.setSize(new PhysicalSize(width, height));
     };
 
     const attachWebview = async () => {
       if (!alive) return;
       const r = host.getBoundingClientRect();
-      const width = Math.max(1, Math.round(r.width));
-      const height = Math.max(1, Math.round(r.height));
+      const logicalWidth = Math.max(1, Math.round(r.width));
+      const logicalHeight = Math.max(1, Math.round(r.height));
 
-      if ((width <= 1 || height <= 1) && tries < 60) {
+      if ((logicalWidth <= 1 || logicalHeight <= 1) && tries < 60) {
         tries += 1;
         raf = requestAnimationFrame(attachWebview);
         return;
       }
 
       const win = getCurrentWindow();
-      const x = Math.round(r.left);
-      const y = Math.round(r.top);
+      const [winPos, scale] = await Promise.all([win.innerPosition(), win.scaleFactor()]);
+      const x = Math.round(winPos.x + r.left * scale);
+      const y = Math.round(winPos.y + r.top * scale);
+      const width = Math.max(1, Math.round(r.width * scale));
+      const height = Math.max(1, Math.round(r.height * scale));
 
       console.log('[WebviewModal] Creating webview with bounds:', { x, y, width, height });
 
@@ -227,15 +235,41 @@ export function WebviewModal() {
       }
 
       // Keep webview positioned with ResizeObserver
-      ro = new ResizeObserver(async () => {
+      const syncBoundsSafe = () => {
         if (!alive) return;
         if (!host) return;
-        const wv2 = await Webview.getByLabel(WEBVIEW_LABEL);
-        if (!wv2) return;
+        Webview.getByLabel(WEBVIEW_LABEL)
+          .then((wv2) => {
+            if (!wv2) return;
+            return syncBounds(wv2);
+          })
+          .catch(() => {});
+      };
 
-        await syncBounds(wv2);
+      ro = new ResizeObserver(() => {
+        syncBoundsSafe();
       });
       ro.observe(host);
+
+      const windowHandle = getCurrentWindow();
+      windowHandle
+        .onMoved(() => syncBoundsSafe())
+        .then((unlisten) => {
+          unlistenMoved = unlisten;
+        })
+        .catch(() => {});
+      windowHandle
+        .onResized(() => syncBoundsSafe())
+        .then((unlisten) => {
+          unlistenResized = unlisten;
+        })
+        .catch(() => {});
+      windowHandle
+        .onScaleChanged(() => syncBoundsSafe())
+        .then((unlisten) => {
+          unlistenScale = unlisten;
+        })
+        .catch(() => {});
 
       const updateForAnimation = async () => {
         if (!alive) return;
@@ -266,6 +300,9 @@ export function WebviewModal() {
       if (raf !== null) cancelAnimationFrame(raf);
       if (positionRaf !== null) cancelAnimationFrame(positionRaf);
       ro?.disconnect();
+      unlistenMoved?.();
+      unlistenResized?.();
+      unlistenScale?.();
       
       // Optionally hide webview on close
       Webview.getByLabel(WEBVIEW_LABEL).then(wv => wv?.close());

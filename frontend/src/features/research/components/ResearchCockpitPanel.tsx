@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
-import { ArrowLeft } from 'lucide-react';
-import { Box, Button, Flex, Heading, Text } from '@radix-ui/themes';
 
-import { researchOpenCockpit, researchSetCockpitBounds, type ResearchCockpitPane } from '@/core/api/tauri';
-import { toast } from '@/core/lib/toast';
+import { CockpitLayout } from './cockpit/CockpitLayout';
+import { CockpitNotesPanel } from './cockpit/CockpitNotesPanel';
+import { CockpitWebviewPane } from './cockpit/CockpitWebviewPane';
 import type { NoteEntityType, WebviewContext } from '@/shared/types';
 
 type CockpitOpenPayload = {
@@ -15,8 +14,6 @@ type CockpitOpenPayload = {
   ideaId?: number | null;
   writingId?: number | null;
 };
-
-const PANE_SEQUENCE: ResearchCockpitPane[] = ['references', 'notes'];
 
 function normalizeUrl(raw: string): string | null {
   const trimmed = raw.trim();
@@ -72,28 +69,6 @@ function mapNoteTarget(
   return null;
 }
 
-function buildNotesUrl(
-  mappedTarget: { entityType: NoteEntityType; entityId: number } | null,
-  title?: string,
-): string | null {
-  if (!mappedTarget) return null;
-  const base = new URL('/notes/cockpit', window.location.origin);
-  base.searchParams.set('entityType', mappedTarget.entityType);
-  base.searchParams.set('entityId', String(mappedTarget.entityId));
-  if (title) base.searchParams.set('title', title);
-  return base.toString();
-}
-
-function boundsFromHost(host: HTMLDivElement) {
-  const rect = host.getBoundingClientRect();
-  return {
-    x: Math.round(rect.left),
-    y: Math.round(rect.top),
-    width: Math.max(1, Math.round(rect.width)),
-    height: Math.max(1, Math.round(rect.height)),
-  };
-}
-
 export function ResearchCockpitPanel() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -115,14 +90,11 @@ export function ResearchCockpitPanel() {
     return normalized ?? 'https://duckduckgo.com/';
   }, [context?.url]);
 
-  const notesUrl = useMemo(() => buildNotesUrl(noteTarget, context?.title), [context?.title, noteTarget]);
+  const [urlInput, setUrlInput] = useState('');
 
-  const hostRefs: Record<ResearchCockpitPane, RefObject<HTMLDivElement>> = {
-    references: useRef<HTMLDivElement | null>(null),
-    notes: useRef<HTMLDivElement | null>(null),
-  };
-
-  const lastOpenedUrlsRef = useRef<Partial<Record<ResearchCockpitPane, string>>>({});
+  useEffect(() => {
+    setUrlInput(referencesUrl);
+  }, [referencesUrl]);
 
   // Listen for cockpit open events (when user opens cockpit from another screen).
   useEffect(() => {
@@ -152,158 +124,35 @@ export function ResearchCockpitPanel() {
     };
   }, []);
 
-  const openPaneUrl = useCallback(
-    async (pane: ResearchCockpitPane, url: string) => {
-      if (!url) return;
-      if (lastOpenedUrlsRef.current[pane] === url) return;
-      lastOpenedUrlsRef.current[pane] = url;
-      try {
-        await researchOpenCockpit({ pane, url });
-      } catch (err) {
-        toast.error(`Failed to open ${pane} pane`, String(err));
+  const submitUrl = useCallback(() => {
+    const normalized = normalizeUrl(urlInput);
+    if (!normalized) return;
+    setContext((prev) => {
+      if (prev) {
+        if (prev.url === normalized) return prev;
+        return { ...prev, url: normalized };
       }
-    },
-    [],
-  );
-
-  // Navigate panes when context changes.
-  useEffect(() => {
-    openPaneUrl('references', referencesUrl);
-  }, [openPaneUrl, referencesUrl]);
-
-  useEffect(() => {
-    if (!notesUrl) return;
-    openPaneUrl('notes', notesUrl);
-  }, [notesUrl, openPaneUrl]);
-
-  const syncPaneBounds = useCallback(
-    (pane: ResearchCockpitPane) => {
-      const host = hostRefs[pane].current;
-      if (!host) return;
-      const rect = host.getBoundingClientRect();
-      if (rect.width <= 1 || rect.height <= 1) return;
-      researchSetCockpitBounds({
-        pane,
-        ...boundsFromHost(host),
-      }).catch(() => {});
-    },
-    [hostRefs],
-  );
-
-  // Forward host bounds to backend (initial + resize).
-  useEffect(() => {
-    let raf: number | null = null;
-    const scheduleSync = () => {
-      PANE_SEQUENCE.forEach((pane) => syncPaneBounds(pane));
-    };
-
-    raf = requestAnimationFrame(scheduleSync);
-
-    const observers = PANE_SEQUENCE.map((pane) => {
-      const host = hostRefs[pane].current;
-      if (!host) return null;
-      const ro = new ResizeObserver(scheduleSync);
-      ro.observe(host);
-      return ro;
-    }).filter(Boolean) as ResizeObserver[];
-
-    window.addEventListener('resize', scheduleSync);
-    return () => {
-      if (raf !== null) cancelAnimationFrame(raf);
-      observers.forEach((ro) => ro.disconnect());
-      window.removeEventListener('resize', scheduleSync);
-    };
-  }, [syncPaneBounds]);
-
+      return { url: normalized };
+    });
+  }, [urlInput]);
   return (
-    <Flex
-      direction="row"
-      style={{
-        width: '100vw',
-        height: '100vh',
-        minHeight: 0,
-        overflow: 'hidden',
-        backgroundColor: 'var(--color-surface)',
-      }}
-    >
-      <Flex
-        align="center"
-        justify="between"
-        style={{
-          padding: 'var(--space-3)',
-          borderBottom: '1px solid var(--color-border)',
-          backgroundColor: 'var(--color-surface)',
-          width: '100%',
-        }}
-      >
-        <Button variant="ghost" onClick={() => navigate(-1)}>
-          <ArrowLeft size={16} />
-          Back
-        </Button>
-        <Flex align="center" gap="3" style={{ minWidth: 0, flex: 1, justifyContent: 'flex-end' }}>
-          <Heading
-            size="4"
-            style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'right' }}
-          >
-            {context?.title || 'Research Cockpit'}
-          </Heading>
-          {!notesUrl ? (
-            <Text size="1" color="gray" style={{ textAlign: 'right' }}>
-              Open from a reference to load notes alongside the page.
-            </Text>
-          ) : null}
-        </Flex>
-      </Flex>
-
-      <Flex
-        direction="row"
-        style={{
-          flex: 1,
-          minWidth: 0,
-          minHeight: 0,
-          overflow: 'hidden',
-          backgroundColor: 'var(--color-surface)',
-        }}
-      >
-        <Box
-          ref={hostRefs.references}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            minHeight: 0,
-            position: 'relative',
-            borderRight: '1px solid var(--color-border)',
-            backgroundColor: 'var(--color-surface)',
-          }}
-          title={referencesUrl}
+    <CockpitLayout
+      title={context?.title || 'Research Cockpit'}
+      urlInput={urlInput}
+      onUrlChange={setUrlInput}
+      onSubmitUrl={submitUrl}
+      onBack={() => navigate(-1)}
+      left={
+        <CockpitWebviewPane
+          pane="references"
+          url={referencesUrl}
+          title={context?.title ?? undefined}
+          referenceId={context?.referenceId ?? undefined}
+          ideaId={context?.ideaId ?? undefined}
+          writingId={context?.writingId ?? undefined}
         />
-        <Box
-          ref={hostRefs.notes}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            minHeight: 0,
-            position: 'relative',
-            backgroundColor: 'var(--color-surface-soft)',
-          }}
-          title={notesUrl ?? undefined}
-        >
-          {!notesUrl ? (
-            <Flex
-              direction="column"
-              align="center"
-              justify="center"
-              gap="2"
-              style={{ position: 'absolute', inset: 0, padding: 'var(--space-3)' }}
-            >
-              <Heading size="3">No linked notes</Heading>
-              <Text color="gray" align="center">
-                Launch Research Cockpit from a reference or idea to view its notes here.
-              </Text>
-            </Flex>
-          ) : null}
-        </Box>
-      </Flex>
-    </Flex>
+      }
+      right={<CockpitNotesPanel noteTarget={noteTarget} />}
+    />
   );
 }
