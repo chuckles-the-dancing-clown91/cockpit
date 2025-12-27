@@ -3,7 +3,7 @@
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use serde_json::json;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::AppState;
 use crate::connectors::{get_connector, NormalizedItem};
@@ -173,8 +173,10 @@ pub async fn delete_account(id: i64, state: &AppState) -> Result<(), String> {
 }
 
 pub async fn test_account(_id: i64, _state: &AppState) -> Result<(), String> {
-    // TODO: validate auth/scopes vs allowed capabilities
-    Ok(())
+    warn!(
+        "research_test_account is disabled until connector validation is implemented"
+    );
+    Err("research_test_account is not available yet".into())
 }
 
 pub async fn list_streams(
@@ -455,7 +457,7 @@ pub async fn convert_to_reference(
     _idea_id: Option<i64>,
     _state: &AppState,
 ) -> Result<(), String> {
-    Err("research_convert_to_reference not implemented yet".into())
+    Err("research_convert_to_reference is not available yet".into())
 }
 
 pub async fn publish(
@@ -464,7 +466,7 @@ pub async fn publish(
     _state: &AppState,
 ) -> Result<serde_json::Value, String> {
     // Capabilities guard will be added when publish is implemented
-    Err("research_publish not implemented yet".into())
+    Err("research_publish is not available yet".into())
 }
 
 async fn upsert_research_item(
