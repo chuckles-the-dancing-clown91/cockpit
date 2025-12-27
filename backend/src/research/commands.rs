@@ -172,7 +172,9 @@ pub async fn research_test_account(
     id: i64,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    connectors::test_account(id, state.inner()).await
+    let _ = id;
+    let _ = state;
+    Err("research_test_account is not available yet".into())
 }
 
 #[tauri::command]
@@ -230,7 +232,10 @@ pub async fn research_convert_to_reference(
     idea_id: Option<i64>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    connectors::convert_to_reference(item_id, idea_id, state.inner()).await
+    let _ = item_id;
+    let _ = idea_id;
+    let _ = state;
+    Err("research_convert_to_reference is not available yet".into())
 }
 
 #[tauri::command]
@@ -239,7 +244,10 @@ pub async fn research_publish(
     payload: serde_json::Value,
     state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    connectors::publish(account_id, payload, state.inner()).await
+    let _ = account_id;
+    let _ = payload;
+    let _ = state;
+    Err("research_publish is not available yet".into())
 }
 
 #[tauri::command]
