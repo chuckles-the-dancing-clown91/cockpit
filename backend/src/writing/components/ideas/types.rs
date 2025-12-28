@@ -284,3 +284,15 @@ pub struct UpdateReferenceNotesInput {
     pub reference_id: i64,
     pub notes_markdown: Option<String>,
 }
+
+/// DTO for a read-only reader snapshot of a reference
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReferenceReaderSnapshotDto {
+    pub reference_id: i64,
+    pub url: String,
+    pub title: String,
+    pub excerpt: Option<String>,
+    pub content_html: String,
+    pub content_text: String,
+}

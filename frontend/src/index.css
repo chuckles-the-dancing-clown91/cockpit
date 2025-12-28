@@ -91,3 +91,38 @@ body {
 [data-state="open"] > button svg {
   transform: rotate(180deg);
 }
+
+/* Reader mode content styling */
+.reference-reader-content {
+  color: var(--color-text-primary);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.reference-reader-content h1,
+.reference-reader-content h2,
+.reference-reader-content h3,
+.reference-reader-content h4 {
+  margin: 0 0 0.6em;
+}
+
+.reference-reader-content p {
+  margin: 0 0 1em;
+}
+
+.reference-reader-content a {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.reference-reader-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+.reference-reader-content blockquote {
+  margin: 0 0 1em;
+  padding-left: 1em;
+  border-left: 2px solid var(--color-border);
+  color: var(--color-text-soft);
+}

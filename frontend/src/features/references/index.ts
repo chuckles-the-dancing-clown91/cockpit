@@ -8,3 +8,4 @@ export {
   useRemoveReference,
   useUpdateReferenceNotes,
 } from './hooks/useReferences';
+export { useReferenceReader } from './hooks/useReferenceReader';

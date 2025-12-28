@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Box } from '@radix-ui/themes';
 
-import { researchOpenCockpit, researchSetCockpitBounds, type ResearchCockpitPane } from '@/core/api/tauri';
+import {
+  researchOpenCockpit,
+  researchSetCockpitBounds,
+  resolveResearchCockpitLabel,
+  type ResearchCockpitPane,
+} from '@/core/api/tauri';
 import { toast } from '@/core/lib/toast';
 
 type CockpitWebviewPaneProps = {
@@ -34,15 +39,16 @@ export function CockpitWebviewPane({
   const hostRef = useRef<HTMLDivElement | null>(null);
   const lastOpenedUrlRef = useRef<string | null>(null);
   const [boundsReady, setBoundsReady] = useState(false);
+  const webviewLabel = resolveResearchCockpitLabel(pane);
 
   const syncBounds = useCallback(() => {
     const host = hostRef.current;
     if (!host) return false;
     const bounds = boundsFromHost(host);
     if (bounds.width <= 1 || bounds.height <= 1) return false;
-    researchSetCockpitBounds({ pane, ...bounds }).catch(() => {});
+    researchSetCockpitBounds({ pane, webviewLabel, ...bounds }).catch(() => {});
     return true;
-  }, [pane]);
+  }, [pane, webviewLabel]);
 
   useEffect(() => {
     let raf: number | null = null;
@@ -91,6 +97,7 @@ export function CockpitWebviewPane({
     lastOpenedUrlRef.current = url;
     researchOpenCockpit({
       pane,
+      webviewLabel,
       url,
       title,
       referenceId,
@@ -99,7 +106,7 @@ export function CockpitWebviewPane({
     }).catch((err) => {
       toast.error(`Failed to open ${pane} pane`, String(err));
     });
-  }, [boundsReady, ideaId, pane, referenceId, title, url, writingId]);
+  }, [boundsReady, ideaId, pane, referenceId, title, url, webviewLabel, writingId]);
 
   return (
     <Box

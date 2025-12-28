@@ -32,6 +32,7 @@ use writing::commands::{
     update_idea_metadata, update_idea_notes, update_idea_article, archive_idea,
     open_article_modal, add_highlight,
     list_idea_references, add_reference_to_idea, remove_reference, update_reference_notes,
+    get_reference_reader_snapshot,
     // Knowledge Graph commands
     kg_list_references, kg_get_reference, kg_create_reference, kg_update_reference, kg_delete_reference,
     kg_list_writings, kg_get_writing, kg_create_writing, kg_update_writing, kg_publish_writing, kg_delete_writing,
@@ -268,6 +269,7 @@ fn main() {
             add_reference_to_idea,
             remove_reference,
             update_reference_notes,
+            get_reference_reader_snapshot,
             // Knowledge Graph - Reference Items
             kg_list_references,
             kg_get_reference,

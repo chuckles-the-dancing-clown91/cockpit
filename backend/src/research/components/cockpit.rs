@@ -135,10 +135,9 @@ fn cockpit_physical_bounds(
     logical: CockpitBounds,
 ) -> Result<CockpitBounds, String> {
     let scale = window.scale_factor().map_err(|e| e.to_string())?;
-    let origin = window.inner_position().map_err(|e| e.to_string())?;
     Ok((
-        origin.x as f64 + logical.0 * scale,
-        origin.y as f64 + logical.1 * scale,
+        logical.0 * scale,
+        logical.1 * scale,
         logical.2 * scale,
         logical.3 * scale,
     ))
@@ -154,10 +153,6 @@ fn cockpit_rect_for_window(
 
 fn apply_webview_rect(webview: &tauri::Webview, rect: Rect) -> Result<(), String> {
     webview.set_bounds(rect).map_err(|e| e.to_string())?;
-    webview
-        .set_position(rect.position)
-        .map_err(|e| e.to_string())?;
-    webview.set_size(rect.size).map_err(|e| e.to_string())?;
     webview.show().map_err(|e| e.to_string())?;
     Ok(())
 }

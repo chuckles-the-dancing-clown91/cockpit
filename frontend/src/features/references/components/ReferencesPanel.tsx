@@ -1,10 +1,9 @@
 import { Flex, Text, Button, Badge, Card, TextField, TextArea } from '@radix-ui/themes';
-import { Plus, ExternalLink, Trash2, Eye, FileText } from 'lucide-react';
+import { Plus, ExternalLink, Trash2, FileText, BookOpen } from 'lucide-react';
 import { useState } from 'react';
 import { useIdeaReferences, useAddReference, useRemoveReference } from '../hooks/useReferences';
 import { NoteHoverPreview, ReferenceNotesDialog } from '@/features/notes';
-import { researchOpenDetachedCockpit } from '@/core/api/tauri';
-import { toast } from '@/core/lib/toast';
+import { ReferenceReaderDialog } from './ReferenceReaderDialog';
 
 interface ReferencesPanelProps {
   ideaId: number;
@@ -31,6 +30,10 @@ export function ReferencesPanel({ ideaId }: ReferencesPanelProps) {
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
   const [notesReferenceId, setNotesReferenceId] = useState<number | null>(null);
   const [notesReferenceTitle, setNotesReferenceTitle] = useState('');
+  const [readerDialogOpen, setReaderDialogOpen] = useState(false);
+  const [readerReferenceId, setReaderReferenceId] = useState<number | null>(null);
+  const [readerReferenceTitle, setReaderReferenceTitle] = useState('');
+  const [readerReferenceUrl, setReaderReferenceUrl] = useState<string | null>(null);
   
   const handleAddReference = async () => {
     if (!newRefUrl.trim()) return;
@@ -168,26 +171,20 @@ export function ReferencesPanel({ ideaId }: ReferencesPanelProps) {
                   >
                     <FileText className="w-4 h-4" />
                   </Button>
-                  {ref.url && (
-                    <Button
-                      variant="ghost"
-                      size="1"
-                      color="blue"
-                      onClick={() =>
-                        researchOpenDetachedCockpit({
-                          url: ref.url!,
-                          title: ref.title ?? undefined,
-                          referenceId: ref.id,
-                          ideaId,
-                        }).catch((err) => {
-                          toast.error('Failed to open research cockpit', String(err));
-                        })
-                      }
-                      title="View in embedded browser"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                  )}
+                  <Button
+                    variant="ghost"
+                    size="1"
+                    color="blue"
+                    onClick={() => {
+                      setReaderReferenceId(ref.id);
+                      setReaderReferenceTitle(ref.title || 'Reference');
+                      setReaderReferenceUrl(ref.url ?? null);
+                      setReaderDialogOpen(true);
+                    }}
+                    title="Open reader view"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="1"
@@ -212,6 +209,20 @@ export function ReferencesPanel({ ideaId }: ReferencesPanelProps) {
           }}
           referenceId={notesReferenceId}
           referenceTitle={notesReferenceTitle}
+        />
+      )}
+      {readerReferenceId && (
+        <ReferenceReaderDialog
+          open={readerDialogOpen}
+          onClose={() => {
+            setReaderDialogOpen(false);
+            setReaderReferenceId(null);
+            setReaderReferenceTitle('');
+            setReaderReferenceUrl(null);
+          }}
+          referenceId={readerReferenceId}
+          referenceTitle={readerReferenceTitle}
+          referenceUrl={readerReferenceUrl}
         />
       )}
     </Flex>

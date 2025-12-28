@@ -67,6 +67,15 @@ export interface Reference {
   updatedAt: string;
 }
 
+export interface ReferenceReaderSnapshot {
+  referenceId: number;
+  url: string;
+  title: string;
+  excerpt: string | null;
+  contentHtml: string;
+  contentText: string;
+}
+
 // News Article interface
 export interface NewsArticle {
   id: number;

@@ -7,6 +7,7 @@
 pub mod types;
 pub mod handlers;
 pub mod references;
+pub mod reader;
 pub mod entities;
 
 // Re-export DTOs for API responses
@@ -14,6 +15,7 @@ pub use types::{
     CreateIdeaForArticleInput, CreateIdeaInput, IdeaDto, UpdateIdeaArticleInput,
     UpdateIdeaMetadataInput, UpdateIdeaNotesInput,
     IdeaReferenceDto, AddReferenceInput, UpdateReferenceNotesInput,
+    ReferenceReaderSnapshotDto,
 };
 
 // Re-export handlers for Tauri commands
@@ -27,4 +29,8 @@ pub use handlers::{
 pub use references::{
     list_idea_references_handler, add_reference_to_idea_handler,
     remove_reference_handler, update_reference_notes_handler,
+};
+
+pub use reader::{
+    get_reference_reader_snapshot_handler,
 };

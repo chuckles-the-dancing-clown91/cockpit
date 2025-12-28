@@ -1,5 +1,13 @@
 import { invoke as tauriInvoke } from '@tauri-apps/api/core';
-import type { FeedSource, FeedSourceConfig, Idea, NewsArticle, NewsSourceDto, Reference } from '@/shared/types';
+import type {
+  FeedSource,
+  FeedSourceConfig,
+  Idea,
+  NewsArticle,
+  NewsSourceDto,
+  Reference,
+  ReferenceReaderSnapshot,
+} from '@/shared/types';
 import { priorityFromNumber } from '@/shared/types';
 
 /**
@@ -96,6 +104,10 @@ export async function removeReference(referenceId: number): Promise<void> {
 
 export async function updateReferenceNotes(referenceId: number, notesMarkdown: string): Promise<Reference> {
   return tauriInvoke('update_reference_notes', { referenceId, input: { notesMarkdown } });
+}
+
+export async function getReferenceReaderSnapshot(referenceId: number): Promise<ReferenceReaderSnapshot> {
+  return tauriInvoke('get_reference_reader_snapshot', { referenceId });
 }
 
 // ========== Research/News Commands ==========
@@ -201,7 +213,7 @@ export async function syncAllFeedSources(): Promise<unknown> {
 
 export type ResearchCockpitPane = 'references' | 'notes';
 
-function resolveResearchCockpitLabel(pane: ResearchCockpitPane): string {
+export function resolveResearchCockpitLabel(pane: ResearchCockpitPane): string {
   return pane === 'references' ? 'research_cockpit_left' : 'research_cockpit_right';
 }
 
