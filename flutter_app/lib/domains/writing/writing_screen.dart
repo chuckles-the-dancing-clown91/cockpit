@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/models.dart';
 import '../../core/widgets/async_value_view.dart';
+import '../../core/widgets/domain_action_bar.dart';
 import '../../core/widgets/domain_scaffold.dart';
 import '../../features/overview/providers.dart';
 
@@ -18,6 +19,12 @@ class WritingScreen extends ConsumerWidget {
     return DomainScaffold(
       title: 'Writing',
       subtitle: 'Drafts, chapters, and published work wired to the knowledge graph.',
+      toolbar: const DomainActionBar(
+        searchHint: 'Search drafts, chapters, or publications',
+        primaryLabel: 'New draft',
+        secondaryLabel: 'Link reference',
+        tertiaryLabel: 'Open outline',
+      ),
       child: AsyncValueView<List<WritingSummary>>(
         value: writings,
         emptyLabel: 'No drafts yet — start from an idea or a blank document.',

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/models.dart';
 import '../../core/widgets/async_value_view.dart';
+import '../../core/widgets/domain_action_bar.dart';
 import '../../core/widgets/domain_scaffold.dart';
 import '../../features/overview/providers.dart';
 
@@ -18,6 +19,12 @@ class ResearchScreen extends ConsumerWidget {
     return DomainScaffold(
       title: 'Research',
       subtitle: 'News, feeds, and clippings ready to attach to ideas and drafts.',
+      toolbar: const DomainActionBar(
+        searchHint: 'Search research sources or articles',
+        primaryLabel: 'Sync feeds',
+        secondaryLabel: 'Clip to note',
+        tertiaryLabel: 'Star newest',
+      ),
       child: AsyncValueView<List<ResearchItem>>(
         value: researchItems,
         emptyLabel: 'No research items yet — sync feed sources to get started.',
