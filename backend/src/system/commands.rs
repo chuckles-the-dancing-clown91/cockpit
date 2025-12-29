@@ -1,11 +1,11 @@
 //! System domain Tauri commands
 
-use tauri::State;
-use crate::AppState;
 use super::components::scheduler::{
     get_task_history_handler, list_system_tasks_handler, run_system_task_now_handler,
     update_system_task_handler, RunTaskNowResult, SystemTaskDto, TaskRunDto, UpdateTaskInput,
 };
+use crate::AppState;
+use tauri::State;
 
 #[tauri::command]
 pub async fn list_system_tasks(state: State<'_, AppState>) -> Result<Vec<SystemTaskDto>, String> {
@@ -32,9 +32,13 @@ pub async fn run_system_task_now(
     state: State<'_, AppState>,
     app: tauri::AppHandle,
 ) -> Result<RunTaskNowResult, String> {
-    run_system_task_now_handler(task_type, &state, &app)
-        .await
-        .map_err(|e| e.to_string())
+    run_system_task_now_handler(
+        task_type,
+        &state,
+        &crate::core::components::events::NoopEventEmitter,
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

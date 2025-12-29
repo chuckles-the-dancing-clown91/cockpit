@@ -4,6 +4,7 @@ pub mod config;
 pub mod crypto;
 pub mod db;
 pub mod errors;
+pub mod events;
 pub mod logging;
 pub mod reader;
 pub mod settings;

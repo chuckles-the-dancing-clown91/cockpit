@@ -12,7 +12,6 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, IntoActiveModel,
     QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
 };
-use tauri::State;
 use tracing::{info, instrument};
 
 /// List writing ideas with filtering, search, and pagination
@@ -26,7 +25,7 @@ pub async fn list_ideas_handler(
     include_removed: Option<bool>,
     limit: Option<u64>,
     offset: Option<u64>,
-    state: &State<'_, AppState>,
+    state: &AppState,
 ) -> AppResult<Vec<IdeaDto>> {
     let mut query = Entity::find();
 
@@ -81,7 +80,7 @@ pub async fn list_ideas_handler(
 }
 
 /// Get a single idea by ID with full content
-pub async fn get_idea_handler(id: i64, state: &State<'_, AppState>) -> AppResult<IdeaDto> {
+pub async fn get_idea_handler(id: i64, state: &AppState) -> AppResult<IdeaDto> {
     let model = Entity::find_by_id(id)
         .one(&state.db)
         .await?
@@ -95,10 +94,7 @@ pub async fn get_idea_handler(id: i64, state: &State<'_, AppState>) -> AppResult
 /// Creates idea with initial metadata and content.
 /// Uses default status if not provided.
 #[instrument(skip(state, input), fields(title = %input.title))]
-pub async fn create_idea_handler(
-    input: CreateIdeaInput,
-    state: &State<'_, AppState>,
-) -> AppResult<IdeaDto> {
+pub async fn create_idea_handler(input: CreateIdeaInput, state: &AppState) -> AppResult<IdeaDto> {
     info!("Creating new idea");
     create_idea_with_conn(input, &state.db).await
 }
@@ -143,7 +139,7 @@ where
 #[instrument(skip(state), fields(article_id = input.article_id))]
 pub async fn create_idea_for_article_handler(
     input: CreateIdeaForArticleInput,
-    state: &State<'_, AppState>,
+    state: &AppState,
 ) -> AppResult<IdeaDto> {
     info!("Creating idea from news article");
     // Use transaction to ensure both operations succeed or both fail
@@ -197,10 +193,10 @@ pub async fn create_idea_for_article_handler(
 pub async fn update_idea_metadata_handler(
     id: i64,
     input: UpdateIdeaMetadataInput,
-    state: &State<'_, AppState>,
+    state: &AppState,
 ) -> AppResult<IdeaDto> {
     tracing::info!("Updating idea metadata");
-    
+
     let mut model: ActiveModel = Entity::find_by_id(id)
         .one(&state.db)
         .await?
@@ -254,11 +250,11 @@ pub async fn update_idea_metadata_handler(
 pub async fn update_idea_notes_handler(
     id: i64,
     input: UpdateIdeaNotesInput,
-    state: &State<'_, AppState>,
+    state: &AppState,
 ) -> AppResult<IdeaDto> {
     let notes_len = input.notes_markdown.as_ref().map_or(0, |s| s.len());
     tracing::info!(notes_size = %notes_len, "Updating idea notes");
-    
+
     let mut model: ActiveModel = Entity::find_by_id(id)
         .one(&state.db)
         .await?
@@ -285,10 +281,10 @@ pub async fn update_idea_notes_handler(
 pub async fn update_idea_article_handler(
     id: i64,
     input: UpdateIdeaArticleInput,
-    state: &State<'_, AppState>,
+    state: &AppState,
 ) -> AppResult<IdeaDto> {
     tracing::info!("Updating idea article content");
-    
+
     let mut model: ActiveModel = Entity::find_by_id(id)
         .one(&state.db)
         .await?
@@ -310,9 +306,9 @@ pub async fn update_idea_article_handler(
 
 /// Archive an idea (soft delete)
 #[tracing::instrument(skip(state), fields(idea_id = %id))]
-pub async fn archive_idea_handler(id: i64, state: &State<'_, AppState>) -> AppResult<IdeaDto> {
+pub async fn archive_idea_handler(id: i64, state: &AppState) -> AppResult<IdeaDto> {
     tracing::info!("Archiving idea");
-    
+
     let mut model: ActiveModel = Entity::find_by_id(id)
         .one(&state.db)
         .await?
