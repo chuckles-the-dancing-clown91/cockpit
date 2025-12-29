@@ -7,12 +7,12 @@ use super::entities::{Column, Entity};
 use super::task_runs::ActiveModel as TaskRunActiveModel;
 use super::types::{SystemTask, TaskRunResult};
 use crate::core::components::errors::AppResult;
+use crate::core::components::events::EventEmitter;
 use crate::research::components::feed as news;
 use crate::AppState;
 use chrono::Utc;
 use sea_orm::prelude::Expr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
-use tauri::{AppHandle, Emitter};
 use tracing::{error, info, warn};
 
 /// Generate cron expression from task configuration
@@ -38,10 +38,7 @@ pub(crate) fn cron_for_task(task: &SystemTask) -> Option<String> {
 pub(crate) async fn load_enabled_tasks(
     db: &sea_orm::DatabaseConnection,
 ) -> AppResult<Vec<SystemTask>> {
-    let rows = Entity::find()
-        .filter(Column::Enabled.eq(1))
-        .all(db)
-        .await?;
+    let rows = Entity::find().filter(Column::Enabled.eq(1)).all(db).await?;
     Ok(rows
         .into_iter()
         .map(|m| SystemTask {
@@ -61,7 +58,7 @@ pub(crate) async fn load_enabled_tasks(
 /// Checks if task is already running, executes the task function,
 /// updates database with results, and emits event to frontend.
 pub(crate) async fn run_task_once(
-    app: &AppHandle,
+    emitter: &(dyn EventEmitter),
     state: &AppState,
     task: SystemTask,
 ) -> TaskRunResult {
@@ -100,10 +97,10 @@ pub(crate) async fn run_task_once(
         // Legacy news tasks (backwards compatibility)
         "news_sync" => news::run_news_sync_task(state).await,
         "news_sources_sync" => news::run_news_sources_sync_task(state).await,
-        
+
         // Feed source sync tasks
         "feed_sources_sync_all" => news::run_feed_sources_sync_all_task(state).await,
-        
+
         // Per-source sync tasks (pattern: feed_sync_{source_id})
         task_type if task_type.starts_with("feed_sync_") => {
             if let Some(source_id_str) = task_type.strip_prefix("feed_sync_") {
@@ -128,7 +125,7 @@ pub(crate) async fn run_task_once(
                 }
             }
         }
-        
+
         _ => {
             warn!(
                 target: "scheduler",
@@ -220,11 +217,8 @@ pub(crate) async fn run_task_once(
         "errorMessage": result.error_message,
         "finishedAt": now,
     });
-    if let Err(e) = app.emit("system_task_run", payload) {
-        error!(
-            target: "scheduler",
-            "Failed to emit task completion event: {}", e
-        );
+    if let Err(e) = emitter.emit("system_task_run", payload).await {
+        error!(target: "scheduler", "Failed to emit task completion event: {}", e);
     }
 
     // Remove from running set

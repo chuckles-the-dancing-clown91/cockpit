@@ -4,14 +4,17 @@
 
 use super::entities::{Column, Entity};
 use super::executor::run_task_once;
-use super::task_runs::{Column as TaskRunsColumn, Entity as TaskRunsEntity, Model as TaskRunsModel};
+use super::task_runs::{
+    Column as TaskRunsColumn, Entity as TaskRunsEntity, Model as TaskRunsModel,
+};
 use super::types::{model_to_dto, RunTaskNowResult, SystemTask, SystemTaskDto, UpdateTaskInput};
 use crate::core::components::errors::{AppError, AppResult};
+use crate::core::components::events::EventEmitter;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set,
+    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder,
+    QuerySelect, Set,
 };
 use serde::Serialize;
-use tauri::AppHandle;
 
 /// List all system tasks with execution history
 pub async fn list_system_tasks_handler(state: &crate::AppState) -> AppResult<Vec<SystemTaskDto>> {
@@ -23,7 +26,7 @@ pub async fn list_system_tasks_handler(state: &crate::AppState) -> AppResult<Vec
 pub async fn run_system_task_now_handler(
     task_type: String,
     state: &crate::AppState,
-    app: &AppHandle,
+    emitter: &(dyn EventEmitter),
 ) -> AppResult<RunTaskNowResult> {
     let maybe_task = Entity::find()
         .filter(Column::TaskType.eq(task_type.clone()))
@@ -41,7 +44,7 @@ pub async fn run_system_task_now_handler(
         frequency_seconds: model.frequency_seconds,
         enabled: model.enabled == 1,
     };
-    let res = run_task_once(app, state, task).await;
+    let res = run_task_once(emitter, state, task).await;
     let finished_at = chrono::Utc::now().to_rfc3339();
     Ok(RunTaskNowResult {
         status: res.status.to_string(),
@@ -132,19 +135,14 @@ pub async fn get_task_history_handler(
     let limit = limit.unwrap_or(50).min(200); // Max 200 records
     let offset = offset.unwrap_or(0);
 
-    let mut query = TaskRunsEntity::find()
-        .order_by_desc(TaskRunsColumn::StartedAt);
+    let mut query = TaskRunsEntity::find().order_by_desc(TaskRunsColumn::StartedAt);
 
     // Filter by task_id if provided
     if let Some(tid) = task_id {
         query = query.filter(TaskRunsColumn::TaskId.eq(tid));
     }
 
-    let runs = query
-        .limit(limit)
-        .offset(offset)
-        .all(&state.db)
-        .await?;
+    let runs = query.limit(limit).offset(offset).all(&state.db).await?;
 
     Ok(runs.into_iter().map(task_run_to_dto).collect())
 }
