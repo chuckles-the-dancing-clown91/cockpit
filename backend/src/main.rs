@@ -10,10 +10,10 @@ mod util;
 mod connectors;
 
 use sea_orm::DatabaseConnection;
-use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex as StdMutex};
+use std::collections::HashSet;
+use std::sync::Arc;
 use std::time::Duration;
-use tauri::{async_runtime, Manager, WindowEvent};
+use tauri::{async_runtime, Manager};
 use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 use reqwest::Client;
@@ -32,7 +32,7 @@ use writing::commands::{
     update_idea_metadata, update_idea_notes, update_idea_article, archive_idea,
     open_article_modal, add_highlight,
     list_idea_references, add_reference_to_idea, remove_reference, update_reference_notes,
-    get_reference_reader_snapshot,
+    get_reference_reader_snapshot, get_reader_snapshot_for_url,
     // Knowledge Graph commands
     kg_list_references, kg_get_reference, kg_create_reference, kg_update_reference, kg_delete_reference,
     kg_list_writings, kg_get_writing, kg_create_writing, kg_update_writing, kg_publish_writing, kg_delete_writing,
@@ -54,8 +54,10 @@ use research::commands::{
     research_list_accounts, research_upsert_account, research_update_account, research_delete_account,
     research_list_streams, research_upsert_stream, research_delete_stream, research_sync_stream_now,
     research_list_items, research_set_item_status,
-    research_open_cockpit, research_close_cockpit, research_open_detached_cockpit,
-    research_set_cockpit_bounds, resize_research_cockpit,
+    research_open_detached_cockpit,
+    reader_fetch, reader_refresh, reader_reference_get, reader_reference_update,
+    reader_snapshots_list, reader_snapshot_get, reader_clips_list, reader_clip_create,
+    reader_clip_delete, open_live_page_window,
 };
 use system::commands::{get_task_history, list_system_tasks, run_system_task_now, update_system_task};
 use util::commands::{
@@ -70,18 +72,11 @@ use notes::commands::{
 use system::scheduler::start_scheduler;
 
 #[derive(Clone)]
-pub struct CockpitBoundsState {
-    pub window_label: String,
-    pub panes: HashMap<String, (f64, f64, f64, f64)>, // logical px relative to the cockpit window
-}
-
-#[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
     pub running: Arc<Mutex<HashSet<i64>>>,
     pub config: Arc<core::config::AppConfig>,
     pub http_client: Client,
-    pub cockpit_bounds: Arc<StdMutex<Option<CockpitBoundsState>>>,
 }
 
 // ========== Main Application Setup ==========
@@ -165,22 +160,8 @@ fn main() {
                 running: Arc::new(Mutex::new(HashSet::new())),
                 config: config_arc.clone(),
                 http_client,
-                cockpit_bounds: Arc::new(StdMutex::new(None)),
             };
             app.manage(state);
-            if let Some(window) = app.get_window("main") {
-                let handle = app.handle().clone();
-                window.on_window_event(move |event| {
-                    if matches!(
-                        event,
-                        WindowEvent::Resized(_)
-                            | WindowEvent::ScaleFactorChanged { .. }
-                            | WindowEvent::Moved(_)
-                    ) {
-                        let _ = resize_research_cockpit(&handle);
-                    }
-                });
-            }
             let handle = app.handle().clone();
             async_runtime::spawn(async move {
                 if let Err(err) = start_scheduler(handle.clone()).await {
@@ -251,10 +232,17 @@ fn main() {
             research_sync_stream_now,
             research_list_items,
             research_set_item_status,
-            research_open_cockpit,
-            research_close_cockpit,
             research_open_detached_cockpit,
-            research_set_cockpit_bounds,
+            reader_fetch,
+            reader_refresh,
+            reader_reference_get,
+            reader_reference_update,
+            reader_snapshots_list,
+            reader_snapshot_get,
+            reader_clips_list,
+            reader_clip_create,
+            reader_clip_delete,
+            open_live_page_window,
             list_ideas,
             get_idea,
             create_idea,
@@ -270,6 +258,7 @@ fn main() {
             remove_reference,
             update_reference_notes,
             get_reference_reader_snapshot,
+            get_reader_snapshot_for_url,
             // Knowledge Graph - Reference Items
             kg_list_references,
             kg_get_reference,

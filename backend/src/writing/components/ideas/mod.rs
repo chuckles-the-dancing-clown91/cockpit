@@ -15,7 +15,7 @@ pub use types::{
     CreateIdeaForArticleInput, CreateIdeaInput, IdeaDto, UpdateIdeaArticleInput,
     UpdateIdeaMetadataInput, UpdateIdeaNotesInput,
     IdeaReferenceDto, AddReferenceInput, UpdateReferenceNotesInput,
-    ReferenceReaderSnapshotDto,
+    ReferenceReaderSnapshotDto, ReaderSnapshotInput,
 };
 
 // Re-export handlers for Tauri commands
@@ -32,5 +32,5 @@ pub use references::{
 };
 
 pub use reader::{
-    get_reference_reader_snapshot_handler,
+    get_reference_reader_snapshot_handler, get_reader_snapshot_for_url_handler,
 };

@@ -1,5 +1,5 @@
-import { ResearchCockpitPanel } from '@/features/research';
+import { ReaderCockpitPage } from '@/features/research';
 
 export function ResearchCockpitView() {
-  return <ResearchCockpitPanel />;
+  return <ReaderCockpitPage />;
 }

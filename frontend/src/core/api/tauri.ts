@@ -7,6 +7,10 @@ import type {
   NewsSourceDto,
   Reference,
   ReferenceReaderSnapshot,
+  ReaderClip,
+  ReaderReference,
+  ReaderResult,
+  ReaderSnapshot,
 } from '@/shared/types';
 import { priorityFromNumber } from '@/shared/types';
 
@@ -110,6 +114,13 @@ export async function getReferenceReaderSnapshot(referenceId: number): Promise<R
   return tauriInvoke('get_reference_reader_snapshot', { referenceId });
 }
 
+export async function getReaderSnapshotForUrl(input: {
+  url: string;
+  title?: string;
+}): Promise<ReferenceReaderSnapshot> {
+  return tauriInvoke('get_reader_snapshot_for_url', { input });
+}
+
 // ========== Research/News Commands ==========
 
 export async function listNewsArticles(params?: {
@@ -211,56 +222,6 @@ export async function syncAllFeedSources(): Promise<unknown> {
   return tauriInvoke('sync_all_feed_sources');
 }
 
-export type ResearchCockpitPane = 'references' | 'notes';
-
-export function resolveResearchCockpitLabel(pane: ResearchCockpitPane): string {
-  return pane === 'references' ? 'research_cockpit_left' : 'research_cockpit_right';
-}
-
-export async function researchOpenCockpit(input: {
-  pane: ResearchCockpitPane;
-  url: string;
-  title?: string;
-  referenceId?: number;
-  ideaId?: number;
-  writingId?: number;
-  windowLabel?: string;
-  webviewLabel?: string;
-}): Promise<void> {
-  const payload: Record<string, unknown> = { url: input.url };
-  if (input.title !== undefined) payload.title = input.title;
-  if (input.referenceId !== undefined) payload.referenceId = input.referenceId;
-  if (input.ideaId !== undefined) payload.ideaId = input.ideaId;
-  if (input.writingId !== undefined) payload.writingId = input.writingId;
-  if (input.windowLabel !== undefined) payload.windowLabel = input.windowLabel;
-  payload.webviewLabel = input.webviewLabel ?? resolveResearchCockpitLabel(input.pane);
-  return tauriInvoke('research_open_cockpit', { input: payload });
-}
-
-export async function researchCloseCockpit(): Promise<void> {
-  return tauriInvoke('research_close_cockpit');
-}
-
-export async function researchSetCockpitBounds(input: {
-  pane: ResearchCockpitPane;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  windowLabel?: string;
-  webviewLabel?: string;
-}): Promise<void> {
-  const payload: Record<string, unknown> = {
-    x: input.x,
-    y: input.y,
-    width: input.width,
-    height: input.height,
-  };
-  if (input.windowLabel !== undefined) payload.windowLabel = input.windowLabel;
-  payload.webviewLabel = input.webviewLabel ?? resolveResearchCockpitLabel(input.pane);
-  return tauriInvoke('research_set_cockpit_bounds', { input: payload });
-}
-
 export async function researchOpenDetachedCockpit(input: {
   url: string;
   title?: string;
@@ -274,6 +235,60 @@ export async function researchOpenDetachedCockpit(input: {
   if (input.ideaId !== undefined) payload.ideaId = input.ideaId;
   if (input.writingId !== undefined) payload.writingId = input.writingId;
   return tauriInvoke('research_open_detached_cockpit', { input: payload });
+}
+
+export async function readerFetch(input: {
+  url: string;
+  title?: string;
+  referenceId?: number;
+  ideaId?: number;
+  writingId?: number;
+}): Promise<ReaderResult> {
+  return tauriInvoke('reader_fetch', { input });
+}
+
+export async function readerRefresh(referenceId: number): Promise<ReaderResult> {
+  return tauriInvoke('reader_refresh', { input: { referenceId } });
+}
+
+export async function readerReferenceGet(referenceId: number): Promise<ReaderReference> {
+  return tauriInvoke('reader_reference_get', { referenceId });
+}
+
+export async function readerReferenceUpdate(referenceId: number, input: {
+  title?: string;
+  tags?: string[];
+}): Promise<ReaderReference> {
+  return tauriInvoke('reader_reference_update', { referenceId, input });
+}
+
+export async function readerSnapshotsList(referenceId: number): Promise<ReaderSnapshot[]> {
+  return tauriInvoke('reader_snapshots_list', { referenceId });
+}
+
+export async function readerSnapshotGet(snapshotId: number): Promise<ReaderSnapshot> {
+  return tauriInvoke('reader_snapshot_get', { snapshotId });
+}
+
+export async function readerClipsList(referenceId: number): Promise<ReaderClip[]> {
+  return tauriInvoke('reader_clips_list', { referenceId });
+}
+
+export async function readerClipCreate(input: {
+  referenceId: number;
+  snapshotId: number;
+  quote: string;
+  anchor?: string;
+}): Promise<ReaderClip> {
+  return tauriInvoke('reader_clip_create', { input });
+}
+
+export async function readerClipDelete(clipId: number): Promise<void> {
+  return tauriInvoke('reader_clip_delete', { clipId });
+}
+
+export async function openLivePageWindow(url: string): Promise<void> {
+  return tauriInvoke('open_live_page_window', { url });
 }
 
 // Backwards-compatible alias

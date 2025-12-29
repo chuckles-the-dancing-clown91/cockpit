@@ -76,6 +76,51 @@ export interface ReferenceReaderSnapshot {
   contentText: string;
 }
 
+export interface ReaderResult {
+  referenceId: number;
+  snapshotId: number;
+  finalUrl: string;
+  title: string;
+  byline?: string | null;
+  excerpt?: string | null;
+  contentMd: string;
+  wordCount?: number | null;
+  readingTimeMinutes?: number | null;
+}
+
+export interface ReaderReference {
+  id: number;
+  url: string;
+  title: string;
+  byline?: string | null;
+  excerpt?: string | null;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReaderSnapshot {
+  id: number;
+  referenceId: number;
+  fetchedAt: string;
+  title?: string | null;
+  byline?: string | null;
+  excerpt?: string | null;
+  finalUrl?: string | null;
+  contentMd?: string | null;
+  wordCount?: number | null;
+  readingTimeMinutes?: number | null;
+}
+
+export interface ReaderClip {
+  id: number;
+  referenceId: number;
+  snapshotId: number;
+  quote: string;
+  anchor?: string | null;
+  createdAt: string;
+}
+
 // News Article interface
 export interface NewsArticle {
   id: number;
@@ -379,7 +424,7 @@ export interface WebviewActionResult {
 }
 
 // Note types
-export type NoteEntityType = 'idea' | 'reference' | 'writing';
+export type NoteEntityType = 'idea' | 'reference' | 'reader_reference' | 'writing';
 export type NoteType = 'main' | 'highlight' | 'annotation' | 'todo' | 'draft_note';
 
 export interface Note {

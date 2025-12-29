@@ -15,6 +15,8 @@ pub enum EntityType {
     Idea,
     #[sea_orm(string_value = "reference")]
     Reference,
+    #[sea_orm(string_value = "reader_reference")]
+    ReaderReference,
     #[sea_orm(string_value = "writing")]
     Writing,
 }
@@ -24,6 +26,7 @@ impl std::fmt::Display for EntityType {
         match self {
             EntityType::Idea => write!(f, "idea"),
             EntityType::Reference => write!(f, "reference"),
+            EntityType::ReaderReference => write!(f, "reader_reference"),
             EntityType::Writing => write!(f, "writing"),
         }
     }

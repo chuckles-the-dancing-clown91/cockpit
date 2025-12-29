@@ -9,6 +9,7 @@ mod m006_writing_knowledge_graph;
 mod m007_notes_unique_main;
 mod m008_fix_writing_idea_links;
 mod m009_research_connectors;
+mod m010_reader_cockpit;
 
 pub struct Migrator;
 
@@ -25,6 +26,7 @@ impl MigratorTrait for Migrator {
             Box::new(m007_notes_unique_main::Migration),
             Box::new(m008_fix_writing_idea_links::Migration),
             Box::new(m009_research_connectors::Migration),
+            Box::new(m010_reader_cockpit::Migration),
         ]
     }
 }

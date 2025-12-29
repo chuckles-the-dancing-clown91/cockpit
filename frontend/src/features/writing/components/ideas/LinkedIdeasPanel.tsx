@@ -35,6 +35,39 @@ function stripHtml(html: string): string {
   return (tmp.textContent || tmp.innerText || '').trim();
 }
 
+function ReferenceNotesAccordion({ notes }: { notes: string }) {
+  return (
+    <Accordion.Root type="single" collapsible>
+      <Accordion.Item value="notes">
+        <Accordion.Trigger asChild>
+          <Button
+            variant="ghost"
+            size="1"
+            style={{
+              width: '100%',
+              justifyContent: 'space-between',
+              padding: '4px 8px',
+              marginTop: '4px',
+            }}
+          >
+            <Flex align="center" gap="2">
+              <Text size="1" color="gray">
+                Show notes
+              </Text>
+            </Flex>
+            <ChevronDown size={14} style={{ transition: 'transform 150ms' }} />
+          </Button>
+        </Accordion.Trigger>
+        <Accordion.Content style={{ padding: '8px' }}>
+          <Text size="1" color="gray" style={{ whiteSpace: 'pre-wrap' }}>
+            {notes}
+          </Text>
+        </Accordion.Content>
+      </Accordion.Item>
+    </Accordion.Root>
+  );
+}
+
 /**
  * Component to show notes and references for a single linked idea
  */
@@ -114,7 +147,7 @@ function IdeaDetailsAccordion({ idea }: { idea: Idea }) {
                   </Text>
                 </Flex>
                 <Flex direction="column" gap="2">
-                  {references.slice(0, 3).map((ref) => (
+                  {references.map((ref) => (
                     <Box key={ref.id}>
                       <Text 
                         size="1" 
@@ -128,32 +161,10 @@ function IdeaDetailsAccordion({ idea }: { idea: Idea }) {
                         • {ref.title || ref.url}
                       </Text>
                       {ref.notesMarkdown && ref.notesMarkdown.trim().length > 0 && (
-                        <Text 
-                          size="1" 
-                          color="gray"
-                          style={{ 
-                            marginLeft: '12px',
-                            lineHeight: 1.3,
-                            fontStyle: 'italic',
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                          }}
-                        >
-                          {ref.notesMarkdown.length > 100 
-                            ? `${ref.notesMarkdown.substring(0, 100)}...`
-                            : ref.notesMarkdown
-                          }
-                        </Text>
+                        <ReferenceNotesAccordion notes={ref.notesMarkdown} />
                       )}
                     </Box>
                   ))}
-                  {references.length > 3 && (
-                    <Text size="1" color="gray">
-                      +{references.length - 3} more
-                    </Text>
-                  )}
                 </Flex>
               </Box>
             )}

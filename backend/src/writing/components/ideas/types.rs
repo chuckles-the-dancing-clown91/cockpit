@@ -285,6 +285,14 @@ pub struct UpdateReferenceNotesInput {
     pub notes_markdown: Option<String>,
 }
 
+/// Input for fetching a reader snapshot by URL
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReaderSnapshotInput {
+    pub url: String,
+    pub title: Option<String>,
+}
+
 /// DTO for a read-only reader snapshot of a reference
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -9,9 +9,8 @@ pub mod dto;
 pub mod entities;
 pub mod helpers;
 
-pub const RESEARCH_COCKPIT_LEFT_WEBVIEW_LABEL: &str = "research_cockpit_left";
-pub const RESEARCH_COCKPIT_RIGHT_WEBVIEW_LABEL: &str = "research_cockpit_right";
 pub const RESEARCH_COCKPIT_WINDOW_LABEL: &str = "detached_cockpit";
+pub const RESEARCH_LIVE_PAGE_WINDOW_LABEL: &str = "research_live_page";
 
 // Re-export commonly used types
 // Re-export components when needed

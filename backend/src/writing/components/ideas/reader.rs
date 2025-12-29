@@ -1,18 +1,23 @@
 //! Reader snapshot helpers for idea references
 
 use crate::core::components::errors::{AppError, AppResult};
+use crate::core::components::reader::{extract_reader_content, html_to_text, sanitize_html};
 use crate::AppState;
-use ammonia::Builder;
-use reqwest::Url;
-use regex::Regex;
-use scraper::{Html, Selector};
-use sea_orm::EntityTrait;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+use std::collections::HashSet;
 
+use super::entities::idea_references::Column as ReferenceColumn;
 use super::entities::idea_references::Entity as References;
-use super::types::ReferenceReaderSnapshotDto;
+use super::types::{ReaderSnapshotInput, ReferenceReaderSnapshotDto};
 use crate::research::components::feed::entities::articles;
 
-const MAX_HTML_BYTES: usize = 15 * 1024 * 1024;
+struct SnapshotParts {
+    title: String,
+    url: String,
+    excerpt: Option<String>,
+    content_html: String,
+    content_text: String,
+}
 
 pub async fn get_reference_reader_snapshot_handler(
     reference_id: i64,
@@ -48,18 +53,16 @@ pub async fn get_reference_reader_snapshot_handler(
     }
 
     if content_html.is_empty() {
-        let normalized_url = normalize_reference_url(&url)?;
-        url = normalized_url.clone();
-        let raw_html = fetch_html(state, &normalized_url).await?;
+        let snapshot = snapshot_from_url(state, &url, None).await?;
         if title.is_empty() {
-            title = extract_title(&raw_html).unwrap_or_else(|| "Untitled reference".to_string());
+            title = snapshot.title;
         }
         if excerpt.is_none() {
-            excerpt = Some(extract_excerpt(&raw_html));
+            excerpt = snapshot.excerpt;
         }
-        let main_html = extract_main_html(&raw_html).unwrap_or(raw_html);
-        content_html = sanitize_html(&main_html);
-        content_text = html_to_text(&content_html);
+        url = snapshot.url;
+        content_html = snapshot.content_html;
+        content_text = snapshot.content_text;
     }
 
     Ok(ReferenceReaderSnapshotDto {
@@ -72,108 +75,69 @@ pub async fn get_reference_reader_snapshot_handler(
     })
 }
 
-async fn fetch_html(state: &AppState, url: &str) -> AppResult<String> {
-    let response = state
-        .http_client
-        .get(url)
-        .header(
-            reqwest::header::USER_AGENT,
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) CockpitReader/1.0",
-        )
-        .send()
-        .await?;
-
-    if !response.status().is_success() {
-        return Err(AppError::other(format!(
-            "Reader fetch failed with status {}",
-            response.status()
-        )));
-    }
-
-    if let Some(len) = response.content_length() {
-        if len as usize > MAX_HTML_BYTES {
-            return Err(AppError::other(format!(
-                "Reader fetch exceeded max size ({} bytes)",
-                len
-            )));
-        }
-    }
-
-    let bytes = response.bytes().await?;
-    if bytes.len() > MAX_HTML_BYTES {
-        return Err(AppError::other(format!(
-            "Reader fetch exceeded max size ({} bytes)",
-            bytes.len()
-        )));
-    }
-
-    Ok(String::from_utf8_lossy(&bytes).to_string())
+pub async fn get_reader_snapshot_for_url_handler(
+    input: ReaderSnapshotInput,
+    state: &AppState,
+) -> AppResult<ReferenceReaderSnapshotDto> {
+    let snapshot = snapshot_from_url(state, &input.url, input.title).await?;
+    let reference_id = find_reference_id_for_url(state, &snapshot.url, &input.url).await?;
+    Ok(ReferenceReaderSnapshotDto {
+        reference_id: reference_id.unwrap_or(0),
+        url: snapshot.url,
+        title: snapshot.title,
+        excerpt: snapshot.excerpt,
+        content_html: snapshot.content_html,
+        content_text: snapshot.content_text,
+    })
 }
 
-fn normalize_reference_url(raw: &str) -> AppResult<String> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return Err(AppError::other("Reference URL is required for reader mode"));
+async fn snapshot_from_url(
+    state: &AppState,
+    url: &str,
+    title_override: Option<String>,
+) -> AppResult<SnapshotParts> {
+    let extracted = extract_reader_content(&state.http_client, url, title_override).await?;
+    Ok(SnapshotParts {
+        title: extracted.title,
+        url: extracted.final_url,
+        excerpt: extracted.excerpt,
+        content_html: extracted.content_html,
+        content_text: extracted.content_text,
+    })
+}
+
+async fn find_reference_id_for_url(
+    state: &AppState,
+    normalized_url: &str,
+    raw_url: &str,
+) -> AppResult<Option<i64>> {
+    let mut candidates = HashSet::new();
+    let trimmed = raw_url.trim();
+    if !trimmed.is_empty() {
+        candidates.insert(trimmed.to_string());
     }
-    let normalized = if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
-        trimmed.to_string()
-    } else if trimmed.starts_with("//") {
-        format!("https:{}", trimmed)
-    } else {
-        format!("https://{}", trimmed)
-    };
-    Url::parse(&normalized)
-        .map(|url| url.to_string())
-        .map_err(|e| AppError::other(format!("Reference URL is invalid: {}", e)))
-}
-
-fn extract_title(html: &str) -> Option<String> {
-    let document = Html::parse_document(html);
-    let selector = Selector::parse("title").ok()?;
-    document
-        .select(&selector)
-        .next()
-        .map(|node| node.text().collect::<String>().trim().to_string())
-        .filter(|title| !title.is_empty())
-}
-
-fn extract_main_html(html: &str) -> Option<String> {
-    let document = Html::parse_document(html);
-    let selectors = ["article", "main", "body"];
-    for selector_str in selectors {
-        if let Ok(selector) = Selector::parse(selector_str) {
-            if let Some(node) = document.select(&selector).next() {
-                let content = node.inner_html();
-                if !content.trim().is_empty() {
-                    return Some(content);
-                }
+    if !normalized_url.is_empty() {
+        candidates.insert(normalized_url.to_string());
+        if let Some(stripped) = normalized_url
+            .strip_prefix("https://")
+            .or_else(|| normalized_url.strip_prefix("http://"))
+        {
+            if !stripped.is_empty() {
+                candidates.insert(stripped.to_string());
             }
         }
     }
-    None
-}
 
-fn sanitize_html(html: &str) -> String {
-    Builder::default().clean(html).to_string()
-}
-
-fn html_to_text(html: &str) -> String {
-  let with_breaks = html
-    .replace("</p>", "\n\n")
-    .replace("<br>", "\n")
-    .replace("<br/>", "\n")
-    .replace("<br />", "\n");
-  let re_tags = Regex::new(r"<[^>]+>").unwrap_or_else(|_| Regex::new(r"<.*?>").unwrap());
-  let stripped = re_tags.replace_all(&with_breaks, " ");
-  let re_space = Regex::new(r"\s+").unwrap_or_else(|_| Regex::new(r"\s+").unwrap());
-  re_space.replace_all(stripped.trim(), " ").to_string()
-}
-
-fn extract_excerpt(html: &str) -> String {
-    let text = html_to_text(html);
-    if text.len() <= 220 {
-        text
-    } else {
-        format!("{}...", &text[..220])
+    if candidates.is_empty() {
+        return Ok(None);
     }
+
+    let candidate_list: Vec<String> = candidates.into_iter().collect();
+    let found = References::find()
+        .filter(ReferenceColumn::Url.is_in(candidate_list))
+        .order_by_desc(ReferenceColumn::UpdatedAt)
+        .one(&state.db)
+        .await?;
+
+    Ok(found.map(|reference| reference.id))
 }

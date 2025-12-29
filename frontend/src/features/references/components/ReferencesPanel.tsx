@@ -1,9 +1,9 @@
 import { Flex, Text, Button, Badge, Card, TextField, TextArea } from '@radix-ui/themes';
-import { Plus, ExternalLink, Trash2, FileText, BookOpen } from 'lucide-react';
+import { Plus, ExternalLink, Trash2, FileText, Book } from 'lucide-react';
 import { useState } from 'react';
 import { useIdeaReferences, useAddReference, useRemoveReference } from '../hooks/useReferences';
 import { NoteHoverPreview, ReferenceNotesDialog } from '@/features/notes';
-import { ReferenceReaderDialog } from './ReferenceReaderDialog';
+import { ReaderCockpitDialog } from '@/features/research/readerCockpit';
 
 interface ReferencesPanelProps {
   ideaId: number;
@@ -30,10 +30,8 @@ export function ReferencesPanel({ ideaId }: ReferencesPanelProps) {
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
   const [notesReferenceId, setNotesReferenceId] = useState<number | null>(null);
   const [notesReferenceTitle, setNotesReferenceTitle] = useState('');
-  const [readerDialogOpen, setReaderDialogOpen] = useState(false);
+  const [readerCockpitOpen, setReaderCockpitOpen] = useState(false);
   const [readerReferenceId, setReaderReferenceId] = useState<number | null>(null);
-  const [readerReferenceTitle, setReaderReferenceTitle] = useState('');
-  const [readerReferenceUrl, setReaderReferenceUrl] = useState<string | null>(null);
   
   const handleAddReference = async () => {
     if (!newRefUrl.trim()) return;
@@ -174,16 +172,14 @@ export function ReferencesPanel({ ideaId }: ReferencesPanelProps) {
                   <Button
                     variant="ghost"
                     size="1"
-                    color="blue"
+                    color="green"
                     onClick={() => {
                       setReaderReferenceId(ref.id);
-                      setReaderReferenceTitle(ref.title || 'Reference');
-                      setReaderReferenceUrl(ref.url ?? null);
-                      setReaderDialogOpen(true);
+                      setReaderCockpitOpen(true);
                     }}
-                    title="Open reader view"
+                    title="Open reader cockpit"
                   >
-                    <BookOpen className="w-4 h-4" />
+                    <Book className="w-4 h-4" />
                   </Button>
                   <Button
                     variant="ghost"
@@ -212,17 +208,13 @@ export function ReferencesPanel({ ideaId }: ReferencesPanelProps) {
         />
       )}
       {readerReferenceId && (
-        <ReferenceReaderDialog
-          open={readerDialogOpen}
+        <ReaderCockpitDialog
+          open={readerCockpitOpen}
           onClose={() => {
-            setReaderDialogOpen(false);
+            setReaderCockpitOpen(false);
             setReaderReferenceId(null);
-            setReaderReferenceTitle('');
-            setReaderReferenceUrl(null);
           }}
           referenceId={readerReferenceId}
-          referenceTitle={readerReferenceTitle}
-          referenceUrl={readerReferenceUrl}
         />
       )}
     </Flex>

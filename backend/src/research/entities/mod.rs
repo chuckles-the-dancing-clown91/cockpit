@@ -120,3 +120,138 @@ pub mod items {
 
     impl ActiveModelBehavior for ActiveModel {}
 }
+
+pub mod reader_references {
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "reader_references")]
+    pub struct Model {
+        #[sea_orm(primary_key)]
+        pub id: i64,
+        pub url: String,
+        pub title: String,
+        pub byline: Option<String>,
+        pub excerpt: Option<String>,
+        pub tags_json: Option<String>,
+        pub created_at: DateTime,
+        pub updated_at: DateTime,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        #[sea_orm(has_many = "super::reader_snapshots::Entity")]
+        Snapshots,
+        #[sea_orm(has_many = "super::reader_clips::Entity")]
+        Clips,
+    }
+
+    impl Related<super::reader_snapshots::Entity> for Entity {
+        fn to() -> RelationDef {
+            Relation::Snapshots.def()
+        }
+    }
+
+    impl Related<super::reader_clips::Entity> for Entity {
+        fn to() -> RelationDef {
+            Relation::Clips.def()
+        }
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod reader_snapshots {
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "reader_snapshots")]
+    pub struct Model {
+        #[sea_orm(primary_key)]
+        pub id: i64,
+        pub reference_id: i64,
+        pub fetched_at: DateTime,
+        pub title: Option<String>,
+        pub byline: Option<String>,
+        pub excerpt: Option<String>,
+        pub final_url: Option<String>,
+        pub content_md: String,
+        pub word_count: Option<i32>,
+        pub reading_time_minutes: Option<i32>,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        #[sea_orm(
+            belongs_to = "super::reader_references::Entity",
+            from = "Column::ReferenceId",
+            to = "super::reader_references::Column::Id",
+            on_delete = "Cascade"
+        )]
+        Reference,
+        #[sea_orm(has_many = "super::reader_clips::Entity")]
+        Clips,
+    }
+
+    impl Related<super::reader_references::Entity> for Entity {
+        fn to() -> RelationDef {
+            Relation::Reference.def()
+        }
+    }
+
+    impl Related<super::reader_clips::Entity> for Entity {
+        fn to() -> RelationDef {
+            Relation::Clips.def()
+        }
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod reader_clips {
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "reader_clips")]
+    pub struct Model {
+        #[sea_orm(primary_key)]
+        pub id: i64,
+        pub reference_id: i64,
+        pub snapshot_id: i64,
+        pub quote: String,
+        pub anchor: Option<String>,
+        pub created_at: DateTime,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        #[sea_orm(
+            belongs_to = "super::reader_references::Entity",
+            from = "Column::ReferenceId",
+            to = "super::reader_references::Column::Id",
+            on_delete = "Cascade"
+        )]
+        Reference,
+        #[sea_orm(
+            belongs_to = "super::reader_snapshots::Entity",
+            from = "Column::SnapshotId",
+            to = "super::reader_snapshots::Column::Id",
+            on_delete = "Cascade"
+        )]
+        Snapshot,
+    }
+
+    impl Related<super::reader_references::Entity> for Entity {
+        fn to() -> RelationDef {
+            Relation::Reference.def()
+        }
+    }
+
+    impl Related<super::reader_snapshots::Entity> for Entity {
+        fn to() -> RelationDef {
+            Relation::Snapshot.def()
+        }
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+}

@@ -191,10 +191,14 @@ fn parse_entity_type(entity_type: &str) -> AppResult<notes::EntityType> {
     match entity_type {
         "idea" => Ok(EntityType::Idea),
         "reference" => Ok(EntityType::Reference),
+        "reader_reference" => Ok(EntityType::ReaderReference),
         "writing" => Ok(EntityType::Writing),
         _ => Err(AppError::validation(
             "entity_type",
-            format!("Invalid value '{}'. Must be one of: idea, reference, writing", entity_type),
+            format!(
+                "Invalid value '{}'. Must be one of: idea, reference, reader_reference, writing",
+                entity_type
+            ),
         )),
     }
 }

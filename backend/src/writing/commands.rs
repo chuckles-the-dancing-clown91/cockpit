@@ -8,11 +8,11 @@ use super::components::ideas::{
     update_idea_notes_handler, update_idea_article_handler, archive_idea_handler,
     list_idea_references_handler, add_reference_to_idea_handler,
     remove_reference_handler, update_reference_notes_handler,
-    get_reference_reader_snapshot_handler,
+    get_reference_reader_snapshot_handler, get_reader_snapshot_for_url_handler,
     IdeaDto, CreateIdeaInput, CreateIdeaForArticleInput,
     UpdateIdeaMetadataInput, UpdateIdeaNotesInput, UpdateIdeaArticleInput,
     IdeaReferenceDto, AddReferenceInput, UpdateReferenceNotesInput,
-    ReferenceReaderSnapshotDto,
+    ReaderSnapshotInput, ReferenceReaderSnapshotDto,
 };
 
 /// List writing ideas with filtering and pagination
@@ -187,6 +187,17 @@ pub async fn get_reference_reader_snapshot(
     state: State<'_, AppState>,
 ) -> Result<ReferenceReaderSnapshotDto, String> {
     get_reference_reader_snapshot_handler(reference_id, &state)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Fetch a read-only reader snapshot for a raw URL
+#[tauri::command]
+pub async fn get_reader_snapshot_for_url(
+    input: ReaderSnapshotInput,
+    state: State<'_, AppState>,
+) -> Result<ReferenceReaderSnapshotDto, String> {
+    get_reader_snapshot_for_url_handler(input, &state)
         .await
         .map_err(|e| e.to_string())
 }

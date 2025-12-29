@@ -47,6 +47,14 @@ export const queryKeys = {
     reader: (id: number) => [...queryKeys.references._def, 'reader', id] as const,
   },
 
+  reader: {
+    url: (url: string) => ['reader', 'url', url] as const,
+    reference: (id: number) => ['reader', 'reference', id] as const,
+    snapshots: (referenceId: number) => ['reader', 'snapshots', referenceId] as const,
+    snapshot: (snapshotId: number) => ['reader', 'snapshot', snapshotId] as const,
+    clips: (referenceId: number) => ['reader', 'clips', referenceId] as const,
+  },
+
   // ========== Research Domain ==========
 
   articles: {
