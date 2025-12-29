@@ -66,6 +66,23 @@ cargo tauri dev
 "beforeDevCommand": "npm --prefix ../frontend run dev"
 ```
 
+### Flutter + headless bridge (mobile/desktop)
+
+- The backend ships an HTTP command bridge at `http://localhost:1420/api/command`
+  (set `COCKPIT_HTTP_PORT` to change the port). Commands and payloads mirror the
+  existing Tauri invoke names with camelCase keys.
+- Dart clients live in `flutter_app/lib/api/` and expose a `CockpitApi` facade
+  with domain-focused services (`ideas`, `writings`, `notes`, `research`).
+- Configure endpoints and native bindings via `--dart-define` flags:
+  - `COCKPIT_ENV` (`dev`/`prod`)
+  - `COCKPIT_API_URL` (default `http://localhost:1420`)
+  - `COCKPIT_COMMAND_PATH` (default `/api/command`)
+  - `COCKPIT_USE_NATIVE=true` to prefer MethodChannel/FFI when bundled natively,
+    falling back to HTTP otherwise
+  - `COCKPIT_NATIVE_CHANNEL` (default `cockpit.backend/commands`)
+  - `COCKPIT_GRPC_URL` (optional, reserved for future transports)
+- Example: `flutter run --dart-define=COCKPIT_ENV=dev --dart-define=COCKPIT_API_URL=http://localhost:1420 --dart-define=COCKPIT_COMMAND_PATH=/api/command`
+
 ## Database + migrations
 
 - Cockpit uses **SQLite**.

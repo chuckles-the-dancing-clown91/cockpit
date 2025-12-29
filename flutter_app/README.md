@@ -15,7 +15,13 @@ Prototype Flutter client that mirrors Cockpit’s desktop domains (ideas, writin
 
 ## API layer
 - `core/api/cockpit_api_client.dart` defines a `CockpitApiClient` interface with a `TauriCommandApiClient` implementation that calls the Rust commands via `MethodChannel`
-- `MockCockpitApiClient` keeps the UI working until the Flutter ↔︎ Rust bridge is wired
+- `lib/api/` adds a transport-agnostic `CockpitApi` wrapper for the new Rust HTTP bridge (`/api/command`) with domain services (`ideas`, `writings`, `notes`, `research`)
+- Configure endpoints with `--dart-define` flags (defaults shown):
+  - `COCKPIT_API_URL=http://localhost:1420`
+  - `COCKPIT_COMMAND_PATH=/api/command`
+  - `COCKPIT_USE_NATIVE=false` (set to `true` to prefer MethodChannel/FFI when bundled)
+  - `COCKPIT_NATIVE_CHANNEL=cockpit.backend/commands`
+- Example: `flutter run --dart-define=COCKPIT_API_URL=http://localhost:1420 --dart-define=COCKPIT_COMMAND_PATH=/api/command --dart-define=COCKPIT_ENV=dev`
 
 ## Getting started
 1. Install Flutter (3.5+ recommended).
