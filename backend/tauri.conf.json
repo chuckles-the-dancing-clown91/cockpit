@@ -5,9 +5,9 @@
   "identifier": "com.cockpitapp.cockpit",
   "build": {
     "beforeDevCommand": "npm --prefix ./frontend run dev",
-    "beforeBuildCommand": "npm --prefix ./frontend run build",
+    "beforeBuildCommand": "./build-frontend.sh",
     "devUrl": "http://localhost:5173",
-    "frontendDist": "../frontend/dist"
+    "frontendDist": "./target/flutter-dist"
   },
   "bundle": {
     "active": true,
