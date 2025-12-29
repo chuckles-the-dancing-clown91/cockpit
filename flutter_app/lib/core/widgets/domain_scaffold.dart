@@ -6,6 +6,7 @@ class DomainScaffold extends StatelessWidget {
     required this.child,
     this.subtitle,
     this.actions,
+    this.toolbar,
     super.key,
   });
 
@@ -13,6 +14,7 @@ class DomainScaffold extends StatelessWidget {
   final String? subtitle;
   final Widget child;
   final List<Widget>? actions;
+  final Widget? toolbar;
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +58,10 @@ class DomainScaffold extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
+              if (toolbar != null) ...[
+                toolbar!,
+                const SizedBox(height: 12),
+              ],
               Expanded(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),

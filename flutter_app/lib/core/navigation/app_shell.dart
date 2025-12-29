@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../theme/theme_controller.dart';
+
 class AppNavigationScaffold extends ConsumerWidget {
   const AppNavigationScaffold({
     required this.navigationShell,
@@ -43,6 +45,9 @@ class AppNavigationScaffold extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
+    final platformBrightness = MediaQuery.of(context).platformBrightness;
+    final themeMode = ref.watch(themeModeProvider);
+    final themeController = ref.read(themeModeProvider.notifier);
     final isWide = MediaQuery.of(context).size.width >= 1100;
     final selectedIndex = navigationShell.currentIndex;
 
@@ -75,6 +80,46 @@ class AppNavigationScaffold extends ConsumerWidget {
       ],
     );
 
+    final appBar = AppBar(
+      title: const Text('Cockpit'),
+      actions: [
+        IconButton(
+          tooltip: 'Toggle light/dark',
+          onPressed: themeController.toggleLightDark,
+          icon: Icon(themeController.iconFor(platformBrightness)),
+        ),
+        PopupMenuButton<ThemeMode>(
+          tooltip: 'Theme mode',
+          initialValue: themeMode,
+          position: PopupMenuPosition.under,
+          onSelected: themeController.setThemeMode,
+          itemBuilder: (context) => [
+            _buildThemeModeMenuItem(
+              context,
+              value: ThemeMode.system,
+              label: 'System default',
+              icon: Icons.brightness_auto_rounded,
+              isSelected: themeMode == ThemeMode.system,
+            ),
+            _buildThemeModeMenuItem(
+              context,
+              value: ThemeMode.light,
+              label: 'Light',
+              icon: Icons.light_mode_rounded,
+              isSelected: themeMode == ThemeMode.light,
+            ),
+            _buildThemeModeMenuItem(
+              context,
+              value: ThemeMode.dark,
+              label: 'Dark',
+              icon: Icons.dark_mode_rounded,
+              isSelected: themeMode == ThemeMode.dark,
+            ),
+          ],
+        ),
+      ],
+    );
+
     final content = AnimatedSwitcher(
       duration: const Duration(milliseconds: 200),
       switchInCurve: Curves.easeInOut,
@@ -84,7 +129,9 @@ class AppNavigationScaffold extends ConsumerWidget {
 
     if (isWide) {
       return Scaffold(
+        appBar: appBar,
         body: SafeArea(
+          top: false,
           child: Row(
             children: [
               navigationRail,
@@ -97,7 +144,8 @@ class AppNavigationScaffold extends ConsumerWidget {
     }
 
     return Scaffold(
-      body: SafeArea(child: content),
+      appBar: appBar,
+      body: SafeArea(top: false, child: content),
       bottomNavigationBar: navigationBar,
     );
   }
@@ -113,4 +161,25 @@ class _NavigationDestination {
   final String title;
   final IconData icon;
   final String route;
+}
+
+PopupMenuItem<ThemeMode> _buildThemeModeMenuItem(
+  BuildContext context, {
+  required ThemeMode value,
+  required String label,
+  required IconData icon,
+  required bool isSelected,
+}) {
+  final colorScheme = Theme.of(context).colorScheme;
+  return PopupMenuItem<ThemeMode>(
+    value: value,
+    child: Row(
+      children: [
+        Icon(icon, color: colorScheme.onSurfaceVariant),
+        const SizedBox(width: 12),
+        Expanded(child: Text(label)),
+        if (isSelected) Icon(Icons.check, color: colorScheme.primary),
+      ],
+    ),
+  );
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/models.dart';
 import '../../core/widgets/async_value_view.dart';
+import '../../core/widgets/domain_action_bar.dart';
 import '../../core/widgets/domain_scaffold.dart';
 import '../../features/overview/providers.dart';
 
@@ -18,6 +19,12 @@ class NotesScreen extends ConsumerWidget {
     return DomainScaffold(
       title: 'Notes',
       subtitle: 'Workspace-level and per-entity notes to keep research attached.',
+      toolbar: const DomainActionBar(
+        searchHint: 'Search notes by title or entity',
+        primaryLabel: 'New note',
+        secondaryLabel: 'Attach to idea',
+        tertiaryLabel: 'Pin favorite',
+      ),
       child: AsyncValueView<List<NoteSummary>>(
         value: notes,
         emptyLabel: 'No notes yet — append snippets from ideas or research.',

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/models.dart';
 import '../../core/widgets/async_value_view.dart';
+import '../../core/widgets/domain_action_bar.dart';
 import '../../core/widgets/domain_scaffold.dart';
 import '../../features/overview/providers.dart';
 
@@ -17,6 +18,12 @@ class IdeasScreen extends ConsumerWidget {
     return DomainScaffold(
       title: 'Ideas',
       subtitle: 'Capture and prioritize ideas before they graduate into drafts.',
+      toolbar: const DomainActionBar(
+        searchHint: 'Search ideas or filter by priority',
+        primaryLabel: 'New idea',
+        secondaryLabel: 'Attach note',
+        tertiaryLabel: 'Mark as ready',
+      ),
       child: AsyncValueView<List<IdeaSummary>>(
         value: ideas,
         emptyLabel: 'No ideas yet — start with a quick capture.',
