@@ -1,0 +1,27 @@
+# Flutter/Dart tool directories
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.flutter-configuration
+.pub-cache/
+
+# Build outputs
+build/
+
+# Plugin registrants and generated code
+lib/generated_plugin_registrant.dart
+
+# IDE
+.idea/
+.vscode/
+
+# Platform artifacts
+android/.gradle/
+android/local.properties
+ios/Pods/
+ios/.generated/
+macos/Flutter/GeneratedPluginRegistrant.swift
+windows/flutter/generated_plugin_registrant.cc
+linux/flutter/generated_plugin_registrant.cc
+web/.dart_tool/
